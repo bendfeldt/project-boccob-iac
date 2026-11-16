@@ -203,6 +203,36 @@ resource "kubernetes_network_policy_v1" "ingress_controller" {
   }
 }
 
+resource "kubernetes_network_policy_v1" "ingress_hosts" {
+  count = var.allow_ingress_hosts ? 1 : 0
+  metadata {
+    name      = "allow-out-ingress-hosts"
+    namespace = local.ns
+    labels    = local.labels
+  }
+  spec {
+    pod_selector {}
+    policy_types = ["Egress"]
+    egress {
+      to {
+        namespace_selector {
+          match_labels = { "kubernetes.io/metadata.name" = var.ingress_controller.namespace }
+        }
+        pod_selector {
+          match_labels = var.ingress_controller.pod_labels
+        }
+      }
+      dynamic "ports" {
+        for_each = var.ingress_controller_entrypoint_ports
+        content {
+          port     = tostring(ports.value)
+          protocol = "TCP"
+        }
+      }
+    }
+  }
+}
+
 resource "kubernetes_network_policy_v1" "ingress" {
   for_each = { for rule in var.ingress_rules : rule.name => rule }
   metadata {

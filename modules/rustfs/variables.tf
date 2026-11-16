@@ -1,0 +1,103 @@
+variable "namespace" {
+  description = "Namespace (convention: storage; needs secrets_access = true)."
+  type        = string
+}
+
+variable "chart" {
+  description = "Chart coordinates from module.versions.charts[\"rustfs\"]."
+  type = object({
+    repository = string
+    name       = string
+    version    = string
+  })
+}
+
+variable "images" {
+  description = "Images from module.versions.images: rustfs, init (busybox), rc (RustFS CLI for provisioning)."
+  type = map(object({
+    repository = string
+    tag_digest = string
+    ref        = string
+  }))
+}
+
+variable "distributed" {
+  description = "false = single node, single drive (dev). true = distributed erasure-coded cluster (HA)."
+  type        = bool
+  default     = false
+}
+
+variable "replicas" {
+  description = "Nodes in distributed mode (>= 4 recommended; the chart supports 4, 8, 16 style layouts)."
+  type        = number
+  default     = 4
+}
+
+variable "drives_per_node" {
+  description = "Data volumes per node in distributed mode."
+  type        = number
+  default     = 1
+}
+
+variable "data_storage_size" {
+  description = "Size of each data volume."
+  type        = string
+  default     = "5Gi"
+}
+
+variable "storage_class" {
+  description = "StorageClass for data volumes."
+  type        = string
+  default     = "local-path"
+}
+
+variable "resources" {
+  description = "Resources per RustFS pod."
+  type        = any
+  default     = { requests = { cpu = "50m", memory = "256Mi" }, limits = { memory = "1Gi" } }
+}
+
+variable "region" {
+  description = "S3 region name reported by RustFS."
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "cluster_issuer" {
+  description = "cert-manager ClusterIssuer for the server certificate."
+  type        = string
+  default     = "openbao-pki"
+}
+
+variable "ca_configmap" {
+  description = "ConfigMap in the namespace with the platform CA bundle (key ca.crt)."
+  type        = string
+  default     = "platform-ca"
+}
+
+variable "buckets" {
+  description = "Buckets to create (idempotent). versioning = true enables S3 object versioning."
+  type = map(object({
+    versioning = optional(bool, true)
+  }))
+  default = {}
+}
+
+variable "users" {
+  description = <<-EOT
+    S3 users (static access keys) with bucket-scoped policies. The access key
+    is the map key, the secret key is generated in-cluster and stored in
+    OpenBao at kv/storage/s3-users/<name> (properties access-key, secret-key).
+  EOT
+  type = map(object({
+    read_write_buckets = optional(list(string), [])
+    read_only_buckets  = optional(list(string), [])
+  }))
+  default = {}
+}
+
+variable "labels" {
+  description = "Labels for the created objects."
+  type        = map(string)
+  default     = {}
+}

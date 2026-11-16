@@ -68,6 +68,18 @@ variable "ingress_controller" {
   }
 }
 
+variable "allow_ingress_hosts" {
+  description = "Allow egress to the ingress controller, i.e. let pods call other platform services through their public hostname (<svc>.<base_domain>), as OIDC clients must do for the Keycloak issuer URL."
+  type        = bool
+  default     = false
+}
+
+variable "ingress_controller_entrypoint_ports" {
+  description = "Container ports of the ingress controller entrypoints (Traefik websecure/web)."
+  type        = list(number)
+  default     = [8443, 8000]
+}
+
 variable "ingress_rules" {
   description = <<-EOT
     Explicit ingress allows. One NetworkPolicy `allow-in-<name>` per rule.
