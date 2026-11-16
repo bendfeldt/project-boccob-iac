@@ -117,6 +117,9 @@ if [[ "$STACK_NEEDS_OPENBAO" == "1" && "$action" != "init" && "$action" != "vali
   openbao_port_forward_start
   trap openbao_port_forward_stop EXIT
   openbao_export_token
+  # public certificate of the CA that signed OpenBao's listener certificate
+  TF_VAR_bootstrap_ca_pem="$(cat "${STATE_DIR}/pki/openbao-ca.crt")"
+  export TF_VAR_bootstrap_ca_pem
 fi
 
 case "$action" in
