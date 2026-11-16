@@ -110,13 +110,13 @@ if ! podman image exists "$zot_upstream"; then
   fi
 fi
 
-if podman container exists "$ZOT_NAME"; then
-  if [[ "$(podman inspect -f '{{.State.Running}}' "$ZOT_NAME")" != "true" ]]; then podman start "$ZOT_NAME" >/dev/null; fi
+if podman_container_alive "$ZOT_NAME"; then
   # pick up config/cert changes
   if [[ "${CFG}/etc/config.json" -nt "${CFG}/.started" || "${CFG}/etc/tls.crt" -nt "${CFG}/.started" ]]; then
     podman restart "$ZOT_NAME" >/dev/null
   fi
 else
+  podman rm -f "$ZOT_NAME" >/dev/null 2>&1 || true
   podman volume exists "${ZOT_NAME}-data" || podman volume create "${ZOT_NAME}-data" >/dev/null
   podman volume exists "${ZOT_NAME}-log" || podman volume create "${ZOT_NAME}-log" >/dev/null
   podman run -d --name "$ZOT_NAME" \

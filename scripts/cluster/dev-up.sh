@@ -63,14 +63,15 @@ if ! podman image exists "$k3s_ref"; then
   skopeo copy --quiet --preserve-digests "docker://${k3s_ref}" "containers-storage:${k3s_ref}"
 fi
 
-if podman container exists "$NODE"; then
+if podman_container_alive "$NODE"; then
   old_sum="$(podman inspect -f '{{ index .Config.Labels "boccob.config-sha256" }}' "$NODE")"
   if [[ "$old_sum" != "$cfg_sum" ]]; then
     warn "k3s configuration changed; recreating the node container (data volumes are kept)"
     podman rm -f "$NODE" >/dev/null
-  elif [[ "$(podman inspect -f '{{.State.Running}}' "$NODE")" != "true" ]]; then
-    podman start "$NODE" >/dev/null
   fi
+else
+  # stopped or stale: recreate from the persistent volumes
+  podman rm -f "$NODE" >/dev/null 2>&1 || true
 fi
 if ! podman container exists "$NODE"; then
   for v in data kubelet log; do

@@ -162,6 +162,23 @@ write_secret_file() {
   chmod 600 "$path"
 }
 
+# podman_container_alive <name>: true only when the container really runs.
+# After a host crash/reboot podman can still report "running" for a container
+# whose process is gone; such a stale container is removed (volumes are kept)
+# so the caller recreates it.
+podman_container_alive() {
+  local name="$1" pid
+  podman container exists "$name" || return 1
+  if [[ "$(podman inspect -f '{{.State.Running}}' "$name")" == "true" ]]; then
+    pid="$(podman inspect -f '{{.State.Pid}}' "$name")"
+    [[ -d "/proc/${pid}" ]] && return 0
+    warn "container ${name} is stale (host restarted?); removing it, data volumes are kept"
+    podman rm -f "$name" >/dev/null 2>&1 || true
+    return 1
+  fi
+  return 1
+}
+
 wait_for() {
   # wait_for <timeout-seconds> <description> <command...>
   local timeout="$1" desc="$2"; shift 2
