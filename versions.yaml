@@ -1,0 +1,179 @@
+# versions.yaml — HUMAN-EDITED desired versions (source of intent).
+#
+# `make lock` resolves this file into versions.lock.yaml (digests + checksums).
+# versions.lock.yaml is the single source of truth consumed by:
+#   - scripts/airgap/*      (what to mirror into Zot / put into the bundle)
+#   - modules/versions      (what OpenTofu deploys; image refs are pinned by digest)
+#   - scripts/cluster/*     (k3s binary / images, Zot bootstrap image)
+#
+# Rules:
+#   - every image and chart used anywhere in this repo MUST be listed here;
+#   - keys are stable logical names ([a-z0-9-]) referenced from HCL as
+#     module.versions.images["<key>"] / module.versions.charts["<key>"];
+#   - `groups` tag an entry with the stack(s) that need it, so a partial mirror
+#     is possible (make airgap-mirror GROUPS=foundation).
+#
+# Zot layout produced by the mirror:
+#   images: <registry>/<source registry>/<repo>:<tag>@<digest>   e.g. registry/quay.io/openbao/openbao:2.7.2
+#   charts: oci://<registry>/charts/<name>:<version>
+#   solution artefacts (pushed by the solution repo): <registry>/boccob/<name>
+
+platform: linux/amd64
+
+k3s:
+  version: v1.35.10+k3s1
+
+images:
+  # --- cluster bootstrap -----------------------------------------------------
+  k3s:
+    source: docker.io/rancher/k3s
+    tag: v1.35.10-k3s1
+    groups: [cluster]
+  zot:
+    source: ghcr.io/project-zot/zot
+    tag: v2.1.23
+    groups: [cluster]
+  # k3s system images (k3s-images.txt of the pinned release); pulled by the
+  # node itself through the registries.yaml mirror, so they only need mirroring.
+  k3s-klipper-helm:
+    source: docker.io/rancher/klipper-helm
+    tag: v0.13.3-build20261021
+    groups: [cluster]
+  k3s-klipper-lb:
+    source: docker.io/rancher/klipper-lb
+    tag: v0.4.17
+    groups: [cluster]
+  k3s-local-path-provisioner:
+    source: docker.io/rancher/local-path-provisioner
+    tag: v0.0.37
+    groups: [cluster]
+  k3s-coredns:
+    source: docker.io/rancher/mirrored-coredns-coredns
+    tag: 1.14.7
+    groups: [cluster]
+  k3s-busybox:
+    source: docker.io/rancher/mirrored-library-busybox
+    tag: 1.37.0
+    groups: [cluster]
+  k3s-traefik:
+    source: docker.io/rancher/mirrored-library-traefik
+    tag: 3.7.15
+    groups: [cluster]
+  k3s-metrics-server:
+    source: docker.io/rancher/mirrored-metrics-server
+    tag: v0.9.0
+    groups: [cluster]
+  k3s-pause:
+    source: docker.io/rancher/mirrored-pause
+    tag: 3.10.2
+    groups: [cluster]
+
+  # --- foundation --------------------------------------------------------------
+  cert-manager-controller:
+    source: quay.io/jetstack/cert-manager-controller
+    tag: v1.21.3
+    groups: [foundation]
+  cert-manager-webhook:
+    source: quay.io/jetstack/cert-manager-webhook
+    tag: v1.21.3
+    groups: [foundation]
+  cert-manager-cainjector:
+    source: quay.io/jetstack/cert-manager-cainjector
+    tag: v1.21.3
+    groups: [foundation]
+  cert-manager-acmesolver:
+    source: quay.io/jetstack/cert-manager-acmesolver
+    tag: v1.21.3
+    groups: [foundation]
+  openbao:
+    source: quay.io/openbao/openbao
+    tag: 2.7.2
+    groups: [foundation]
+  external-secrets:
+    source: ghcr.io/external-secrets/external-secrets
+    tag: v2.15.0
+    groups: [foundation]
+  cloudnative-pg:
+    source: ghcr.io/cloudnative-pg/cloudnative-pg
+    tag: 1.30.1
+    groups: [foundation]
+  postgresql:
+    # "system" flavour = includes barman-cloud for in-tree object-store backups
+    source: ghcr.io/cloudnative-pg/postgresql
+    tag: 17.12-system-trixie
+    groups: [foundation]
+  rustfs:
+    source: docker.io/rustfs/rustfs
+    tag: 1.0.6
+    groups: [foundation]
+  rustfs-rc:
+    # RustFS S3/admin CLI, used by the bucket provisioning Job
+    source: docker.io/rustfs/rc
+    tag: v0.1.37
+    groups: [foundation]
+  busybox:
+    source: docker.io/library/busybox
+    tag: 1.38.0
+    groups: [foundation]
+  keycloak:
+    source: quay.io/keycloak/keycloak
+    tag: 26.8.2
+    groups: [foundation]
+
+charts:
+  cert-manager:
+    repo: https://charts.jetstack.io
+    name: cert-manager
+    version: v1.21.3
+    groups: [foundation]
+  openbao:
+    repo: https://openbao.github.io/openbao-helm
+    name: openbao
+    version: 0.30.7
+    groups: [foundation]
+  external-secrets:
+    repo: oci://ghcr.io/external-secrets/charts
+    name: external-secrets
+    version: 2.15.0
+    groups: [foundation]
+  cloudnative-pg:
+    repo: oci://ghcr.io/cloudnative-pg/charts
+    name: cloudnative-pg
+    version: 0.29.1
+    groups: [foundation]
+  rustfs:
+    repo: https://charts.rustfs.com
+    name: rustfs
+    version: 1.0.6
+    groups: [foundation]
+
+# Files downloaded verbatim (air-gap bundle + operator workstation tools).
+# `sha256` is filled in by `make lock` on first resolution and verified on
+# every later download.
+binaries:
+  k3s:
+    url: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/k3s
+    file: k3s
+    groups: [cluster]
+  k3s-airgap-images:
+    url: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/k3s-airgap-images-amd64.tar.zst
+    file: k3s-airgap-images-amd64.tar.zst
+    groups: [cluster]
+  k3s-install:
+    url: https://raw.githubusercontent.com/k3s-io/k3s/v1.35.10%2Bk3s1/install.sh
+    file: k3s-install.sh
+    groups: [cluster]
+  cosign:
+    url: https://github.com/sigstore/cosign/releases/download/v3.1.4/cosign-linux-amd64
+    file: cosign
+    groups: [tools]
+  trivy:
+    url: https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_Linux-64bit.tar.gz
+    file: trivy.tar.gz
+    extract: trivy
+    groups: [tools]
+  syft:
+    url: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_linux_amd64.tar.gz
+    file: syft.tar.gz
+    extract: syft
+    groups: [tools]

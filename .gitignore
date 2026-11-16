@@ -1,0 +1,33 @@
+# OpenTofu
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+# local, possibly secret, overrides — committed tfvars must never hold secrets
+*.auto.tfvars
+*.secret.tfvars
+secrets.tfvars
+
+# never commit key material / kubeconfigs / bundles
+*.pem
+*.key
+*.p12
+*.kubeconfig
+kubeconfig
+openbao-init*.json
+*.tar
+*.tar.zst
+/bundle/
+/.state/
+/reports/
+
+# editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store

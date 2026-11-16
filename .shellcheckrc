@@ -1,0 +1,4 @@
+# jq/yq filters legitimately contain $vars inside single quotes
+disable=SC2016
+external-sources=true
+source-path=SCRIPTDIR
