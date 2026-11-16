@@ -21,7 +21,7 @@ registry_ready() { curl -fsS -o /dev/null "https://${REGISTRY_HOST}/v2/"; }
 registry_has_manifest() {
   curl -fsS -o /dev/null -I \
     -H 'Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json' \
-    "https://${REGISTRY_HOST}/v2/$1/manifests/$2"
+    "https://${REGISTRY_HOST}/v2/$1/manifests/$2" 2>/dev/null
 }
 
 # skopeo_copy <src> <dst> : digest-preserving copy of ONE platform image
