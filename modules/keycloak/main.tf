@@ -268,6 +268,7 @@ resource "kubernetes_deployment_v1" "this" {
           }
           security_context {
             allow_privilege_escalation = false
+            run_as_non_root            = true
             # Quarkus re-augments the server at start (`start` without a
             # pre-built optimised image) and writes below /opt/keycloak.
             read_only_root_filesystem = false
@@ -410,7 +411,8 @@ locals {
   config_script = <<-SH
     set -euo pipefail
     export HOME=/tmp
-    KCADM=/opt/keycloak/bin/kcadm.sh
+    # kcadm keeps its session in a config file; the root filesystem is read-only
+    kcadm() { /opt/keycloak/bin/kcadm.sh "$@" --config /tmp/kcadm.config; }
 
     # kcadm needs a Java truststore: import every certificate of the platform bundle
     n=0; cert=""
@@ -419,38 +421,38 @@ locals {
       if [[ "$line" == *"END CERTIFICATE"* ]]; then
         printf '%s' "$cert" > "/tmp/ca-$n.pem"
         keytool -importcert -noprompt -alias "platform-ca-$n" -file "/tmp/ca-$n.pem" \
-          -keystore /tmp/truststore.p12 -storetype PKCS12 -storepass changeit >/dev/null 2>&1
+          -keystore /tmp/truststore.p12 -storetype PKCS12 -storepass changeit >/dev/null
         n=$((n + 1)); cert=""
       fi
     done < /etc/platform-ca/ca.crt
-    "$KCADM" config truststore --trustpass changeit /tmp/truststore.p12
+    kcadm config truststore --trustpass changeit /tmp/truststore.p12
 
     tries=0
-    until "$KCADM" config credentials --server "${local.internal_url}" --realm master \
+    until kcadm config credentials --server "${local.internal_url}" --realm master \
             --user "$KC_ADMIN_USERNAME" --password "$KC_ADMIN_PASSWORD" >/dev/null 2>/tmp/login.err; do
       tries=$((tries + 1))
       if [[ $tries -ge 60 ]]; then cat /tmp/login.err; echo "cannot log in to Keycloak"; exit 1; fi
       sleep 5
     done
 
-    if "$KCADM" get "realms/${var.realm}" >/dev/null 2>&1; then
-      "$KCADM" update "realms/${var.realm}" -f /config/realm.json
+    if kcadm get "realms/${var.realm}" >/dev/null 2>&1; then
+      kcadm update "realms/${var.realm}" -f /config/realm.json
     else
-      "$KCADM" create realms -f /config/realm.json
+      kcadm create realms -f /config/realm.json
     fi
-    "$KCADM" create partialImport -r "${var.realm}" -o -f /config/roles-groups.json
+    kcadm create partialImport -r "${var.realm}" -o -f /config/roles-groups.json
 
     clients="$(cat /config/clients.json)"
     %{for id, _ in var.oidc_clients~}
     clients="$${clients//__SECRET_${upper(replace(id, "-", "_"))}__/$${CLIENT_SECRET_${upper(replace(id, "-", "_"))}}}"
     %{endfor~}
     ( umask 077; printf '%s' "$clients" > /tmp/clients.json )
-    "$KCADM" create partialImport -r "${var.realm}" -o -f /tmp/clients.json >/dev/null
+    kcadm create partialImport -r "${var.realm}" -o -f /tmp/clients.json >/dev/null
     rm -f /tmp/clients.json
 
     %{for id, c in var.oidc_clients~}
     %{for role in c.service_account_roles~}
-    "$KCADM" add-roles -r "${var.realm}" --uusername "service-account-${id}" --rolename "${role}"
+    kcadm add-roles -r "${var.realm}" --uusername "service-account-${id}" --rolename "${role}"
     %{endfor~}
     %{endfor~}
     echo "realm ${var.realm} configured: $(echo ${join(" ", keys(var.oidc_clients))})"
@@ -533,6 +535,7 @@ resource "kubernetes_job_v1" "realm_config" {
           }
           security_context {
             allow_privilege_escalation = false
+            run_as_non_root            = true
             read_only_root_filesystem  = true
             capabilities {
               drop = ["ALL"]
