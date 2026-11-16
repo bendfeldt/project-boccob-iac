@@ -44,6 +44,11 @@ cp "${REGISTRY_CA_FILE}" "${CFG}/etc/hardening/registry-ca.crt"
 # podman would copy the host's /etc/hosts (incl. our 127.0.0.1 dev block) into
 # the node; give it a clean one so the registry name resolves via podman DNS.
 printf '127.0.0.1 localhost\n::1 localhost\n' > "${CFG}/etc/hosts"
+# Fixed node address: NetworkPolicies that allow the Kubernetes API reference
+# the node IP, so it must survive a re-creation of the container.
+subnet="$(podman network inspect "${CLUSTER_NAME}" | jq -r '.[0].subnets[0].subnet')"
+node_ip="${DEV_NODE_IP:-${subnet%.*}.10}"
+
 # Container hosts without CAP_SYS_RESOURCE (some sandboxes / nested setups)
 # cannot lower oom_score_adj, which runc needs for the pause container
 # (-998). containerd can clamp it to its own value instead.
@@ -54,7 +59,7 @@ if ! ( echo -1 > /proc/self/oom_score_adj ) 2>/dev/null; then
   printf "[plugins.'io.containerd.cri.v1.runtime']\n  restrict_oom_score_adj = true\n" > "${CFG}/etc/containerd-dropin.toml"
   extra_mounts+=(-v "${CFG}/etc/containerd-dropin.toml:/var/lib/rancher/k3s/agent/etc/containerd/config-v3.toml.d/10-boccob-dev.toml:ro")
 fi
-cfg_sum="$(cat "${CFG}/etc/containerd-dropin.toml" "${CFG}/etc/hosts" "${CFG}/etc/config.yaml" "${CFG}/etc/registries.yaml" "${CFG}/etc/hardening/"* | sha256sum | awk '{print $1}')"
+cfg_sum="$(echo "$node_ip" | cat - "${CFG}/etc/containerd-dropin.toml" "${CFG}/etc/hosts" "${CFG}/etc/config.yaml" "${CFG}/etc/registries.yaml" "${CFG}/etc/hardening/"* | sha256sum | awk '{print $1}')"
 
 step "k3s node container ${NODE}"
 k3s_ref="$(image_zot_digest_ref k3s)"
@@ -80,7 +85,7 @@ if ! podman container exists "$NODE"; then
   # --privileged: k3s needs cgroup, mount and netfilter access (same as k3d/kind).
   podman run -d --name "$NODE" --hostname "$NODE" \
     --privileged \
-    --network "${CLUSTER_NAME}" --no-hosts \
+    --network "${CLUSTER_NAME}" --ip "${node_ip}" --no-hosts \
     -v "${CFG}/etc/hosts:/etc/hosts:ro" \
     --label "boccob.config-sha256=${cfg_sum}" \
     -p "127.0.0.1:${DEV_API_PORT}:6443" \
