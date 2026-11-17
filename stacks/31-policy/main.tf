@@ -114,6 +114,13 @@ locals {
       name_prefixes = ["rustfs"]
       justification = "The init container of the upstream RustFS chart has no resources block and no value to set one; the namespace LimitRange supplies defaults."
     },
+    {
+      name          = "log-collector-root"
+      policies      = ["require-run-as-non-root"]
+      namespaces    = ["observability-agent"]
+      name_prefixes = ["otel-log-collector"]
+      justification = "Reads root-owned node log files (/var/log/pods, API audit log) through read-only hostPath mounts; runs as uid 0 without any capability, no privilege escalation, read-only root filesystem."
+    },
   ]
 }
 

@@ -9,9 +9,5 @@ terraform {
       source  = "hashicorp/helm"
       version = "3.3.0"
     }
-    vault = {
-      source  = "hashicorp/vault"
-      version = "5.13.0"
-    }
   }
 }

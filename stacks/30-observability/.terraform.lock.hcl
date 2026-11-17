@@ -3,7 +3,7 @@
 
 provider "registry.opentofu.org/hashicorp/helm" {
   version     = "3.3.0"
-  constraints = "3.3.0"
+  constraints = ">= 3.0.0, 3.3.0"
   hashes = [
     "h1:MoUoWd56qOteNNVkYzKK5u5j7Xv/RAknMvZtm6PcTXo=",
     "zh:0a406aeadea91aa0feabd73ba27fe125f61993dfe760040f8bf35e3500b23e58",
@@ -26,7 +26,7 @@ provider "registry.opentofu.org/hashicorp/helm" {
 
 provider "registry.opentofu.org/hashicorp/kubernetes" {
   version     = "3.5.0"
-  constraints = "3.5.0"
+  constraints = ">= 2.30.0, >= 3.0.0, 3.5.0"
   hashes = [
     "h1:enPnDjUC5Hk/ytFZJfrbAUtpp/+9WeCaQJVOCM8o7n8=",
     "zh:0134deda32046cc10a18b65f8e84616ab719493ad26202d75984181a5846601c",
@@ -44,28 +44,5 @@ provider "registry.opentofu.org/hashicorp/kubernetes" {
     "zh:c8e66b40e9398693bde9e0c82d320985973f4fbf7ed101c60556ba714e6a4a59",
     "zh:e3093facdda2540ec58722bb711fbc87b02549421ee117eabd74ec25d09bb6fe",
     "zh:efc97073ef218f20a307563a0a27cc1952c8367747432ae874f4524a0e041fc3",
-  ]
-}
-
-provider "registry.opentofu.org/hashicorp/vault" {
-  version     = "5.13.0"
-  constraints = "5.13.0"
-  hashes = [
-    "h1:OR/rYv3nKAylXPfJCcPCaAujxwPmQObsYMKYH045eQ0=",
-    "zh:161098ace3903744c96ca73ce82ea5530be14e0eb8a351017c1c614ae5c8df9b",
-    "zh:1900f155fca7ba118b9e16dff42bd7daca4be34cd4eac2da81bdc5fdd0ae58f6",
-    "zh:219d2699cac7df8e113784ae436b026007dbc01e9a5ddd97fb424830c007a9fe",
-    "zh:22c71f65aedbb7a1144b4a05b3083005aa938461ffd24275331ed076f074c734",
-    "zh:35d3b72bf5259915e75f4c9a31290e6c2ff7c6267b05bdf17cd94d65be4737a2",
-    "zh:37c95f1c5a5e1641482daa7125ae8030371e73ee2676f6a66b6ffee320f5b5f0",
-    "zh:3d6c202f3dfa79a4038024c0a515b4dc8f714c01849f6126716ce17a7e90e696",
-    "zh:48cdc7dd715e353fe8d3dd2f7e9cbd0315cec5cdb6087456896dad09dca7de50",
-    "zh:5d869bc01ebdfc860ec94a4c0b09a39ae9bac856a1a31b6edea18a34ffa0d89d",
-    "zh:6de02c315388ed63aa4a6a409d77034cf31c1a23b5d60d03b951858fdfd35a6c",
-    "zh:9f96247ff30f20c99f15770a5ba1171b507a454bfa69bc307c2aa06f05aea9ca",
-    "zh:ae325c1f849fb355306fa2879f41001b91c925d25d67f2f0263fda82c341ee46",
-    "zh:bc8741f8e00e2b33010c4eb0cf49554bcb9ebfca3fc5d854a4085977d0382c43",
-    "zh:c66995ef3b5a7d058e864f2426fe6d1de9f417fce97ce0b74d7cdd67c3c1cf53",
-    "zh:f530bc8b481d583e93babfdabcec2c0086010e50016703f016c49d5da3d84a89",
   ]
 }
