@@ -127,3 +127,15 @@ variable "grafana_role_mapping" {
   })
   default = {}
 }
+
+variable "audit_archive_enabled" {
+  description = "Daily export of the audit tenant into the object-locked bucket platform-audit (hash-chained manifests)."
+  type        = bool
+  default     = true
+}
+
+variable "audit_archive_schedule" {
+  description = "Cron schedule (UTC) of the audit archive (archives the previous UTC day)."
+  type        = string
+  default     = "20 1 * * *"
+}

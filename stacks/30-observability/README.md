@@ -15,3 +15,11 @@ exception in stack 31.
 
 Queries (port-forward or Grafana): `{service_name=~".+"}` with `X-Scope-OrgID: platform`;
 audit trail: tenant `audit`, attribute `boccob_audit_source` (structured metadata).
+
+Tamper resistance of the audit trail: `modules/audit-archive` exports the
+previous UTC day of tenant `audit` every night to the bucket `platform-audit`
+(created with S3 object lock, default retention `audit_archive_lock` in stack 12,
+COMPLIANCE mode: not deletable before expiry, not even by the RustFS root user —
+verified on dev). Each day has a manifest with the archive sha256 and the sha256
+of the previous manifest (hash chain). `platform-logs` (Loki chunks) is versioned;
+Loki's compactor must delete for retention, so it cannot be object-locked itself.

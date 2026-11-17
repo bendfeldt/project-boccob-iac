@@ -222,3 +222,24 @@ module "prometheus" {
   alert_rules                = local.alert_rules
   labels                     = local.common_labels
 }
+
+# =============================================================================
+# WORM archive of the audit trail (bucket platform-audit, object lock, stack 12)
+# =============================================================================
+module "audit_archive" {
+  count     = var.audit_archive_enabled ? 1 : 0
+  source    = "../../modules/audit-archive"
+  namespace = module.ns_observability.name
+  images = {
+    python = module.versions.images["python"].ref
+    rc     = module.versions.images["rustfs-rc"].ref
+  }
+  schedule = var.audit_archive_schedule
+  loki_url = module.loki.url
+  s3 = {
+    endpoint           = local.platform.s3_url
+    bucket             = "platform-audit"
+    credentials_secret = module.logs_s3_credentials.secret_name
+  }
+  labels = local.common_labels
+}
