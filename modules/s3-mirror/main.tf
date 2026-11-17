@@ -1,11 +1,11 @@
-# Off-site copy: one-way `rc mirror` of a bucket to a second S3 target.
-# Objects deleted at the source are NOT deleted at the target (the mirror runs
-# without its delete option): the target should itself have versioning (and
-# object lock) so that a compromised platform cannot destroy the off-site copy.
+# Off-site copy: one-way `rc mirror` of buckets to a second S3 target, one
+# sub-path per source bucket. Per bucket: propagate_deletes (rc mirror
+# --remove) for data that must be erasable (lake buckets), no propagation for
+# backups (the target should have versioning + object lock so that a
+# compromised platform cannot destroy them).
 
 locals {
   labels = merge(var.labels, { "app.kubernetes.io/name" = var.name, "app.kubernetes.io/component" = "backup" })
-  src    = trim("${var.source_s3.bucket}/${var.source_s3.prefix}", "/")
   dst    = trim("${var.target_s3.bucket}/${var.target_s3.prefix}", "/")
   plain_env = {
     SSL_CERT_FILE = "/etc/platform-ca/ca.crt"
@@ -34,7 +34,12 @@ resource "kubernetes_config_map_v1" "this" {
       set -eu
       export RC_HOST_src="$${SRC_SCHEME}://$${SRC_ACCESS_KEY}:$${SRC_SECRET_KEY}@$${SRC_HOST}"
       export RC_HOST_dst="$${DST_SCHEME}://$${DST_ACCESS_KEY}:$${DST_SECRET_KEY}@$${DST_HOST}"
-      rc mirror --summary --retry-attempts 5 "src/${local.src}" "dst/${local.dst}"
+      rc_status=0
+      %{for b in var.source_s3.buckets~}
+      echo "== ${b.name}"
+      rc mirror --summary --retry-attempts 5 %{if b.propagate_deletes}--remove %{endif}"src/${b.name}" "dst/${local.dst}/${b.name}" || rc_status=1
+      %{endfor~}
+      exit $rc_status
     SH
   }
 }

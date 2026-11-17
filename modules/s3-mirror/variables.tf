@@ -21,12 +21,21 @@ variable "schedule" {
 }
 
 variable "source_s3" {
-  description = "Source: endpoint (https URL), bucket, optional prefix, Secret with access_key_id / secret_access_key."
+  description = <<-EOT
+    Source: endpoint (https URL), Secret with access_key_id / secret_access_key,
+    and the buckets to copy. Each bucket lands below <target bucket>/<target
+    prefix>/<bucket>/. propagate_deletes = true also removes objects at the
+    target that no longer exist at the source (lake buckets: erasure and
+    retention must reach the copy); false keeps everything that ever reached
+    the target (backups: a compromised platform cannot delete the copy).
+  EOT
   type = object({
     endpoint           = string
-    bucket             = string
-    prefix             = optional(string, "")
     credentials_secret = string
+    buckets = list(object({
+      name              = string
+      propagate_deletes = optional(bool, false)
+    }))
   })
 }
 

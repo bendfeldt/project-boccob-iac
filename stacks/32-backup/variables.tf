@@ -49,6 +49,18 @@ variable "offsite" {
     namespaces  = optional(list(string), [])
     port        = optional(number, 443)
     schedule    = optional(string, "45 */6 * * *")
+    # buckets copied (each below <bucket>/<prefix>/<source bucket>/);
+    # lake buckets propagate deletions so that erasure reaches the copy
+    buckets = optional(list(object({
+      name              = string
+      propagate_deletes = optional(bool, false)
+      })), [
+      { name = "platform-backup" },
+      { name = "lakehouse-raw", propagate_deletes = true },
+      { name = "lakehouse-clean", propagate_deletes = true },
+      { name = "lakehouse-consolidated", propagate_deletes = true },
+      { name = "lakehouse-curated", propagate_deletes = true },
+    ])
   })
   default = null
 }

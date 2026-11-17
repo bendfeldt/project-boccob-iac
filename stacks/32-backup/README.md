@@ -5,7 +5,7 @@
 | PostgreSQL (every CNPG cluster) | base backup daily + continuous WAL archive (PITR), gzip, SSE-S3 | `s3://platform-backup/postgres/<cluster>/` — configured on the cluster (`modules/postgres-cluster` `backup`, stack 12 `local.postgres_backup`) |
 | OpenBao | raft snapshot CronJob (`openbao_snapshot_schedule`), SSE-S3 | `s3://platform-backup/openbao/raft-<ts>.snap` |
 | Retention | barman `retentionPolicy` (PostgreSQL); S3 lifecycle: snapshots `openbao_snapshot_retention_days`, noncurrent versions `noncurrent_version_retention_days` | bucket `platform-backup` (versioned) |
-| Off-site copy | `rc mirror` CronJob to the S3 target in `offsite` (null = off) | variable `offsite`, credentials `kv/backup/offsite-s3` |
+| Off-site copy | `rc mirror` CronJob to the S3 target in `offsite` (null = off): `platform-backup` (no delete propagation) + the four lakehouse buckets (`offsite.buckets`, deletions propagated so that erasure reaches the copy) | variable `offsite`, credentials `kv/backup/offsite-s3`; source user `platform-backup` has read on the lake buckets |
 | k3s datastore | etcd snapshots on HA servers (`scripts/lib/k3s-config.sh`) | `/var/lib/rancher/k3s/server/db/snapshots` (+ optional S3) |
 | Targets | `rpo_minutes`, `rto_minutes` (documented; alerts and `make restore-test` measure against them) | |
 

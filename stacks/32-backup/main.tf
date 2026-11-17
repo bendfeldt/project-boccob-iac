@@ -148,8 +148,8 @@ module "offsite_copy" {
   schedule  = var.offsite.schedule
   source_s3 = {
     endpoint           = local.platform.s3_url
-    bucket             = "platform-backup"
     credentials_secret = module.backup_s3_credentials.secret_name
+    buckets            = var.offsite.buckets
   }
   target_s3 = {
     endpoint           = var.offsite.endpoint
