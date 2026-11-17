@@ -171,6 +171,38 @@ images:
     tag: v1.19.2
     groups: [policy]
 
+  # --- observability + audit (stack 30-observability) ---------------------------
+  prometheus:
+    source: quay.io/prometheus/prometheus
+    tag: v3.16.0
+    groups: [observability]
+  prometheus-config-reloader:
+    source: quay.io/prometheus-operator/prometheus-config-reloader
+    tag: v0.95.2
+    groups: [observability]
+  alertmanager:
+    source: quay.io/prometheus/alertmanager
+    tag: v0.35.0
+    groups: [observability]
+  kube-state-metrics:
+    source: registry.k8s.io/kube-state-metrics/kube-state-metrics
+    tag: v2.20.0
+    groups: [observability]
+  loki:
+    source: docker.io/grafana/loki
+    tag: 3.6.18
+    groups: [observability]
+  otel-collector:
+    # "k8s" distribution: file_log, k8s_attributes, routing, otlp_http (checked with `components`)
+    source: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
+    tag: 0.163.2
+    groups: [observability]
+  grafana:
+    # separate group: ~480 MB, optional (grafana_enabled)
+    source: docker.io/grafana/grafana
+    tag: 13.3.1
+    groups: [observability-ui]
+
 charts:
   cert-manager:
     repo: https://charts.jetstack.io
@@ -223,6 +255,26 @@ charts:
     name: kyverno
     version: 3.9.2
     groups: [policy]
+  prometheus:
+    repo: https://prometheus-community.github.io/helm-charts
+    name: prometheus
+    version: 29.47.2
+    groups: [observability]
+  loki:
+    repo: https://grafana.github.io/helm-charts
+    name: loki
+    version: 7.6.0
+    groups: [observability]
+  opentelemetry-collector:
+    repo: oci://ghcr.io/open-telemetry/opentelemetry-helm-charts
+    name: opentelemetry-collector
+    version: 0.178.3
+    groups: [observability]
+  grafana:
+    repo: oci://ghcr.io/grafana-community/helm-charts
+    name: grafana
+    version: 14.4.2
+    groups: [observability-ui]
 
 # Files downloaded verbatim (air-gap bundle + operator workstation tools).
 # `sha256` is filled in by `make lock` on first resolution and verified on
