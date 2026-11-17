@@ -31,11 +31,14 @@ module "ns_query" {
   allow_same_namespace     = false # OPA may only be queried by the coordinator
   ingress_controller_ports = [8443]
 
-  ingress_rules = [
+  # clients normally come through Traefik (https://trino.<base_domain>): only
+  # Traefik may then set X-Forwarded-* (http-server.process-forwarded=true)
+  ingress_rules = concat(length(var.trino_client_namespaces) == 0 ? [] : [
     { name = "trino-clients", pod_selector = local.coordinator, from_namespaces = var.trino_client_namespaces, ports = [8443] },
+    ], [
     { name = "trino-internal", pod_selector = local.trino_labels, from_namespaces = [local.ns.query], from_pod_labels = local.trino_labels, ports = [8080, 8443] },
     { name = "trino-metrics", pod_selector = local.trino_labels, from_namespaces = var.metrics_namespaces, ports = [5556] },
-  ]
+  ])
   egress_rules = [
     { name = "trino-internal", pod_selector = local.trino_labels, to_namespaces = [local.ns.query], to_pod_labels = local.trino_labels, ports = [8080, 8443] },
     { name = "trino-opa", pod_selector = local.coordinator, to_namespaces = [local.ns.query], to_pod_labels = local.opa_labels, ports = [8181] },

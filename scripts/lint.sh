@@ -10,6 +10,13 @@ step "shellcheck"
 mapfile -t files < <(find "${REPO_ROOT}/scripts" "${REPO_ROOT}/environments" "${REPO_ROOT}/stacks" -type f \( -name '*.sh' -o -name 'stack.env' \) | sort)
 ( cd "${REPO_ROOT}/scripts" && shellcheck -x "${files[@]}" ) || rc=1
 
+step "python unit tests of module helper scripts (modules/*/files/test_*.py)"
+for d in "${REPO_ROOT}"/modules/*/files; do
+  compgen -G "${d}/test_*.py" >/dev/null || continue
+  PYTHONDONTWRITEBYTECODE=1 python3 -I -m unittest discover -s "$d" -p 'test_*.py' 2>&1 | tail -1 | grep -q '^OK' \
+    || { err "unit tests failed in ${d#"${REPO_ROOT}"/}"; rc=1; }
+done
+
 step "tofu fmt"
 tofu fmt -check -recursive "${REPO_ROOT}" || rc=1
 

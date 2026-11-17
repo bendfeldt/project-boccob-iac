@@ -78,9 +78,9 @@ variable "trino_jmx_exporter" {
 }
 
 variable "trino_client_namespaces" {
-  description = "Namespaces whose pods may connect to the Trino coordinator (8443) directly."
+  description = "Namespaces whose pods may connect to the Trino coordinator (8443) directly, bypassing Traefik. Empty (default): every client uses https://trino.<base_domain>, so X-Forwarded-For in the audit trail can only come from Traefik. Pods of a listed namespace could forge it."
   type        = list(string)
-  default     = ["orchestration", "observability"]
+  default     = []
 }
 
 variable "metrics_namespaces" {

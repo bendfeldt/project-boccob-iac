@@ -188,3 +188,18 @@ resource "kubernetes_deployment_v1" "this" {
     }
   }
 }
+
+resource "kubernetes_pod_disruption_budget_v1" "this" {
+  count = var.replicas > 1 ? 1 : 0
+  metadata {
+    name      = var.name
+    namespace = var.namespace
+    labels    = local.labels
+  }
+  spec {
+    min_available = 1
+    selector {
+      match_labels = local.selector_labels
+    }
+  }
+}

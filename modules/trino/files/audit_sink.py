@@ -4,15 +4,37 @@ line per query event to stdout, where the cluster log pipeline collects it.
 Trino (484) has no stdout/file event listener; the http listener is the only
 built-in one that needs no external system. AUDIT_FULL_EVENTS=true emits the
 complete event instead of the audit subset.
+
+Redaction (GDPR: the audit archive is WORM and can never be erased): string
+literals that look like a pseudonymised subject key (64 hex characters) or a
+CPR number (DDMMYY-NNNN / DDMMYYNNNN) are replaced in the query text before
+the record is written, so neither an erasure nor an ad-hoc lookup of a person
+puts the identifier into the archive. The query shape stays auditable.
 Python standard library only.
 """
 
 import json
 import os
+import re
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 FULL = os.environ.get("AUDIT_FULL_EVENTS", "false").lower() == "true"
+REDACTED = "<redacted>"
+# 64 hex characters (HMAC-SHA256 pseudonym) and CPR-shaped numbers, anywhere in
+# the text: inside quotes, in LIKE patterns, in EXECUTE ... USING parameters
+_PATTERNS = (
+    re.compile(r"(?<![0-9A-Za-z])[0-9A-Fa-f]{64}(?![0-9A-Za-z])"),
+    re.compile(r"(?<![0-9])[0-3][0-9][01][0-9]{3}-?[0-9]{4}(?![0-9])"),
+)
+
+
+def redact(text):
+    if not text:
+        return text
+    for pattern in _PATTERNS:
+        text = pattern.sub(REDACTED, text)
+    return text
 
 
 def subset(event):
@@ -34,7 +56,7 @@ def subset(event):
         "catalog": ctx.get("catalog"),
         "schema": ctx.get("schema"),
         "query_type": ctx.get("queryType"),
-        "query": meta.get("query"),
+        "query": redact(meta.get("query")),
         "create_time": event.get("createTime"),
         "end_time": event.get("endTime"),
         "inputs": [
@@ -56,7 +78,12 @@ class Handler(BaseHTTPRequestHandler):
         raw = self.rfile.read(length)
         try:
             event = json.loads(raw)
-            out = event if FULL else subset(event)
+            if FULL:
+                out = event
+                if "metadata" in out and "query" in out["metadata"]:
+                    out["metadata"]["query"] = redact(out["metadata"]["query"])
+            else:
+                out = subset(event)
             sys.stdout.write(json.dumps(out, separators=(",", ":")) + "\n")
             sys.stdout.flush()
             self.send_response(204)

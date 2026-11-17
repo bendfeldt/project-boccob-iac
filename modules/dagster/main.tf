@@ -461,3 +461,19 @@ resource "kubernetes_job_v1" "pools" {
   }
   depends_on = [helm_release.this, helm_release.code_location]
 }
+
+resource "kubernetes_pod_disruption_budget_v1" "webserver" {
+  count = var.webserver_replicas > 1 ? 1 : 0
+  metadata {
+    name      = "${local.name}-webserver"
+    namespace = var.namespace
+    labels    = var.labels
+  }
+  spec {
+    min_available = 1
+    selector {
+      match_labels = { component = "dagster-webserver" }
+    }
+  }
+  depends_on = [helm_release.this]
+}

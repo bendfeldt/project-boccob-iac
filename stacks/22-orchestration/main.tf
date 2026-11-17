@@ -39,7 +39,7 @@ module "ns_orchestration" {
   secrets_access           = true
   ca_bundle_pem            = local.platform_ca_pem
   allow_kube_api           = true # K8sRunLauncher creates Jobs
-  allow_ingress_hosts      = true # oauth2-proxy -> Keycloak issuer
+  allow_ingress_hosts      = true # oauth2-proxy -> Keycloak issuer; run pods -> Trino through Traefik
   ingress_controller_ports = [8443]
   # explicit flows only: the webserver has no authentication of its own
   allow_same_namespace = false
@@ -52,7 +52,6 @@ module "ns_orchestration" {
     { name = "code-server", pod_selector = { "app.kubernetes.io/name" = "dagster" }, to_namespaces = [local.ns.orchestration], to_pod_labels = local.code_server, ports = [4000] },
     { name = "webserver", pod_selector = local.auth_labels, to_namespaces = [local.ns.orchestration], to_pod_labels = local.webserver, ports = [80] },
     { name = "postgres", to_namespaces = [local.ns.database], ports = [5432] },
-    { name = "trino", to_namespaces = [local.ns.query], ports = [8443] },
     { name = "polaris", to_namespaces = [local.ns.catalog], ports = [8181] },
     { name = "s3", to_namespaces = [local.ns.storage], ports = [9000] },
     # pepper Job: create-only write to OpenBao
@@ -104,13 +103,14 @@ module "dagster" {
     CLEAN_CATALOG        = "clean"
     CONSOLIDATED_CATALOG = "consolidated"
     CURATED_CATALOG      = "curated"
-    TRINO_HOST           = "trino.${local.ns.query}.svc"
-    TRINO_PORT           = "8443"
-    TRINO_HTTP_SCHEME    = "https"
-    TRINO_USER           = var.trino_service_account
-    DBT_TARGET           = "password"
-    SCHEDULES_ENABLED    = tostring(var.schedules_enabled)
-    SCHEDULE_TIMEZONE    = "Europe/Copenhagen"
+    # through Traefik, like every other client (audit: X-Forwarded-For only from Traefik)
+    TRINO_HOST        = "trino.${var.base_domain}"
+    TRINO_PORT        = "443"
+    TRINO_HTTP_SCHEME = "https"
+    TRINO_USER        = var.trino_service_account
+    DBT_TARGET        = "password"
+    SCHEDULES_ENABLED = tostring(var.schedules_enabled)
+    SCHEDULE_TIMEZONE = "Europe/Copenhagen"
   }, var.solution_env)
   solution_secrets = {
     S3_ACCESS_KEY_ID      = { kv_path = "storage/s3-users/${var.s3_user}", property = "access-key" }
