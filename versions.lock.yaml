@@ -208,6 +208,34 @@ images:
     groups:
       - data-plane
     index_digest: sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72
+  kyverno:
+    source: ghcr.io/kyverno/kyverno
+    tag: v1.19.2
+    digest: sha256:6f0c520054d863a4a3df53ac7bb67d571d20421b77b99809013a62ec5f1d5947
+    groups:
+      - policy
+    index_digest: sha256:c8c4dd09e720d2cd7fd24ca73ac28e46651001372f988e0cba3f2f612f04b955
+  kyverno-pre:
+    source: ghcr.io/kyverno/kyvernopre
+    tag: v1.19.2
+    digest: sha256:380c58effb6f065d4e856c084564482930eef789f47fab9dafa68a1964139a81
+    groups:
+      - policy
+    index_digest: sha256:27f3cc52e628559b56d08363b85316819802086c9808606914f7805a244148f4
+  kyverno-background-controller:
+    source: ghcr.io/kyverno/background-controller
+    tag: v1.19.2
+    digest: sha256:7643ae5d759ae45f5c6035c62d9db4de6b325e513e36d43cfe47f3bc95dadac7
+    groups:
+      - policy
+    index_digest: sha256:c46e124f21ef8a6bb4b48de57106808b1007edcd5ddd4ff7df5d23b9efa60ce2
+  kyverno-reports-controller:
+    source: ghcr.io/kyverno/reports-controller
+    tag: v1.19.2
+    digest: sha256:9fbfa8cce7008bc45be75b2f6c4bf40e5ff582466fe571c1a38733a16a2bb510
+    groups:
+      - policy
+    index_digest: sha256:5fb6d3e738050dbce84f60ecabaede7665fbe0578d07c1e8c912443b035e79c3
 charts:
   cert-manager:
     repo: https://charts.jetstack.io
@@ -265,6 +293,13 @@ charts:
     sha256: bce50b219c64a5f1666f33c25e2c84127aa1a74154f5dbdb22aefc2e27fcf872
     groups:
       - data-plane
+  kyverno:
+    repo: https://kyverno.github.io/kyverno
+    name: kyverno
+    version: 3.9.2
+    sha256: f6fe7184544d5e2ee33a77808c09e67aa603ce6560cc197038fde31d727c861e
+    groups:
+      - policy
 binaries:
   k3s:
     url: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/k3s
