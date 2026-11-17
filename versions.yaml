@@ -184,10 +184,10 @@ images:
     source: quay.io/prometheus/alertmanager
     tag: v0.35.0
     groups: [observability]
-  kube-state-metrics:
-    source: registry.k8s.io/kube-state-metrics/kube-state-metrics
-    tag: v2.20.0
-    groups: [observability]
+  # kube-state-metrics (registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.20.0)
+  # is not listed: its blobs are served from us-east5-docker.pkg.dev, which the build
+  # sandbox cannot reach. Add it here, `make lock`, and set
+  # kube_state_metrics_enabled = true (stack 30-observability) where it is reachable.
   loki:
     source: docker.io/grafana/loki
     tag: 3.6.18

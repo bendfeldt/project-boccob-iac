@@ -236,6 +236,48 @@ images:
     groups:
       - policy
     index_digest: sha256:5fb6d3e738050dbce84f60ecabaede7665fbe0578d07c1e8c912443b035e79c3
+  prometheus:
+    source: quay.io/prometheus/prometheus
+    tag: v3.16.0
+    digest: sha256:89c1a644817e9ad70fa2af76c84898e327c1de7063735f962e8313b1e28672c3
+    groups:
+      - observability
+    index_digest: sha256:9332054523223e2ddc18d8101799d54a4a8d823b030c53216f063a6c117773cd
+  prometheus-config-reloader:
+    source: quay.io/prometheus-operator/prometheus-config-reloader
+    tag: v0.95.2
+    digest: sha256:b4adf5166416c4d8bd2c77dc12a5402f47e7a5daa27e08a3bcdf1191e94f1a23
+    groups:
+      - observability
+    index_digest: sha256:cc74ddedad4ab1c49446971f6d51302ad4303d8660a2018af925c7f62c114304
+  alertmanager:
+    source: quay.io/prometheus/alertmanager
+    tag: v0.35.0
+    digest: sha256:0f6727a39ff00b6cf95e8a5ebaf7442c55af855b79c689fb9a060e2bada1ecbf
+    groups:
+      - observability
+    index_digest: sha256:5f6e66c01bd610aef6dd671642a52eee775fd3a89bd8788ebada33efaf373d10
+  loki:
+    source: docker.io/grafana/loki
+    tag: 3.6.18
+    digest: sha256:8352b4b12073e37932d58ab5c4aece77213c3a3956d8532ec3b9c0f7a5535a03
+    groups:
+      - observability
+    index_digest: sha256:700eaaa9fbd4275914d6b11f77c080b5ba0b983f6690055e48264ea77cb0bf6f
+  otel-collector:
+    source: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
+    tag: 0.163.2
+    digest: sha256:a65df9129a5b3f99ee4434c5e53aee1965ff0129eda6a2da75ea917165b7fa6b
+    groups:
+      - observability
+    index_digest: sha256:cce4142919331aa26dd9e2900b0583dac12c44d2f87c270d3a2110912d4785a9
+  grafana:
+    source: docker.io/grafana/grafana
+    tag: 13.3.1
+    digest: sha256:1c88285f1dd391a62232c010e6c224846e6a73bdc583b3365be2eba614b7919e
+    groups:
+      - observability-ui
+    index_digest: sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf
 charts:
   cert-manager:
     repo: https://charts.jetstack.io
@@ -307,6 +349,34 @@ charts:
     sha256: f6fe7184544d5e2ee33a77808c09e67aa603ce6560cc197038fde31d727c861e
     groups:
       - policy
+  prometheus:
+    repo: https://prometheus-community.github.io/helm-charts
+    name: prometheus
+    version: 29.47.2
+    sha256: ed5e5fc1f051637f6dad1306c30feba2a1cba3644ccdd1df5c0af0e42662ea1a
+    groups:
+      - observability
+  loki:
+    repo: https://grafana.github.io/helm-charts
+    name: loki
+    version: 7.6.0
+    sha256: 9a2d779cb749c2d5dab7bc900578c7288aacc198248687acc6de363ddef6e605
+    groups:
+      - observability
+  opentelemetry-collector:
+    repo: oci://ghcr.io/open-telemetry/opentelemetry-helm-charts
+    name: opentelemetry-collector
+    version: 0.178.3
+    sha256: 6c5df6fcb8dfa54b9514eeae08b47f641f32c3ab236d8881a6008599b4f18b12
+    groups:
+      - observability
+  grafana:
+    repo: oci://ghcr.io/grafana-community/helm-charts
+    name: grafana
+    version: 14.4.2
+    sha256: 0827c659f45c772e517b83f3b9df524cdda5877f04ee630980d7211fd181ac8f
+    groups:
+      - observability-ui
 binaries:
   k3s:
     url: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/k3s
