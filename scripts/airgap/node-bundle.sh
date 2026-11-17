@@ -31,6 +31,7 @@ cat > "${out}/bundle.env" <<ENVF
 K3S_VERSION="$(lock_q '.k3s.version')"
 REGISTRY_HOST="${REGISTRY_HOST}"
 K3S_API_ENDPOINT="${K3S_API_ENDPOINT:-}"
+K3S_FLANNEL_BACKEND="${K3S_FLANNEL_BACKEND:-}"
 ENVF
 sums="$(cd "$out" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum)"
 printf '%s\n' "$sums" > "${out}/SHA256SUMS"

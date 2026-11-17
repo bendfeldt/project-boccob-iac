@@ -14,6 +14,10 @@ export K3S_API_ENDPOINT="k3s.test.lakehouse.internal"
 export K3S_SERVERS="${K3S_SERVERS:-k3s-server-1.test.lakehouse.internal k3s-server-2.test.lakehouse.internal k3s-server-3.test.lakehouse.internal}"
 export K3S_AGENTS="${K3S_AGENTS:-k3s-agent-1.test.lakehouse.internal k3s-agent-2.test.lakehouse.internal k3s-agent-3.test.lakehouse.internal}"
 export K3S_SSH_USER="${K3S_SSH_USER:-root}"
+# encrypt pod traffic between nodes (WireGuard): covers the in-namespace
+# plaintext hops of the data plane (docs/data-plane.md, "TLS exceptions").
+# Hosts need the wireguard kernel module and UDP 51820 open between nodes.
+export K3S_FLANNEL_BACKEND="${K3S_FLANNEL_BACKEND:-wireguard-native}"
 
 # OpenBao init: Shamir 5/3, shares PGP-encrypted to the key custodians
 # (see docs/runbook-bootstrap.md "OpenBao key custody"). Comma separated list of

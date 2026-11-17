@@ -35,6 +35,13 @@ CFG
       printf 'etcd-s3-config-secret: "%s"\n' "$K3S_ETCD_S3_CONFIG_SECRET"
     fi
   fi
+  # pod network encryption between nodes (test/prod: wireguard-native, see
+  # docs/data-plane.md "TLS exceptions"); unset = k3s default (vxlan, dev).
+  # Must be identical on all servers; agents take it from the servers.
+  # Needs the WireGuard kernel module (Linux >= 5.6) and UDP 51820 between nodes.
+  if [[ -n "${K3S_FLANNEL_BACKEND:-}" ]]; then
+    printf 'flannel-backend: "%s"\n' "$K3S_FLANNEL_BACKEND"
+  fi
   cat <<CFG
 # --- CIS / hardening ----------------------------------------------------------
 secrets-encryption: true
