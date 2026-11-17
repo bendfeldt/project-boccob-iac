@@ -176,10 +176,16 @@ plaintext; each is confined by NetworkPolicy to the two pod groups involved:
 | Dagster webserver/daemon -> code server, gRPC 4000 (`orchestration`) | policies `allow-in/out-code-server` (only Dagster system pods) | the chart and `dagster api grpc` have no TLS options for the code server |
 | oauth2-proxy -> Dagster webserver, HTTP 80 (`orchestration`) | policies `allow-in/out-webserver` (only the proxy pods); the webserver has no other ingress | `dagster-webserver` cannot serve TLS |
 
-In test/prod these hops can cross nodes. Recommended mitigation for the
-residual risk: encrypt node-to-node pod traffic at the CNI level (k3s
-`flannel-backend: wireguard-native`, a change of `scripts/lib/k3s-config.sh`,
-foundation) — this covers all three hops without application changes.
+In test/prod these hops can cross nodes. Mitigation **[static]**: test and
+prod run flannel with `wireguard-native` (`K3S_FLANNEL_BACKEND` in
+`environments/{test,prod}/env.sh`, rendered into the server configuration by
+`scripts/lib/k3s-config.sh`, carried to the hosts in the node bundle), so all
+pod traffic between nodes — these three hops included — is encrypted with
+WireGuard. Requirements: WireGuard kernel module (Linux >= 5.6, in every
+supported distribution kernel), UDP 51820 open between the nodes, the same
+backend on all servers (it cannot be changed on a running cluster without
+re-creating it). dev (single node, k3s in Podman) keeps the default vxlan
+backend: there the hops never leave the node.
 
 ## Audit trail and personal data (audit H-1)
 
@@ -193,6 +199,20 @@ Trino's own query history (`system.runtime.queries`, in memory, visible to
 `platform-admin`/`auditor` through OPA) still holds the text until it expires
 (`query.max-history`); the solution should stop putting keys into SQL (audit
 H-1, solution part).
+
+## Drift from the solution's platform contract
+
+The IaC deliberately differs from `project-boccob/docs/platform-contract.md`
+in these points; the solution document should be updated (the IaC is the
+stricter side in every case):
+
+| Contract says | Platform provides | Effect for the solution |
+|---|---|---|
+| OPA at `http://opa.query.svc:8181` (section 1.2) | **HTTPS** `https://opa.query.svc:8181`, certificate from the platform PKI; only the Trino coordinator may connect | none (only Trino calls OPA); the documented `access-control.properties` should show `https://` |
+| Trino `TRINO_PORT` default 8443, e.g. host `trino.query.svc` | `TRINO_HOST=trino.<base_domain>`, `TRINO_PORT=443` (through Traefik, audit L3) | none: both are variables |
+| groups of service accounts via the OPA `principals` overlay | static entries in the Trino group file (`trino_service_accounts`) | equivalent; `data.lakehouse.config.principals` stays empty |
+| "Trino query logs can be shipped as they are" (section 3, Audit) | the audit sink redacts subject keys and CPR-shaped literals (audit H-1) | the claim is wrong while the erasure SQL embeds keys: fix in the solution |
+| compute logs not specified | run pods log to stdout; no S3 compute log manager (`dagster-aws` missing in the image) | add `dagster-aws` if compute logs in the UI are wanted |
 
 ## Registered with the foundation (tfvars of stack 12)
 
