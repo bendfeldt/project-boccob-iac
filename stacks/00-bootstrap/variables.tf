@@ -15,3 +15,15 @@ variable "traefik_replicas" {
   type        = number
   default     = null
 }
+
+variable "metrics_namespaces" {
+  description = "Namespaces allowed to scrape the metrics endpoints of the platform-system controllers."
+  type        = list(string)
+  default     = ["observability"]
+}
+
+variable "metrics_ports" {
+  description = "Metrics ports of the platform-system controllers (cert-manager 9402, External Secrets and CloudNativePG operator 8080)."
+  type        = list(number)
+  default     = [9402, 8080]
+}

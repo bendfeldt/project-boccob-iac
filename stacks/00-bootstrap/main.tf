@@ -17,6 +17,12 @@ module "ns_platform" {
       from_cidrs = var.cluster_cidrs
       ports      = [10250, 9443]
     },
+    {
+      # Prometheus: cert-manager 9402, External Secrets + CloudNativePG operator 8080
+      name            = "metrics"
+      from_namespaces = var.metrics_namespaces
+      ports           = var.metrics_ports
+    },
   ]
   egress_rules = [
     {

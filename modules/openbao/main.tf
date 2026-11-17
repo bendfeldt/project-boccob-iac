@@ -12,6 +12,12 @@ locals {
       tls_cert_file   = "/openbao/tls/tls.crt"
       tls_key_file    = "/openbao/tls/tls.key"
       tls_min_version = "tls12"
+      # Prometheus scrapes /v1/sys/metrics without a token (no secret in the
+      # scrape config / tofu state); metrics carry no secret values and the
+      # port is limited by NetworkPolicy to the OpenBao client namespaces.
+      telemetry {
+        unauthenticated_metrics_access = true
+      }
     }
 
     storage "raft" {
