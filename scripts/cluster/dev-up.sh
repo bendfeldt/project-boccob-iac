@@ -115,4 +115,12 @@ wait_for 180 "node Ready" kubectl wait --for=condition=Ready "node/${NODE}" --ti
 wait_for 300 "coredns" kubectl -n kube-system rollout status deploy/coredns --timeout=5s
 wait_for 300 "traefik" kubectl -n kube-system rollout status deploy/traefik --timeout=5s
 kubectl get nodes -o wide >&2
+
+# OpenBao seals itself whenever its pod restarts. In dev the single unseal key
+# is on this machine, so bring it back automatically (test/prod: custodians run
+# `make openbao-unseal`).
+if kubectl -n secrets get statefulset openbao >/dev/null 2>&1 && [[ -f "${STATE_DIR}/openbao/init.json" ]]; then
+  step "unseal OpenBao (dev)"
+  "${REPO_ROOT}/scripts/openbao/init.sh" "$ENV" --unseal
+fi
 log "dev cluster is up. export KUBECONFIG=${KUBECONFIG}"
