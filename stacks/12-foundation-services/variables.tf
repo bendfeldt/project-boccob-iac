@@ -38,7 +38,7 @@ variable "postgres_resources" {
 variable "postgres_client_namespaces" {
   description = "Namespaces whose pods may connect to PostgreSQL clusters in the database namespace (port 5432)."
   type        = list(string)
-  default     = ["identity", "catalog", "orchestration", "observability"]
+  default     = ["identity", "catalog", "orchestration", "observability", "backup"]
 }
 
 # --- RustFS ----------------------------------------------------------------------
@@ -92,7 +92,7 @@ variable "s3_users" {
 variable "s3_client_namespaces" {
   description = "Namespaces whose pods may reach the RustFS S3 API (port 9000) directly."
   type        = list(string)
-  default     = ["database", "secrets", "catalog", "query", "orchestration", "observability"]
+  default     = ["database", "secrets", "catalog", "query", "orchestration", "observability", "backup"]
 }
 
 # --- Keycloak --------------------------------------------------------------------

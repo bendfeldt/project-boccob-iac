@@ -31,5 +31,5 @@ variable "storage_class" {
 variable "openbao_client_namespaces" {
   description = "Namespaces whose pods may call the OpenBao API directly (ESO/cert-manager in platform-system are always allowed)."
   type        = list(string)
-  default     = ["identity", "storage", "database", "catalog", "query", "orchestration", "observability"]
+  default     = ["identity", "storage", "database", "catalog", "query", "orchestration", "observability", "backup"]
 }
