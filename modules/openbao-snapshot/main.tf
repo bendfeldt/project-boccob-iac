@@ -39,6 +39,15 @@ resource "kubernetes_config_map_v1" "this" {
       trap '[ -f /work/done ] || echo failed > /work/failed' EXIT
       # NetworkPolicy allows for a new pod can take a few seconds to be programmed
       i=0
+      until st="$(bao status -format=json 2>/dev/null)" || [ -n "$st" ]; do
+        i=$((i + 1)); [ "$i" -lt 30 ] || { echo "OpenBao not reachable"; exit 1; }
+        sleep 2
+      done
+      if echo "$st" | grep -q '"sealed": *true'; then
+        echo "OpenBao is SEALED: no snapshot possible until custodians unseal it (alert OpenBaoSealed)"
+        exit 1
+      fi
+      i=0
       until token="$(bao write -field=token auth/kubernetes/login role="$OPENBAO_ROLE" jwt=@/var/run/secrets/openbao/token)"; do
         i=$((i + 1)); [ "$i" -lt 30 ] || exit 1
         sleep 2

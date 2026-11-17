@@ -39,14 +39,16 @@ locals {
   env_list = [for k, v in merge(local.tls_env, var.solution_env) : { name = k, value = v }]
 
   code_location = {
-    name                        = var.code_location_name
-    image                       = local.code_image
-    dagsterApiGrpcArgs          = ["--module-name", var.code_location_module]
-    port                        = 4000
-    env                         = local.env_list
-    envSecrets                  = [{ name = local.env_secret }]
-    volumes                     = local.volumes
-    volumeMounts                = local.volume_mounts
+    name               = var.code_location_name
+    image              = local.code_image
+    dagsterApiGrpcArgs = ["--module-name", var.code_location_module]
+    port               = 4000
+    env                = local.env_list
+    envSecrets         = [{ name = local.env_secret }]
+    # run pods inherit these: op outputs of the default fs IO manager go to
+    # $DAGSTER_HOME/storage (read-only root filesystem otherwise)
+    volumes                     = concat(local.volumes, [{ name = "dagster-storage", emptyDir = {} }])
+    volumeMounts                = concat(local.volume_mounts, [{ name = "dagster-storage", mountPath = "/opt/dagster/dagster_home/storage" }])
     includeConfigInLaunchedRuns = { enabled = true }
     podSecurityContext          = local.pod_secctx
     securityContext             = local.container_sctx
