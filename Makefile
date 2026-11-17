@@ -69,6 +69,15 @@ verify: ## Smoke test of cluster + foundation
 destroy: ## Destroy stacks (CONFIRM=<env> required; STACK=.. for one; CLUSTER=1 also removes the dev cluster)
 	$(S)/destroy.sh $(ENV) $(STACK)
 
+# --- backup & DR (stack 32-backup, scripts/backup) --------------------------------
+.PHONY: backup restore restore-test
+backup: ## On-demand backup: PostgreSQL base backups, OpenBao snapshot, off-site copy (WHAT=postgres|openbao|offsite)
+	$(S)/backup/backup.sh $(ENV) $(or $(WHAT),all)
+restore: ## Restore: WHAT=postgres CLUSTER=.. TO=<new> [TIME=..] | WHAT=openbao [KEY=..] CONFIRM=<env>
+	$(S)/backup/restore.sh $(ENV) $(WHAT) $(if $(filter postgres,$(WHAT)),$(CLUSTER) $(TO) $(TIME),$(KEY))
+restore-test: ## Restore test: PITR of a database into a scratch cluster + OpenBao snapshot check (CLUSTER=..)
+	$(S)/backup/restore-test.sh $(ENV) $(CLUSTER)
+
 # --- quality ----------------------------------------------------------------------
 .PHONY: lint fmt
 lint: ## shellcheck + tofu fmt -check + tofu validate + lock consistency
