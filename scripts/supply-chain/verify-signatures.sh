@@ -25,10 +25,10 @@ for key in "${keys[@]}"; do
       digest="$(lock_q '.images[$k].index_digest // .images[$k].digest' --arg k "$key")"
       if cosign verify "${src}@${digest}" \
            --certificate-identity-regexp "$(jq -r '.identity_regexp' <<<"$entry")" \
-           --certificate-oidc-issuer "$(jq -r '.oidc_issuer' <<<"$entry")" >/dev/null 2>&1; then
+           --certificate-oidc-issuer "$(jq -r '.oidc_issuer' <<<"$entry")" >/dev/null 2>"${TMPDIR:-/tmp}/cosign.err"; then
         log "verified (keyless): ${key}"
       else
-        err "signature verification FAILED: ${key}"; rc=1
+        err "signature verification FAILED: ${key}: $(tail -n 1 "${TMPDIR:-/tmp}/cosign.err" | cut -c1-300)"; rc=1
       fi ;;
     key)
       if cosign verify --insecure-ignore-tlog=true --key "$(jq -r '.key' <<<"$entry")" "$(image_zot_digest_ref "$key")" >/dev/null 2>&1; then
