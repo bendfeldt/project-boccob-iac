@@ -37,13 +37,19 @@ node-bundle: ## Build the k3s node bundle for test/prod hosts
 	$(S)/airgap/node-bundle.sh $(ENV)
 
 # --- supply chain ---------------------------------------------------------------
-.PHONY: scan sbom verify-signatures
+.PHONY: scan sbom verify-signatures sign verify-solution-signatures trivy-db
 scan: ## Trivy scan of mirrored images (FAIL_ON=CRITICAL to gate)
 	MIRROR_GROUPS=$(GROUPS) $(S)/supply-chain/scan.sh $(ENV)
 sbom: ## SPDX SBOMs of mirrored images (syft)
 	MIRROR_GROUPS=$(GROUPS) $(S)/supply-chain/sbom.sh $(ENV)
 verify-signatures: ## cosign verification per scripts/supply-chain/signature-policy.yaml
 	MIRROR_GROUPS=$(GROUPS) $(S)/supply-chain/verify-signatures.sh $(ENV)
+sign: ## cosign-sign solution artefacts in Zot with the OpenBao transit key (REFS="<image@sha256:..> ..")
+	$(S)/supply-chain/sign.sh $(ENV) sign $(REFS)
+verify-solution-signatures: ## cosign-verify solution artefacts (REFS="<image@sha256:..> ..")
+	$(S)/supply-chain/sign.sh $(ENV) verify $(REFS)
+trivy-db: ## Connected: mirror the Trivy vulnerability DB into Zot (JAVA_DB=1 adds the Java DB)
+	$(S)/supply-chain/trivy-db.sh sync $(ENV)
 
 # --- cluster ----------------------------------------------------------------------
 .PHONY: registry-up cluster-up cluster-down
