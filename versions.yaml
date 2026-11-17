@@ -120,6 +120,39 @@ images:
     tag: 26.8.2
     groups: [foundation]
 
+  # --- data plane (stacks 20-catalog, 21-query, 22-orchestration) ----------------
+  polaris:
+    source: docker.io/apache/polaris
+    tag: 1.9.0
+    groups: [data-plane]
+  polaris-admin-tool:
+    # realm bootstrap of the relational metastore (Job)
+    source: docker.io/apache/polaris-admin-tool
+    tag: 1.9.0
+    groups: [data-plane]
+  trino:
+    source: docker.io/trinodb/trino
+    tag: "484"
+    groups: [data-plane]
+  opa:
+    source: docker.io/openpolicyagent/opa
+    tag: 1.22.4-static
+    groups: [data-plane]
+  jmx-exporter:
+    # default exporter image of the Trino chart (frozen "legacy" repository, see docs/data-plane.md)
+    source: docker.io/bitnamilegacy/jmx-exporter
+    tag: 1.4.0
+    groups: [data-plane]
+  oauth2-proxy:
+    source: quay.io/oauth2-proxy/oauth2-proxy
+    tag: v7.15.6
+    groups: [data-plane]
+  python:
+    # provisioning Jobs and small sidecars (Polaris provisioning, Trino group sync / audit sink)
+    source: docker.io/library/python
+    tag: 3.13-slim-bookworm
+    groups: [data-plane]
+
 charts:
   cert-manager:
     repo: https://charts.jetstack.io
@@ -146,6 +179,21 @@ charts:
     name: rustfs
     version: 1.0.6
     groups: [foundation]
+  polaris:
+    repo: https://downloads.apache.org/polaris/helm-chart
+    name: polaris
+    version: 1.9.0
+    groups: [data-plane]
+  trino:
+    repo: https://trinodb.github.io/charts
+    name: trino
+    version: 1.45.0
+    groups: [data-plane]
+  dagster:
+    repo: https://dagster-io.github.io/helm
+    name: dagster
+    version: 1.13.30
+    groups: [data-plane]
 
 # Files downloaded verbatim (air-gap bundle + operator workstation tools).
 # `sha256` is filled in by `make lock` on first resolution and verified on

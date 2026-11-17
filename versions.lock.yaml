@@ -159,6 +159,55 @@ images:
     groups:
       - foundation
     index_digest: sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
+  polaris:
+    source: docker.io/apache/polaris
+    tag: 1.9.0
+    digest: sha256:5dabc353c16c7c4acc9de4087b63d85bbf0a40986aa86bd7f393219919834dcd
+    groups:
+      - data-plane
+    index_digest: sha256:bc548500f5ba8e798b7f8e107ad0b8fbd5b5c6d0c5437f56c5ca101219b796d0
+  polaris-admin-tool:
+    source: docker.io/apache/polaris-admin-tool
+    tag: 1.9.0
+    digest: sha256:d6adc43ecbfea820006b304a2a71dda82d7c9b7b69beec58fe0b33e038884143
+    groups:
+      - data-plane
+    index_digest: sha256:9ec2467615132f6a837b13fcbb8be23d770c0ffa5a8bb90faf8ebdf513ab14a0
+  trino:
+    source: docker.io/trinodb/trino
+    tag: '484'
+    digest: sha256:274b321a02292ade8fe3995aacfe107a72f06ebe4e7f603f87f08b9edff06316
+    groups:
+      - data-plane
+    index_digest: sha256:2704eb53935af5e582d63d6033e9bf99d20c325e9b0e30b1016ef59a4773979f
+  opa:
+    source: docker.io/openpolicyagent/opa
+    tag: 1.22.4-static
+    digest: sha256:395056bef267e177f8b969356d5cfc0bc0d2d5181fbdc6f09765acfbce679b87
+    groups:
+      - data-plane
+    index_digest: sha256:12cecac5a174368f7d3f09d3a19d040ebe0c91d576e520335ae7a985a26e39d3
+  jmx-exporter:
+    source: docker.io/bitnamilegacy/jmx-exporter
+    tag: 1.4.0
+    digest: sha256:eb08cc46f2952f860d2d3fbb300fee278e82b31044715532fb28ae304314a8e9
+    groups:
+      - data-plane
+    index_digest: sha256:3f67700ab6df95eabe2113adb51ea58a7b081f230f4b421d2815ce37ad14fd3a
+  oauth2-proxy:
+    source: quay.io/oauth2-proxy/oauth2-proxy
+    tag: v7.15.6
+    digest: sha256:01da265f8e371e6d3043b97829e171f3e4d53f9dc3817be15fb4fc29c92fe2a6
+    groups:
+      - data-plane
+    index_digest: sha256:c3415e8660af553f5e18f5d90db050614c02493c0ac6260ac59442f6d9b12048
+  python:
+    source: docker.io/library/python
+    tag: 3.13-slim-bookworm
+    digest: sha256:f3dac913ab53b78c64f26d5518fcd7043d5a1a46522d6a493b598c3ed12f62a6
+    groups:
+      - data-plane
+    index_digest: sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72
 charts:
   cert-manager:
     repo: https://charts.jetstack.io
@@ -195,6 +244,27 @@ charts:
     sha256: 6b8658b00e6520c2c483ec127efb4d3011e57666dd78080e6f37cc3c9048e730
     groups:
       - foundation
+  polaris:
+    repo: https://downloads.apache.org/polaris/helm-chart
+    name: polaris
+    version: 1.9.0
+    sha256: 2defe4444729505db47c8aea84b2287a06a760d3de79197b83ffee1f87876f8f
+    groups:
+      - data-plane
+  trino:
+    repo: https://trinodb.github.io/charts
+    name: trino
+    version: 1.45.0
+    sha256: 44d918d371fd68bded77725cf9bb1f85e6dec595d36ac156a1f42b135641f830
+    groups:
+      - data-plane
+  dagster:
+    repo: https://dagster-io.github.io/helm
+    name: dagster
+    version: 1.13.30
+    sha256: bce50b219c64a5f1666f33c25e2c84127aa1a74154f5dbdb22aefc2e27fcf872
+    groups:
+      - data-plane
 binaries:
   k3s:
     url: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/k3s
