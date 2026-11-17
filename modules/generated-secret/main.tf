@@ -1,8 +1,12 @@
 # Generates random secret values IN THE CLUSTER (External Secrets "Password"
-# generator), materialises them as a Kubernetes Secret and pushes them to
-# OpenBao KV. No value ever passes through OpenTofu (state, plan or logs).
+# generator) into <name>-seed, pushes them to OpenBao KV create-only
+# (PushSecret IfNotExists) and materialises the Secret <name> from OpenBao.
+# OpenBao is the source of truth: after a DR restore of OpenBao the restored
+# values are used, not new ones. No value passes through OpenTofu.
 #
-# Rotation: delete the Kubernetes Secret; a new value is generated and pushed.
+# Rotation: delete the KV entry (bao kv metadata delete kv/<kv_path>) and the
+# Secret <name>-seed; a new value is generated, pushed and synced (<= 1 h, or
+# force: kubectl annotate externalsecret <name> force-sync=$(date +%s)).
 
 resource "kubernetes_manifest" "generator" {
   manifest = {
@@ -23,20 +27,20 @@ resource "kubernetes_manifest" "generator" {
   }
 }
 
-resource "kubernetes_manifest" "external_secret" {
+# Seed: generated once, never overwritten, pushed to OpenBao create-only.
+resource "kubernetes_manifest" "seed" {
   manifest = {
     apiVersion = "external-secrets.io/v1"
     kind       = "ExternalSecret"
     metadata = {
-      name      = var.name
+      name      = "${var.name}-seed"
       namespace = var.namespace
       labels    = var.labels
     }
     spec = {
-      # generate once, never overwrite an existing value
       refreshPolicy = "CreatedOnce"
       target = {
-        name           = var.name
+        name           = "${var.name}-seed"
         creationPolicy = "Owner"
         template = {
           engineVersion = "v2"
@@ -74,6 +78,47 @@ resource "kubernetes_manifest" "external_secret" {
   depends_on = [kubernetes_manifest.generator]
 }
 
+# The Secret workloads consume: always read back from OpenBao, so that a value
+# restored into OpenBao (DR) wins over a freshly generated seed, and consumers
+# in this and other namespaces see the same value.
+resource "kubernetes_manifest" "external_secret" {
+  manifest = {
+    apiVersion = "external-secrets.io/v1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = var.name
+      namespace = var.namespace
+      labels    = var.labels
+    }
+    spec = {
+      refreshPolicy   = "Periodic"
+      refreshInterval = "1h0m0s"
+      secretStoreRef  = { name = var.read_store, kind = var.store_kind }
+      target = {
+        name           = var.name
+        creationPolicy = "Owner"
+        template = {
+          engineVersion = "v2"
+          mergePolicy   = "Merge"
+          metadata      = { labels = var.labels }
+        }
+      }
+      dataFrom = [{ extract = { key = var.kv_path } }]
+    }
+  }
+  wait {
+    condition {
+      type   = "Ready"
+      status = "True"
+    }
+  }
+  timeouts {
+    create = "5m"
+    update = "5m"
+  }
+  depends_on = [kubernetes_manifest.push]
+}
+
 resource "kubernetes_manifest" "push" {
   manifest = {
     apiVersion = "external-secrets.io/v1alpha1"
@@ -85,12 +130,14 @@ resource "kubernetes_manifest" "push" {
     }
     spec = {
       refreshInterval = "1h0m0s"
-      updatePolicy    = "Replace"
-      deletionPolicy  = "None"
+      # create-only: never overwrite a value that exists in OpenBao (e.g. one
+      # restored from a snapshot after a rebuild)
+      updatePolicy   = "IfNotExists"
+      deletionPolicy = "None"
       secretStoreRefs = [
-        { name = var.push_store, kind = "ClusterSecretStore" },
+        { name = var.push_store, kind = var.store_kind },
       ]
-      selector = { secret = { name = var.name } }
+      selector = { secret = { name = "${var.name}-seed" } }
       data = [
         for key in concat(var.keys, keys(var.literals)) : {
           match = {
@@ -111,5 +158,5 @@ resource "kubernetes_manifest" "push" {
     create = "3m"
     update = "3m"
   }
-  depends_on = [kubernetes_manifest.external_secret]
+  depends_on = [kubernetes_manifest.seed]
 }

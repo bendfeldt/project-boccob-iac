@@ -42,3 +42,15 @@ variable "labels" {
   type        = map(string)
   default     = {}
 }
+
+variable "read_store" {
+  description = "Secret store that reads OpenBao KV (materialises the consumed Secret)."
+  type        = string
+  default     = "openbao"
+}
+
+variable "store_kind" {
+  description = "Kind of read_store / push_store: ClusterSecretStore (legacy cluster-wide stores) or SecretStore (per-namespace stores)."
+  type        = string
+  default     = "ClusterSecretStore"
+}

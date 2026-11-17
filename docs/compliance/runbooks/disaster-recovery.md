@@ -45,6 +45,17 @@ Run it at least monthly on test/prod and keep the output **[manual: cadence]**.
    original name after deleting the broken cluster. Re-enable `backup` on the
    new cluster (its WAL archive must go to a new `serverName`/path). **[static]**
 
+### Order matters: OpenBao first
+Generated credentials (S3 keys, OIDC client secrets, Polaris root, service
+passwords) live in OpenBao and are only *seeded* in the cluster: the
+PushSecrets are create-only and every consumed Secret is read back from
+OpenBao. Restore OpenBao (B) **before** applying stacks 12 and later, so that
+the restored values are used and match restored databases and external
+consumers. Exception: the CloudNativePG `<cluster>-app` credentials are
+pushed with Replace (CNPG owns them and they must match the database that
+exists); after a PITR into a new cluster, consumers take the new cluster's
+`-app` Secret (scenario A).
+
 ### B. OpenBao data lost
 1. If the pods are healthy but data is wrong: `CONFIRM=<env> make restore WHAT=openbao [KEY=openbao/raft-….snap] ENV=<env>` with a token holding sudo on `sys/storage/raft/snapshot`.
 2. If the cluster is gone: deploy stack 10, `make openbao-init` **must not**
