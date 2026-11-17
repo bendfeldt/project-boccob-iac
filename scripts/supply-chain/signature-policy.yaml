@@ -1,0 +1,30 @@
+# Which signature is expected for which image (key = versions.yaml image key).
+# Kept deliberately explicit: an image without a verified policy is reported by
+# verify-signatures.sh. The ops work package adds Kyverno verifyImages on top
+# (admission-time enforcement) and should reuse this file as its input.
+default:
+  mode: none
+images:
+  cert-manager-controller: &cert_manager
+    mode: keyless
+    identity_regexp: '^https://github\.com/cert-manager/cert-manager/\.github/workflows/.+'
+    oidc_issuer: https://token.actions.githubusercontent.com
+  cert-manager-webhook: *cert_manager
+  cert-manager-cainjector: *cert_manager
+  cert-manager-acmesolver: *cert_manager
+  external-secrets:
+    mode: keyless
+    identity_regexp: '^https://github\.com/external-secrets/external-secrets/\.github/workflows/.+'
+    oidc_issuer: https://token.actions.githubusercontent.com
+  cloudnative-pg:
+    mode: keyless
+    identity_regexp: '^https://github\.com/cloudnative-pg/cloudnative-pg/\.github/workflows/.+'
+    oidc_issuer: https://token.actions.githubusercontent.com
+  postgresql:
+    mode: keyless
+    identity_regexp: '^https://github\.com/cloudnative-pg/postgres-containers/\.github/workflows/.+'
+    oidc_issuer: https://token.actions.githubusercontent.com
+  zot:
+    mode: keyless
+    identity_regexp: '^https://github\.com/project-zot/zot/\.github/workflows/.+'
+    oidc_issuer: https://token.actions.githubusercontent.com
