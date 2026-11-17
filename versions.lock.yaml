@@ -293,6 +293,13 @@ charts:
     sha256: bce50b219c64a5f1666f33c25e2c84127aa1a74154f5dbdb22aefc2e27fcf872
     groups:
       - data-plane
+  dagster-user-deployments:
+    repo: https://dagster-io.github.io/helm
+    name: dagster-user-deployments
+    version: 1.13.30
+    sha256: ed9fe6cc5e6b185441bc4110eaf94c546841b8f8b3a0abefa53a1d6d87573621
+    groups:
+      - data-plane
   kyverno:
     repo: https://kyverno.github.io/kyverno
     name: kyverno

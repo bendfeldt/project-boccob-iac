@@ -212,6 +212,12 @@ charts:
     name: dagster
     version: 1.13.30
     groups: [data-plane]
+  dagster-user-deployments:
+    # code locations as a separate release (no busybox nslookup init containers in the system pods)
+    repo: https://dagster-io.github.io/helm
+    name: dagster-user-deployments
+    version: 1.13.30
+    groups: [data-plane]
   kyverno:
     repo: https://kyverno.github.io/kyverno
     name: kyverno
