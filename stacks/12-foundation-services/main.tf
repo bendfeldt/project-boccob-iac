@@ -30,6 +30,11 @@ locals {
       name          = "Grafana"
       redirect_uris = ["https://grafana.${var.base_domain}/login/generic_oauth"]
     }
+    # audit trail viewer (stack 30-observability); login restricted to the auditor group
+    grafana-audit = {
+      name          = "Grafana (audit trail)"
+      redirect_uris = ["https://grafana-audit.${var.base_domain}/login/generic_oauth"]
+    }
     openbao = {
       name = "OpenBao"
       redirect_uris = [

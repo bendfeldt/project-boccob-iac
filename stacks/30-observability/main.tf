@@ -243,3 +243,131 @@ module "audit_archive" {
   }
   labels = local.common_labels
 }
+
+# =============================================================================
+# Grafana: `grafana` (metrics + ordinary logs, all platform groups) and
+# `grafana-audit` (audit trail only, login restricted to the auditor groups).
+# Grafana OSS cannot restrict a data source inside one instance, hence two.
+# =============================================================================
+locals {
+  grafana_ds_common = {
+    access   = "proxy"
+    editable = false
+  }
+  loki_ds = { for tenant in ["platform", "audit"] : tenant => merge(local.grafana_ds_common, {
+    name     = tenant == "audit" ? "Audit trail" : "Logs"
+    type     = "loki"
+    uid      = "loki-${tenant}"
+    url      = module.loki.url
+    jsonData = { httpHeaderName1 = "X-Scope-OrgID", tlsAuthWithCACert = true, maxLines = 5000 }
+    secureJsonData = {
+      httpHeaderValue1 = tenant
+      tlsCACert        = "$__file{/etc/platform-ca/ca.crt}"
+    }
+  }) }
+  prometheus_ds = merge(local.grafana_ds_common, {
+    name = "Prometheus", type = "prometheus", uid = "prometheus", url = module.prometheus.url, isDefault = true
+  })
+  dashboards = {
+    "platform-health" = jsonencode({
+      title = "Platform health", uid = "boccob-platform-health", schemaVersion = 39, refresh = "1m"
+      time  = { from = "now-6h", to = "now" }
+      panels = [
+        { type = "stat", title = "Scrape targets down", gridPos = { x = 0, y = 0, w = 6, h = 4 },
+        datasource = { uid = "prometheus" }, targets = [{ expr = "count(up == 0) or vector(0)" }] },
+        { type = "stat", title = "OpenBao unsealed", gridPos = { x = 6, y = 0, w = 6, h = 4 },
+        datasource = { uid = "prometheus" }, targets = [{ expr = "min(vault_core_unsealed)" }] },
+        { type = "stat", title = "Days to first certificate expiry", gridPos = { x = 12, y = 0, w = 6, h = 4 },
+        datasource = { uid = "prometheus" }, targets = [{ expr = "min(certmanager_certificate_expiration_timestamp_seconds - time()) / 86400" }] },
+        { type = "stat", title = "Hours since newest PostgreSQL backup (max over clusters)", gridPos = { x = 18, y = 0, w = 6, h = 4 },
+        datasource = { uid = "prometheus" }, targets = [{ expr = "max(time() - cnpg_collector_last_available_backup_timestamp) / 3600" }] },
+        { type = "timeseries", title = "Kyverno policy results", gridPos = { x = 0, y = 4, w = 12, h = 8 },
+        datasource = { uid = "prometheus" }, targets = [{ expr = "sum by (rule_result) (rate(kyverno_policy_results_total[5m]))" }] },
+        { type = "timeseries", title = "Log records sent / failed", gridPos = { x = 12, y = 4, w = 12, h = 8 },
+          datasource = { uid = "prometheus" }, targets = [
+            { expr = "sum(rate(otelcol_exporter_sent_log_records_total[5m]))", legendFormat = "sent" },
+            { expr = "sum(rate(otelcol_exporter_send_failed_log_records_total[5m]))", legendFormat = "failed" },
+        ] },
+      ]
+    })
+  }
+  audit_dashboards = {
+    "audit-trail" = jsonencode({
+      title = "Audit trail", uid = "boccob-audit-trail", schemaVersion = 39
+      time  = { from = "now-24h", to = "now" }
+      panels = [
+        { type = "timeseries", title = "Audit events by source", gridPos = { x = 0, y = 0, w = 24, h = 8 },
+        datasource = { uid = "loki-audit" }, targets = [{ expr = "sum by (boccob_audit_source) (count_over_time({service_name=~\".+\"} [5m]))" }] },
+        { type = "logs", title = "Audit events", gridPos = { x = 0, y = 8, w = 24, h = 16 },
+        datasource = { uid = "loki-audit" }, targets = [{ expr = "{service_name=~\".+\"}" }] },
+      ]
+    })
+  }
+}
+
+module "grafana_oidc_client" {
+  for_each  = var.grafana_enabled ? toset(["grafana", "grafana-audit"]) : toset([])
+  source    = "../../modules/external-secret"
+  name      = "oidc-client-${each.key}"
+  namespace = module.ns_observability.name
+  kv_path   = "identity/oidc-clients/${each.key}"
+  labels    = local.common_labels
+}
+
+module "grafana" {
+  count     = var.grafana_enabled ? 1 : 0
+  source    = "../../modules/grafana"
+  name      = "grafana"
+  namespace = module.ns_observability.name
+  chart     = module.versions.charts["grafana"]
+  image     = module.versions.images["grafana"]
+  hostname  = "grafana.${var.base_domain}"
+  oidc = {
+    issuer        = local.platform.oidc_issuer
+    client_id     = "grafana"
+    client_secret = module.grafana_oidc_client["grafana"].secret_name
+  }
+  role_mapping = {
+    admin_groups  = var.grafana_role_mapping.admin_groups
+    editor_groups = var.grafana_role_mapping.editor_groups
+  }
+  datasources = [local.prometheus_ds, local.loki_ds["platform"]]
+  dashboards  = local.dashboards
+  resources   = var.grafana_resources != null ? var.grafana_resources : { requests = { cpu = "50m", memory = "128Mi" }, limits = { memory = "384Mi" } }
+  labels      = local.common_labels
+}
+
+module "grafana_audit" {
+  count     = var.grafana_enabled ? 1 : 0
+  source    = "../../modules/grafana"
+  name      = "grafana-audit"
+  namespace = module.ns_observability.name
+  chart     = module.versions.charts["grafana"]
+  image     = module.versions.images["grafana"]
+  hostname  = "grafana-audit.${var.base_domain}"
+  oidc = {
+    issuer        = local.platform.oidc_issuer
+    client_id     = "grafana-audit"
+    client_secret = module.grafana_oidc_client["grafana-audit"].secret_name
+  }
+  role_mapping = {
+    viewer_groups = var.grafana_role_mapping.auditor_groups
+    strict        = true
+  }
+  datasources = [local.loki_ds["audit"]]
+  dashboards  = local.audit_dashboards
+  labels      = local.common_labels
+}
+
+module "ingress_grafana" {
+  for_each     = var.grafana_enabled ? toset(["grafana", "grafana-audit"]) : toset([])
+  source       = "../../modules/ingress-host"
+  name         = each.key
+  namespace    = module.ns_observability.name
+  host         = "${each.key}.${var.base_domain}"
+  service_name = each.key
+  service_port = 80
+  backend_tls  = { server_name = "${each.key}.${local.ns.observability}.svc" }
+  labels       = local.common_labels
+  depends_on   = [module.grafana, module.grafana_audit]
+}
