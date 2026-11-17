@@ -9,7 +9,9 @@ cluster; copy the patterns from `stacks/12-foundation-services`.
 - No image or chart reference outside `versions.yaml`; no internet at deploy time.
 - No secret value in git, tfvars, tofu outputs, tofu state or logs.
 - Every namespace through `modules/namespace-baseline` (default deny, PSS `restricted`).
-- TLS everywhere, certificates from ClusterIssuer `openbao-pki`.
+- TLS on every network hop, certificates from ClusterIssuer `openbao-pki`;
+  the documented plaintext exceptions (all inside one namespace, confined by
+  NetworkPolicy) are listed in docs/data-plane.md, "TLS exceptions".
 - `make lint` and `make verify ENV=dev` must pass before you commit.
 - Dev is small: requests of a few 10m CPU / 100 MiB; every heavy optional piece gets an on/off variable.
 

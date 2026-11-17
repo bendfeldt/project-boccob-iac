@@ -93,8 +93,8 @@ API [static].
 | Service accounts | `PASSWORD`: bcrypt password file rendered by External Secrets from generated passwords in OpenBao (`kv/query/trino/service-accounts/<name>`) | A static JWT expires (platform contract); client certificates would need a distribution and rotation path into the run pods; a password from OpenBao is rotated by deleting the Secret |
 | Groups | file group provider; sidecar `group-sync` mirrors Keycloak group membership (admin API, client `trino-group-sync` with `view-users`/`query-groups` and scope `kc-admin-api`) every 30 s; service accounts get static groups (`svc-dagster`: `data-engineer`, `pii-reader`) | Trino 484 ships only the `file` and `ldap` group providers and cannot take groups from token claims; Keycloak offers no LDAP endpoint. On Keycloak errors the last file is kept |
 | Authorisation | OPA plugin, URIs of the platform contract (`allow`, `batch`, `rowFilters`, `batchColumnMasks`), permission management off | policies as code from the solution |
-| Internal | coordinator/worker traffic on 8080 with `internal-communication.shared-secret` (`kv/query/trino/shared-secret`); NetworkPolicy limits 8080 to Trino pods | Trino's automatic internal TLS needs an IP-based `discovery.uri`, which the chart (service name) does not provide |
-| Audit | HTTP event listener -> sidecar on 127.0.0.1:8090 -> one JSON line per completed query on stdout (`log_type=trino-query-audit`: user, groups, query, inputs/output, state, error) | Trino has no stdout event listener; the ops pipeline ships pod stdout |
+| Internal | coordinator/worker traffic on 8080 with `internal-communication.shared-secret` (`kv/query/trino/shared-secret`); NetworkPolicy limits 8080 to Trino pods | see "TLS exceptions" |
+| Audit | HTTP event listener -> sidecar on 127.0.0.1:8090 -> one JSON line per completed query on stdout (`log_type=trino-query-audit`: user, groups, redacted query, inputs/output, state, error) | Trino has no stdout event listener; the ops pipeline ships pod stdout |
 | Workload | resource groups `admin` (platform-admin), `etl` (`svc-*`), `interactive` (per user sub-group) | |
 | Workers | `trino_workers` (dev 0: coordinator executes), HPA via `trino_worker_autoscaling` or KEDA when `keda_triggers` is set; graceful shutdown (`shutdown.grace-period` + preStop, termination grace 2x+30 s), PDB, topology spread | HA profile [static] |
 | Metrics | JMX exporter sidecar :5556 (ingress from `observability`) | |
@@ -123,7 +123,11 @@ same-namespace allow, so other pods there cannot query OPA [verified by `make ve
   (`TRINO_CA_BUNDLE`, `LAKEHOUSE_CA_BUNDLE`, `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`,
   `AWS_CA_BUNDLE`) point at the mounted `platform-ca`. Secrets
   (`S3_*`, `POLARIS_CLIENT_*`, `TRINO_PASSWORD`, `PSEUDONYM_PEPPER`) come from
-  OpenBao through one ExternalSecret. `DBT_TARGET=password`, `TRINO_USER=svc-dagster`.
+  OpenBao through one ExternalSecret. `DBT_TARGET=password`, `TRINO_USER=svc-dagster`,
+  `TRINO_HOST=trino.<base_domain>`, `TRINO_PORT=443` (through Traefik like every
+  client: `X-Forwarded-For` in the audit trail can only be set by Traefik; direct
+  access to 8443 is closed unless `trino_client_namespaces` lists a namespace).
+  `ERASURE_VERIFY_STORAGE=true` in all three environments (audit M-8).
 - Concurrency: pool `lakehouse_writer` = 1 (Job running
   `dagster instance concurrency set`, idempotent; instance `pools.granularity: op`),
   queued run coordinator with `max_concurrent_runs`.
@@ -159,6 +163,36 @@ passphrase). Restore into an empty OpenBao *before* deploying stack 22:
 Job then leaves it alone. KV v2 keeps versions: a mistaken write can be rolled
 back with `bao kv rollback`. Never rotate without the re-index plan of the
 solution (docs/gdpr.md there).
+
+## TLS exceptions (audit M-3)
+
+Every connection that leaves a namespace, and every client connection, is
+TLS with certificates from the platform PKI. Three hops inside a namespace are
+plaintext; each is confined by NetworkPolicy to the two pod groups involved:
+
+| Hop | Protection | Why not TLS |
+|---|---|---|
+| Trino coordinator <-> workers, HTTP 8080 (`query`) | `internal-communication.shared-secret` (signed internal requests); policy `allow-in/out-trino-internal` (Trino pods only). dev runs **no workers** (`trino_workers = 0`), so the hop does not exist there | Trino's built-in internal TLS (`internal-communication.https.required`) only works with automatically generated certificates for IP addresses and an IP-based `discovery.uri`; the official chart (1.45.0) hard-codes `discovery.uri=http://<service>:8080`, and Trino has no configuration for an external key store for internal traffic |
+| Dagster webserver/daemon -> code server, gRPC 4000 (`orchestration`) | policies `allow-in/out-code-server` (only Dagster system pods) | the chart and `dagster api grpc` have no TLS options for the code server |
+| oauth2-proxy -> Dagster webserver, HTTP 80 (`orchestration`) | policies `allow-in/out-webserver` (only the proxy pods); the webserver has no other ingress | `dagster-webserver` cannot serve TLS |
+
+In test/prod these hops can cross nodes. Recommended mitigation for the
+residual risk: encrypt node-to-node pod traffic at the CNI level (k3s
+`flannel-backend: wireguard-native`, a change of `scripts/lib/k3s-config.sh`,
+foundation) — this covers all three hops without application changes.
+
+## Audit trail and personal data (audit H-1)
+
+The Trino audit sink redacts string content that looks like a pseudonymised
+subject key (64 hex characters) or a CPR number (`DDMMYY-NNNN`, `DDMMYYNNNN`)
+in the query text before the record is written (`<redacted>`); the shape of
+the query, user, groups, tables and columns stay. Unit tests:
+`modules/trino/files/test_audit_sink.py` (run by `make lint`); verified live on
+dev (a query with both kinds of literal is logged with `'<redacted>'`).
+Trino's own query history (`system.runtime.queries`, in memory, visible to
+`platform-admin`/`auditor` through OPA) still holds the text until it expires
+(`query.max-history`); the solution should stop putting keys into SQL (audit
+H-1, solution part).
 
 ## Registered with the foundation (tfvars of stack 12)
 
@@ -196,7 +230,7 @@ solution (docs/gdpr.md there).
 
 - HA profile (Polaris 2, OPA 2, Trino workers + HPA/KEDA, CNPG 3) validated statically only.
 - Dagster compute logs to S3 (see above); Dagster UI has no per-group roles.
-- Trino internal TLS (shared secret + NetworkPolicy today).
+- Trino internal TLS and the Dagster plaintext hops (see "TLS exceptions"; CNI encryption recommended).
 - Kyverno policy `verify-solution-image-signatures` (ops package, Audit mode)
   reports the code-location image as unsigned: sign it with
   `scripts/supply-chain/sign.sh` / `COSIGN_KEY` in the solution's `make image-push`
