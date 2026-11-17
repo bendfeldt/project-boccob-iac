@@ -195,9 +195,12 @@ module "polaris_db_credentials" {
   must be listed in `postgres_client_namespaces`
   (`environments/<env>/12-foundation-services.tfvars`; default: identity,
   catalog, orchestration, observability).
-- Backups: pass `backup = { destination_path = "s3://platform-backup/postgres/<name>", endpoint_url = local.platform.s3_url, credentials_secret = "<secret with access_key_id/secret_access_key>" }`
-  (S3 user `platform-backup` exists: `kv/storage/s3-users/platform-backup`,
-  properties `access-key` / `secret-key` — map them with an `external-secret` template).
+- Backups (required: `make verify` fails for a cluster without): pass
+  `backup = { destination_path = "s3://platform-backup/postgres", endpoint_url = local.platform.s3_url, credentials_secret = "platform-backup-s3", ca_secret = "platform-ca", encryption = "AES256" }`.
+  barman writes below `<destination_path>/<cluster name>/`; the Secrets
+  `platform-backup-s3` and `platform-ca` (CloudNativePG reads the CA from a
+  Secret, not a ConfigMap) are created in `database` by stack 12. Base backup
+  daily + WAL archive (PITR); `make restore-test CLUSTER=<name>` proves it.
 
 ## 7. Add a bucket or an S3 user
 
@@ -303,9 +306,26 @@ tfvars of their stacks: `openbao_client_namespaces` (stack 10),
 Use `module.ns_x.name` for everything placed in the namespace so resources are
 created after the policies. Metrics ports already opened for
 `metrics_namespaces` (default `observability`): CNPG 9187, RustFS 9000,
-Keycloak 9000 (HTTPS). `platform-system`, `secrets` and `kube-system` are not
-opened for scraping yet — the ops package should request the ports it needs
-(variables in stacks 00/10).
+Keycloak 9000 (HTTPS), platform-system 9402/8080 (`metrics_namespaces` /
+`metrics_ports` in stack 00), OpenBao 8200 (`/v1/sys/metrics` without token),
+kube-system has no NetworkPolicies. A new scrape target = a job in
+`stacks/30-observability` (`local.scrape_jobs`) + an ingress opening from
+`observability` in the target namespace.
+
+## 12. Ops hooks for every package
+
+- Logs: everything on stdout is collected. Audit-relevant output is
+  classified by namespace + container (+ body regex) in `audit_sources`
+  (`modules/otel-log-collector`) and goes to the Loki tenant `audit`.
+- Policies: workloads must pass the Kyverno policies (`stacks/31-policy`:
+  mirror registry, digest, no `latest`, non-root, read-only rootfs, requests +
+  memory limit). Legitimate exceptions go to `builtin_exceptions` (stack 31)
+  or `policy_exceptions` (tfvars) with a justification.
+- Solution images under `<registry>/boccob/*` must be signed: `make sign REFS=…`.
+- Verify: add checks as `scripts/verify.d/NN-<package>.sh` (sourced by
+  `scripts/verify.sh`, use `check`).
+- Optional components an environment does not deploy: put their images in an
+  own group and list it in `MIRROR_EXCLUDE_GROUPS` (environments/<env>/env.sh).
 
 ## 11. Scripts
 

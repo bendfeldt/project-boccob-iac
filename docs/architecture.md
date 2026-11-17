@@ -19,7 +19,10 @@
  | 12-foundation-services  database (CNPG cluster), storage (RustFS + buckets),   |
  |                         identity (Keycloak realm lakehouse), ingress hosts     |
  | 20-data-plane           placeholder: Polaris, Trino + OPA, Dagster             |
- | 30-ops                  placeholder: observability, Kyverno, backup & DR       |
+ | 30-observability        Prometheus/Alertmanager, Loki (tenants platform/audit),|
+ |                         OTel log collector, audit WORM archive, Grafana        |
+ | 31-policy               Kyverno + policy set, cosign key (OpenBao transit)     |
+ | 32-backup               OpenBao snapshots, S3 retention, off-site copy         |
  +--------------------------------------------------------------------------------+
 ```
 
@@ -109,7 +112,10 @@ done by the k3s embedded network policy controller (verified by
 | `storage` | 12 | RustFS |
 | `identity` | 12 | Keycloak |
 | `catalog`, `query`, `orchestration` | 20 | Polaris, Trino + OPA, Dagster |
-| `observability` | 30 | monitoring, logging |
+| `observability` | 30 | Prometheus, Alertmanager, Loki, Grafana, audit archive |
+| `observability-agent` | 30 | OTel log collector DaemonSet (PSS privileged: read-only hostPath) |
+| `kyverno` | 31 | Kyverno, PolicyExceptions |
+| `backup` | 32 | backup CronJobs (OpenBao snapshot, off-site copy) |
 | `tofu-state` | scripts | OpenTofu state Secrets |
 
 The contract namespace `registry` is not used: Zot must exist before the
