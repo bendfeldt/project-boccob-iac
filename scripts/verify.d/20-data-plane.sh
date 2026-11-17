@@ -22,7 +22,7 @@ if kubectl get namespace catalog query orchestration >/dev/null 2>&1; then
   step "data plane: OPA + Trino"
   check "OPA ready with the policy bundle activated" kubectl -n query wait --for=condition=Available deploy/opa --timeout=10s
   check "OPA bundle is pinned by digest" bash -c \
-    "kubectl -n query get configmap opa-config -o jsonpath='{.data.config\.yaml}' | grep -Eq 'resource: .+@sha256:[0-9a-f]{64}'"
+    "kubectl -n query get configmap opa-config -o jsonpath='{.data.config\.yaml}' | grep -Eq '\"?resource\"?: \"?[^\" ]+@sha256:[0-9a-f]{64}'"
   check "Trino coordinator ready" kubectl -n query wait --for=condition=Available deploy/trino-coordinator --timeout=10s
   check "Trino catalogs raw/clean/consolidated/curated (svc-dagster over TLS, password auth)" bash -c \
     "$(declare -f dp_trino_sa dp_secret); REPO_ROOT='$REPO_ROOT' DP_TRINO_URL='$DP_TRINO_URL' DP_INGRESS_IP='$DP_INGRESS_IP' dp_trino_sa svc-dagster '$ca' 'show catalogs' | tr -d '\"[]' | sort | tr '\n' ' ' | grep -qx 'clean consolidated curated raw system '"
