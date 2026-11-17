@@ -100,6 +100,47 @@ module "ns_database" {
   ]
 }
 
+# Backup credentials (S3 user platform-backup) for the CloudNativePG clusters.
+# Shared by every cluster in the namespace: pass local.postgres_backup to
+# modules/postgres-cluster (see docs/conventions.md, "Add a database").
+module "postgres_backup_credentials" {
+  source    = "../../modules/external-secret"
+  name      = "platform-backup-s3"
+  namespace = module.ns_database.name
+  kv_path   = "storage/s3-users/platform-backup"
+  template = {
+    access_key_id     = "{{ index . \"access-key\" }}"
+    secret_access_key = "{{ index . \"secret-key\" }}"
+  }
+  labels     = local.common_labels
+  depends_on = [module.rustfs]
+}
+
+# CloudNativePG reads the S3 endpoint CA (endpointCA) from a Secret, not from
+# the platform-ca ConfigMap. Public material only.
+resource "kubernetes_secret_v1" "database_platform_ca" {
+  metadata {
+    name      = local.platform.ca_configmap
+    namespace = module.ns_database.name
+    labels    = local.common_labels
+  }
+  data = {
+    "ca.crt" = local.platform_ca_pem
+  }
+}
+
+locals {
+  postgres_backup = var.postgres_backup == null ? null : {
+    ca_secret          = kubernetes_secret_v1.database_platform_ca.metadata[0].name
+    destination_path   = "s3://platform-backup/postgres"
+    endpoint_url       = local.platform.s3_url
+    credentials_secret = module.postgres_backup_credentials.secret_name
+    retention_policy   = var.postgres_backup.retention_policy
+    schedule           = var.postgres_backup.schedule
+    encryption         = var.rustfs_sse_enabled ? "AES256" : null
+  }
+}
+
 module "keycloak_db" {
   source        = "../../modules/postgres-cluster"
   name          = "keycloak-db"
@@ -107,6 +148,7 @@ module "keycloak_db" {
   image         = module.versions.images["postgresql"].ref
   instances     = coalesce(var.postgres_instances, var.ha ? 3 : 1)
   database      = "keycloak"
+  backup        = local.postgres_backup
   storage_size  = var.postgres_storage_size
   storage_class = var.storage_class
   resources     = var.postgres_resources
@@ -141,6 +183,19 @@ module "ns_storage" {
   limit_range = {}
 }
 
+# SSE-S3 master key: 32 random characters, stored base64-encoded (32 bytes)
+module "rustfs_sse" {
+  count     = var.rustfs_sse_enabled ? 1 : 0
+  source    = "../../modules/generated-secret"
+  name      = "rustfs-sse"
+  namespace = module.ns_storage.name
+  kv_path   = "storage/rustfs-sse"
+  keys      = ["seed"]
+  length    = 32
+  literals  = { "master-key" = "{{ .seed | b64enc }}" }
+  labels    = local.common_labels
+}
+
 module "rustfs" {
   source    = "../../modules/rustfs"
   namespace = module.ns_storage.name
@@ -159,7 +214,11 @@ module "rustfs" {
   region            = local.platform.s3_region
   buckets           = local.buckets
   users             = local.s3_users
-  labels            = local.common_labels
+  sse_master_key_secret = var.rustfs_sse_enabled ? {
+    name = module.rustfs_sse[0].secret_name
+    key  = "master-key"
+  } : null
+  labels = local.common_labels
 }
 
 module "ingress_s3" {

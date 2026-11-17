@@ -84,7 +84,8 @@ variable "backup" {
     storage with the in-tree Barman Cloud integration. null = no backups (dev).
     credentials_secret must exist in the cluster namespace with the keys
     access_key_id / secret_access_key (sync it with modules/external-secret).
-    ca_configmap: ConfigMap with the CA of the S3 endpoint (key ca.crt).
+    ca_secret: Secret (not ConfigMap: CloudNativePG reads endpointCA from a
+    Secret) in the cluster namespace with the CA of the S3 endpoint (key ca.crt).
   EOT
   type = object({
     destination_path   = string
@@ -92,10 +93,12 @@ variable "backup" {
     credentials_secret = string
     access_key_id_key  = optional(string, "access_key_id")
     secret_key_key     = optional(string, "secret_access_key")
-    ca_configmap       = optional(string, "platform-ca")
+    ca_secret          = optional(string, "platform-ca")
     retention_policy   = optional(string, "30d")
     schedule           = optional(string, "0 0 2 * * *")
     immediate          = optional(bool, true)
+    # server-side encryption requested for every backup object (AES256 = SSE-S3)
+    encryption = optional(string)
   })
   default = null
 }

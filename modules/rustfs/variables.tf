@@ -101,3 +101,12 @@ variable "labels" {
   type        = map(string)
   default     = {}
 }
+
+variable "sse_master_key_secret" {
+  description = "Secret (name, key) holding a base64-encoded 32-byte master key for SSE-S3 (RUSTFS_SSE_S3_MASTER_KEY). Without it (and without a KMS) RustFS rejects requests that ask for server-side encryption. null = SSE-S3 not available."
+  type = object({
+    name = string
+    key  = string
+  })
+  default = null
+}

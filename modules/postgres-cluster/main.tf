@@ -70,15 +70,17 @@ locals {
       backup = {
         retentionPolicy = var.backup.retention_policy
         barmanObjectStore = {
+          # barman writes below <destinationPath>/<serverName = cluster name>/
           destinationPath = var.backup.destination_path
           endpointURL     = var.backup.endpoint_url
-          endpointCA      = { name = var.backup.ca_configmap, key = "ca.crt" }
+          endpointCA      = { name = var.backup.ca_secret, key = "ca.crt" }
           s3Credentials = {
             accessKeyId     = { name = var.backup.credentials_secret, key = var.backup.access_key_id_key }
             secretAccessKey = { name = var.backup.credentials_secret, key = var.backup.secret_key_key }
           }
-          wal  = { compression = "gzip" }
-          data = { compression = "gzip" }
+          wal = merge({ compression = "gzip" }, var.backup.encryption == null ? {} : { encryption = var.backup.encryption })
+          data = merge({ compression = "gzip", immediateCheckpoint = true },
+          var.backup.encryption == null ? {} : { encryption = var.backup.encryption })
         }
       }
     },

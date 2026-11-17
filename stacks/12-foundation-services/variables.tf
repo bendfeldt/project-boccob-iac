@@ -125,3 +125,19 @@ variable "keycloak_client_namespaces" {
   type        = list(string)
   default     = []
 }
+
+# --- backup / encryption (ops work package) ---------------------------------------
+variable "rustfs_sse_enabled" {
+  description = "Generate an SSE-S3 master key for RustFS (kv/storage/rustfs-sse) so clients can request server-side encryption (used for backups)."
+  type        = bool
+  default     = true
+}
+
+variable "postgres_backup" {
+  description = "Continuous backup (base backups + WAL, PITR) of the PostgreSQL clusters of this stack to s3://platform-backup/postgres/<cluster>. null = off."
+  type = object({
+    retention_policy = optional(string, "7d")
+    schedule         = optional(string, "0 30 1 * * *")
+  })
+  default = {}
+}

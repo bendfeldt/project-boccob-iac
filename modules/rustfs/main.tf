@@ -107,6 +107,10 @@ resource "helm_release" "this" {
       initImage = { repository = var.images["init"].repository, tag = var.images["init"].tag_digest }
     }
     secret = { existingSecret = module.root_credentials.secret_name }
+    extraEnv = var.sse_master_key_secret == null ? [] : [{
+      name      = "RUSTFS_SSE_S3_MASTER_KEY"
+      valueFrom = { secretKeyRef = { name = var.sse_master_key_secret.name, key = var.sse_master_key_secret.key } }
+    }]
     # the Secret only carries credentials: let the chart inject the pod endpoint identity
     localEndpointHost = { autoInject = var.distributed ? true : null }
     config = {
