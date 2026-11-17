@@ -52,7 +52,7 @@ connect() {
     bash -c "[[ \"\$(kubectl -n '$OPENBAO_NAMESPACE' get pod '$pod' -o jsonpath='{.status.phase}')\" == Running ]]"
   kubectl -n "$OPENBAO_NAMESPACE" port-forward "pod/${pod}" "${port}:8200" --address 127.0.0.1 >/dev/null 2>&1 &
   pf_pid=$!
-  wait_for 60 "API of ${pod}" api_get sys/seal-status
+  wait_for 300 "API of ${pod}" api_get sys/seal-status
 }
 
 b64_file() { base64 -w0 < "$1"; }

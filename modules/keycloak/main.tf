@@ -450,6 +450,15 @@ locals {
     kcadm create partialImport -r "${var.realm}" -o -f /tmp/clients.json >/dev/null
     rm -f /tmp/clients.json
 
+    # partialImport does not create service-account users: an update through the
+    # clients API does (idempotent)
+    %{for id, c in var.oidc_clients~}
+    %{if c.service_account~}
+    cid="$(kcadm get clients -r "${var.realm}" -q "clientId=${id}" --fields id --format csv --noquotes)"
+    kcadm update "clients/$cid" -r "${var.realm}" -s serviceAccountsEnabled=true
+    %{endif~}
+    %{endfor~}
+
     %{for id, c in var.oidc_clients~}
     %{for role in c.service_account_roles~}
     kcadm add-roles -r "${var.realm}" --uusername "service-account-${id}" --rolename "${role}"
