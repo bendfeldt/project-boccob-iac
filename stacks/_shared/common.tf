@@ -87,7 +87,7 @@ locals {
     openbao_url   = "https://openbao.secrets.svc:8200"
     keycloak_url  = "https://keycloak.${var.base_domain}"
     oidc_issuer   = "https://keycloak.${var.base_domain}/realms/lakehouse"
-    s3_url        = "https://rustfs.storage.svc:9000"
+    s3_url        = "https://rustfs-svc.storage.svc:9000"
     s3_region     = "us-east-1"
     ingress_class = "traefik"
   }
