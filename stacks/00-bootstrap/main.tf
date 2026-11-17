@@ -155,7 +155,7 @@ resource "kubernetes_config_map_v1" "coredns_custom" {
   data = {
     "lakehouse.override" = join("\n", concat(
       [for name in var.ingress_dns_rewrite_exclude : "rewrite stop name exact ${name} ${name}"],
-      ["rewrite stop name regex (.*)\\.${replace(var.base_domain, ".", "\\.")} traefik.kube-system.svc.cluster.local answer auto"],
+      ["rewrite stop name regex ^(.*)\\.${replace(var.base_domain, ".", "\\.")}\\.$ traefik.kube-system.svc.cluster.local answer auto"],
     ))
   }
 }
