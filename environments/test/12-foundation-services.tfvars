@@ -37,5 +37,7 @@ oidc_clients = {
     standard_flow                = false
     service_account              = true
     service_account_client_roles = { "realm-management" = ["view-users", "query-groups"] }
+    # Keycloak >= 26.8 admin API: token needs scope kc-admin-api (audience check)
+    optional_client_scopes = ["kc-admin-api"]
   }
 }

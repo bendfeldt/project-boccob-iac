@@ -29,7 +29,6 @@ locals {
     }
     persistence_directory = "/var/opa"
     decision_logs         = { console = var.decision_logs }
-    status                = { console = false }
   })
   config_hash = substr(sha256(local.config), 0, 16)
 }
@@ -173,16 +172,18 @@ resource "kubernetes_deployment_v1" "this" {
           # answer from an OPA without policies
           readiness_probe {
             http_get {
-              path = "/health?bundles"
-              port = "diagnostic"
+              path   = "/health?bundles"
+              port   = "diagnostic"
+              scheme = upper(local.scheme)
             }
             period_seconds    = 5
             failure_threshold = 3
           }
           liveness_probe {
             http_get {
-              path = "/health"
-              port = "diagnostic"
+              path   = "/health"
+              port   = "diagnostic"
+              scheme = upper(local.scheme)
             }
             initial_delay_seconds = 5
             period_seconds        = 10

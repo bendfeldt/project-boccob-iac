@@ -64,6 +64,8 @@ variable "oidc_clients" {
     service_account_roles = optional(list(string), [])
     # client roles of other clients for the service account, e.g. { "realm-management" = ["view-users"] }
     service_account_client_roles = optional(map(list(string)), {})
+    # replaces the realm's default optional client scopes for this client, e.g. ["kc-admin-api"] for Admin REST API callers
+    optional_client_scopes = optional(list(string))
   }))
   default = {}
 }

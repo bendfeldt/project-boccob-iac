@@ -58,6 +58,7 @@ def fetch(ctx):
         f"{base}/realms/{realm}/protocol/openid-connect/token",
         form={
             "grant_type": "client_credentials",
+            "scope": "kc-admin-api",
             "client_id": os.environ["KEYCLOAK_CLIENT_ID"],
             "client_secret": os.environ["KEYCLOAK_CLIENT_SECRET"],
         },

@@ -7,7 +7,7 @@ Open Policy Agent as the decision point of Trino's OPA access control.
   `dist/opa/bundle.ref`). A new policy version is rolled out by changing the
   variable; the pods restart and become ready only after the bundle is active.
 - Decision logs (`decision_logs.console`) and server logs are JSON on stdout.
-- HTTPS on 8181 (`tls = true`), plain HTTP diagnostics on 8282 (probes, metrics).
+- HTTPS on 8181 and on the diagnostic port 8282 (`tls = true`; OPA serves both with the same certificate; probes use HTTPS).
 - NetworkPolicy `opa-access`: API only from `client_pod_labels` (same
   namespace), diagnostics only from `metrics_namespaces`, egress only to the
   registry. The namespace baseline must not allow same-namespace traffic

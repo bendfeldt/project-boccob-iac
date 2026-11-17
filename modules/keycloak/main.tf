@@ -361,21 +361,21 @@ locals {
   clients_json = jsonencode({
     ifResourceExists = "OVERWRITE"
     clients = [
-      for id, c in var.oidc_clients : {
-        clientId                  = id
-        name                      = coalesce(c.name, id)
-        enabled                   = true
-        protocol                  = "openid-connect"
-        publicClient              = false
-        clientAuthenticatorType   = "client-secret"
-        secret                    = "__SECRET_${upper(replace(id, "-", "_"))}__"
-        standardFlowEnabled       = c.standard_flow
-        implicitFlowEnabled       = false
-        directAccessGrantsEnabled = c.direct_access_grants
-        serviceAccountsEnabled    = c.service_account
-        redirectUris              = c.redirect_uris
-        webOrigins                = c.web_origins
-        fullScopeAllowed          = true
+      for id, c in var.oidc_clients : merge(c.optional_client_scopes == null ? {} : { optionalClientScopes = c.optional_client_scopes }, {
+        clientId                                                                                           = id
+        name                                                                                               = coalesce(c.name, id)
+        enabled                                                                                            = true
+        protocol                                                                                           = "openid-connect"
+        publicClient                                                                                       = false
+        clientAuthenticatorType                                                                            = "client-secret"
+        secret                                                                                             = "__SECRET_${upper(replace(id, "-", "_"))}__"
+        standardFlowEnabled                                                                                = c.standard_flow
+        implicitFlowEnabled                                                                                = false
+        directAccessGrantsEnabled                                                                          = c.direct_access_grants
+        serviceAccountsEnabled                                                                             = c.service_account
+        redirectUris                                                                                       = c.redirect_uris
+        webOrigins                                                                                         = c.web_origins
+        fullScopeAllowed                                                                                   = true
         attributes = merge(
           { "post.logout.redirect.uris" = "+" },
           c.pkce_required ? { "pkce.code.challenge.method" = "S256" } : {},
@@ -404,7 +404,7 @@ locals {
             }
           },
         ]
-      }
+      })
     ]
   })
 

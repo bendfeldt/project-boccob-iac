@@ -387,6 +387,10 @@ resource "helm_release" "this" {
     extraEnv = [
       { name = "JAVA_OPTS_APPEND", value = join(" ", module.truststore.jvm_flags) },
       { name = "AWS_REGION", value = var.s3.region },
+      # Polaris 1.9 resolves storage credentials through the AWS default chain for
+      # catalogs with stsUnavailable; polaris.storage.aws.* alone is not enough
+      { name = "AWS_ACCESS_KEY_ID", valueFrom = { secretKeyRef = { name = module.s3_credentials.secret_name, key = "access-key" } } },
+      { name = "AWS_SECRET_ACCESS_KEY", valueFrom = { secretKeyRef = { name = module.s3_credentials.secret_name, key = "secret-key" } } },
     ]
     extraInitContainers = [{
       name            = "truststore"
