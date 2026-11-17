@@ -31,6 +31,12 @@ variable "key_encoding" {
   default     = "PKCS8"
 }
 
+variable "combined_pem" {
+  description = "Also write key + certificate chain into one file `tls-combined.pem` (PEM key store of Java servers such as Trino)."
+  type        = bool
+  default     = false
+}
+
 variable "cluster_issuer" {
   description = "cert-manager ClusterIssuer."
   type        = string

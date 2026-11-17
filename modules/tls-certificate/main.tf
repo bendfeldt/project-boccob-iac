@@ -9,7 +9,7 @@ resource "kubernetes_manifest" "this" {
       namespace = var.namespace
       labels    = var.labels
     }
-    spec = {
+    spec = merge(var.combined_pem ? { additionalOutputFormats = [{ type = "CombinedPEM" }] } : {}, {
       secretName  = var.name
       commonName  = var.dns_names[0]
       duration    = "2160h0m0s"
@@ -23,7 +23,7 @@ resource "kubernetes_manifest" "this" {
       usages    = var.usages
       dnsNames  = var.dns_names
       issuerRef = { group = "cert-manager.io", kind = "ClusterIssuer", name = var.cluster_issuer }
-    }
+    })
   }
   wait {
     condition {
