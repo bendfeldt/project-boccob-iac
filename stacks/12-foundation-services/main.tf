@@ -39,6 +39,26 @@ locals {
     }
   }
   oidc_clients = merge(local.default_oidc_clients, var.oidc_clients)
+
+  default_buckets = {
+    "lakehouse-raw"          = {}
+    "lakehouse-clean"        = {}
+    "lakehouse-consolidated" = {}
+    "lakehouse-curated"      = {}
+    "platform-backup"        = {}
+    "platform-logs"          = {}
+  }
+  buckets = merge(local.default_buckets, var.buckets)
+
+  default_s3_users = {
+    # Polaris / Trino: all Iceberg layers
+    "lakehouse-catalog" = { read_write_buckets = ["lakehouse-raw", "lakehouse-clean", "lakehouse-consolidated", "lakehouse-curated"] }
+    # dlt landing
+    "lakehouse-ingest" = { read_write_buckets = ["lakehouse-raw"] }
+    "platform-backup"  = { read_write_buckets = ["platform-backup"] }
+    "platform-logs"    = { read_write_buckets = ["platform-logs"] }
+  }
+  s3_users = merge(local.default_s3_users, var.s3_users)
 }
 
 # =============================================================================
@@ -137,8 +157,8 @@ module "rustfs" {
   storage_class     = coalesce(var.storage_class, "local-path")
   resources         = var.rustfs_resources
   region            = local.platform.s3_region
-  buckets           = var.buckets
-  users             = var.s3_users
+  buckets           = local.buckets
+  users             = local.s3_users
   labels            = local.common_labels
 }
 

@@ -73,32 +73,20 @@ variable "rustfs_resources" {
 }
 
 variable "buckets" {
-  description = "Buckets (name => { versioning }). The contract buckets are the default; add platform buckets here."
+  description = "Additional buckets (name => { versioning }), merged over the contract buckets defined in main.tf (lakehouse-raw/clean/consolidated/curated, platform-backup, platform-logs)."
   type = map(object({
     versioning = optional(bool, true)
   }))
-  default = {
-    "lakehouse-raw"          = {}
-    "lakehouse-clean"        = {}
-    "lakehouse-consolidated" = {}
-    "lakehouse-curated"      = {}
-    "platform-backup"        = {}
-    "platform-logs"          = {}
-  }
+  default = {}
 }
 
 variable "s3_users" {
-  description = "S3 users (access key => bucket grants). Secret keys are generated and stored in OpenBao at kv/storage/s3-users/<name>."
+  description = "Additional S3 users (access key => bucket grants), merged over the built-in ones (lakehouse-catalog, lakehouse-ingest, platform-backup, platform-logs). Secret keys are generated and stored in OpenBao at kv/storage/s3-users/<name>."
   type = map(object({
     read_write_buckets = optional(list(string), [])
     read_only_buckets  = optional(list(string), [])
   }))
-  default = {
-    "lakehouse-catalog" = { read_write_buckets = ["lakehouse-raw", "lakehouse-clean", "lakehouse-consolidated", "lakehouse-curated"] }
-    "lakehouse-ingest"  = { read_write_buckets = ["lakehouse-raw"] }
-    "platform-backup"   = { read_write_buckets = ["platform-backup"] }
-    "platform-logs"     = { read_write_buckets = ["platform-logs"] }
-  }
+  default = {}
 }
 
 variable "s3_client_namespaces" {
