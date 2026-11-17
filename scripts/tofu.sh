@@ -90,6 +90,11 @@ export TF_VAR_environment="$ENV"
 export TF_VAR_base_domain="$BASE_DOMAIN"
 export TF_VAR_registry_host="$REGISTRY_HOST"
 export TF_VAR_kubeconfig_path="$KUBECONFIG"
+# CA of the Zot registry, for workloads that pull OCI artefacts themselves (OPA bundle)
+if [[ -f "${REGISTRY_CA_FILE}" ]]; then
+  TF_VAR_registry_ca_pem="$(cat "${REGISTRY_CA_FILE}")"
+  export TF_VAR_registry_ca_pem
+fi
 
 var_files=()
 for f in "${REPO_ROOT}/environments/${ENV}/common.tfvars" "${REPO_ROOT}/environments/${ENV}/${stack}.tfvars"; do

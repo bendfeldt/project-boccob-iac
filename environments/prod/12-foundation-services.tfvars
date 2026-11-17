@@ -19,3 +19,23 @@ keycloak_resources = {
   requests = { cpu = "500m", memory = "1536Mi" }
   limits   = { memory = "2Gi" }
 }
+
+# --- registered by the data plane (stacks 20-catalog, 21-query, 22-orchestration) ---
+s3_users = {
+  # Trino: reads and writes Iceberg data files of all layers
+  "lakehouse-query" = { read_write_buckets = ["lakehouse-raw", "lakehouse-clean", "lakehouse-consolidated", "lakehouse-curated"] }
+  # Dagster run pods (dlt landing, erasure, retention): rw raw, read-only on the other layers (erasure storage scan)
+  "lakehouse-orchestration" = {
+    read_write_buckets = ["lakehouse-raw"]
+    read_only_buckets  = ["lakehouse-clean", "lakehouse-consolidated", "lakehouse-curated"]
+  }
+}
+oidc_clients = {
+  # service account that reads group memberships for the Trino file group provider
+  "trino-group-sync" = {
+    name                         = "Trino group sync"
+    standard_flow                = false
+    service_account              = true
+    service_account_client_roles = { "realm-management" = ["view-users", "query-groups"] }
+  }
+}

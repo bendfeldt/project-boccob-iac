@@ -463,6 +463,11 @@ locals {
     %{for role in c.service_account_roles~}
     kcadm add-roles -r "${var.realm}" --uusername "service-account-${id}" --rolename "${role}"
     %{endfor~}
+    %{for client, roles in c.service_account_client_roles~}
+    %{for role in roles~}
+    kcadm add-roles -r "${var.realm}" --uusername "service-account-${id}" --cclientid "${client}" --rolename "${role}"
+    %{endfor~}
+    %{endfor~}
     %{endfor~}
     echo "realm ${var.realm} configured: $(echo ${join(" ", keys(var.oidc_clients))})"
   SH

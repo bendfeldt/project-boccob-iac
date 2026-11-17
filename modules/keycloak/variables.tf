@@ -62,6 +62,8 @@ variable "oidc_clients" {
     direct_access_grants  = optional(bool, false)
     pkce_required         = optional(bool, false)
     service_account_roles = optional(list(string), [])
+    # client roles of other clients for the service account, e.g. { "realm-management" = ["view-users"] }
+    service_account_client_roles = optional(map(list(string)), {})
   }))
   default = {}
 }
