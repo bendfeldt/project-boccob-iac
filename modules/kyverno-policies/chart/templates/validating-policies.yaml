@@ -1,0 +1,64 @@
+{{- $root := . -}}
+{{- $containers := "object.spec.containers + object.spec.?initContainers.orValue([])" -}}
+{{- $all := printf "%s + object.spec.?ephemeralContainers.orValue([])" $containers -}}
+{{- $defs := list
+  (dict "name" "restrict-image-registries"
+        "title" "Images must come from the platform registry mirror"
+        "vars" $all
+        "expr" (printf "variables.ctrs.all(c, c.image.startsWith(%s))" (.Values.registryPrefix | quote | replace "\"" "'"))
+        "msg" (printf "images must be pulled from %s (air-gap mirror); mirror the image with `make airgap-mirror` first" .Values.registryPrefix))
+  (dict "name" "require-image-digest"
+        "title" "Images must be pinned by digest"
+        "vars" $all
+        "expr" "variables.ctrs.all(c, c.image.matches('@sha256:[a-f0-9]{64}$'))"
+        "msg" "images must be referenced by digest (<repo>[:tag]@sha256:...)")
+  (dict "name" "disallow-latest-tag"
+        "title" "The tag latest (or no tag at all) is not allowed"
+        "vars" $all
+        "expr" "variables.ctrs.all(c, !c.image.matches(':latest(@.*)?$') && (c.image.contains('@') || c.image.matches(':[^/]+$')))"
+        "msg" "images need an explicit version: the tag `latest` and untagged references are not allowed")
+  (dict "name" "require-run-as-non-root"
+        "title" "Containers must run as non-root"
+        "vars" $all
+        "expr" "variables.ctrs.all(c, c.?securityContext.?runAsNonRoot.orValue(object.spec.?securityContext.?runAsNonRoot.orValue(false)) == true)"
+        "msg" "runAsNonRoot: true is required (pod or container securityContext)")
+  (dict "name" "require-read-only-root-filesystem"
+        "title" "Containers must use a read-only root filesystem"
+        "vars" $all
+        "expr" "variables.ctrs.all(c, c.?securityContext.?readOnlyRootFilesystem.orValue(false) == true)"
+        "msg" "securityContext.readOnlyRootFilesystem: true is required; mount emptyDir volumes for writable paths")
+  (dict "name" "require-requests-limits"
+        "title" "Containers must declare CPU/memory requests and a memory limit"
+        "vars" $containers
+        "expr" "variables.ctrs.all(c, c.?resources.?requests.?cpu.hasValue() && c.?resources.?requests.?memory.hasValue() && c.?resources.?limits.?memory.hasValue())"
+        "msg" "resources.requests.cpu, resources.requests.memory and resources.limits.memory are required")
+-}}
+{{- range $def := $defs }}
+{{- if index $root.Values.policies $def.name }}
+{{- range $v := (include "boccob.variants" (dict "mode" $root.Values.mode "root" $root) | fromYamlArray) }}
+---
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: {{ $def.name }}{{ $v.suffix }}
+  labels:
+    {{- include "boccob.labels" $root | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: {{ $def.title | quote }}
+    policies.kyverno.io/category: Boccob supply chain and pod hardening
+spec:
+  validationActions: [{{ $v.action }}]
+  failurePolicy: {{ $root.Values.failurePolicy }}
+  evaluation:
+    background:
+      enabled: {{ and $root.Values.background (not $v.enforcedOnly) }}
+  {{- include "boccob.matchPods" (dict "root" $root "enforcedOnly" $v.enforcedOnly) | nindent 2 }}
+  variables:
+    - name: ctrs
+      expression: {{ $def.vars | quote }}
+  validations:
+    - expression: {{ $def.expr | quote }}
+      message: {{ $def.msg | quote }}
+{{- end }}
+{{- end }}
+{{- end }}

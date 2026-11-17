@@ -61,3 +61,55 @@ module "kyverno" {
   background_controller_enabled = var.kyverno_background_controller_enabled
   resources                     = var.kyverno_resources
 }
+
+# =============================================================================
+# Signing key for the solution artefacts: OpenBao transit, never exportable.
+# scripts/supply-chain/sign.sh signs with `cosign --key hashivault://<name>`.
+# =============================================================================
+resource "vault_mount" "transit" {
+  path        = "transit"
+  type        = "transit"
+  description = "Signing keys (cosign) — keys are created non-exportable"
+}
+
+resource "vault_transit_secret_backend_key" "cosign" {
+  backend          = vault_mount.transit.path
+  name             = var.cosign_key_name
+  type             = "ecdsa-p256"
+  exportable       = false
+  deletion_allowed = false
+}
+
+# Release engineers / the publishing job get this policy: sign and read the
+# public key, nothing else.
+resource "vault_policy" "cosign_signer" {
+  name   = "cosign-signer"
+  policy = <<-EOT
+    path "${vault_mount.transit.path}/keys/${var.cosign_key_name}" { capabilities = ["read"] }
+    path "${vault_mount.transit.path}/sign/${var.cosign_key_name}" { capabilities = ["update"] }
+    path "${vault_mount.transit.path}/sign/${var.cosign_key_name}/*" { capabilities = ["update"] }
+    path "${vault_mount.transit.path}/verify/${var.cosign_key_name}" { capabilities = ["update"] }
+    path "${vault_mount.transit.path}/verify/${var.cosign_key_name}/*" { capabilities = ["update"] }
+  EOT
+}
+
+locals {
+  # every key version stays valid for verification until it is trimmed in OpenBao
+  cosign_public_keys = [for k in vault_transit_secret_backend_key.cosign.keys : k.public_key]
+
+  builtin_exceptions = []
+}
+
+module "policies" {
+  source                = "../../modules/kyverno-policies"
+  namespace             = module.kyverno.namespace
+  registry_host         = var.registry_host
+  mode                  = var.policy_mode
+  failure_policy        = coalesce(var.policy_failure_policy, var.ha ? "Fail" : "Ignore")
+  excluded_namespaces   = var.policy_excluded_namespaces
+  policies              = var.policy_overrides
+  signature_public_keys = local.cosign_public_keys
+  signature_mode        = var.signature_mode
+  keyless_policies      = var.keyless_policies
+  exceptions            = concat(local.builtin_exceptions, var.policy_exceptions)
+}

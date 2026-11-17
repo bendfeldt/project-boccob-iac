@@ -1,0 +1,90 @@
+{{- $root := . -}}
+{{- if and .Values.signature.enabled .Values.signature.publicKeys }}
+{{- range $v := (include "boccob.variants" (dict "mode" (default .Values.mode .Values.signature.mode) "root" $root) | fromYamlArray) }}
+---
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: verify-solution-image-signatures{{ $v.suffix }}
+  labels:
+    {{- include "boccob.labels" $root | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: "Solution images must be signed with the platform cosign key"
+    policies.kyverno.io/category: Boccob supply chain and pod hardening
+spec:
+  validationActions: [{{ $v.action }}]
+  failurePolicy: {{ $root.Values.failurePolicy }}
+  evaluation:
+    background:
+      enabled: {{ and $root.Values.background (not $v.enforcedOnly) }}
+  {{- include "boccob.matchPods" (dict "root" $root "enforcedOnly" $v.enforcedOnly) | nindent 2 }}
+  matchImageReferences:
+    {{- range $root.Values.signature.imageGlobs }}
+    - glob: {{ . | quote }}
+    {{- end }}
+  validationConfigurations:
+    mutateDigest: false
+    verifyDigest: false
+    required: false
+  attestors:
+    {{- range $i, $key := $root.Values.signature.publicKeys }}
+    - name: key{{ $i }}
+      cosign:
+        key:
+          data: {{ $key | quote }}
+        # air-gap: signatures are made without a transparency log entry
+        ctlog:
+          insecureIgnoreTlog: true
+          insecureIgnoreSCT: true
+    {{- end }}
+  validations:
+    - expression: >-
+        (images.containers + images.initContainers).all(image,
+        verifyImageSignatures(image, [{{- range $i, $key := $root.Values.signature.publicKeys }}{{ if $i }}, {{ end }}attestors.key{{ $i }}{{- end }}]) > 0)
+      message: "solution images must carry a valid cosign signature of the platform signing key (scripts/supply-chain/sign.sh)"
+{{- end }}
+{{- end }}
+{{- range $k := .Values.keyless }}
+---
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: verify-upstream-signature-{{ $k.name }}
+  labels:
+    {{- include "boccob.labels" $root | nindent 4 }}
+  annotations:
+    policies.kyverno.io/title: {{ printf "Upstream keyless signature: %s" $k.name | quote }}
+spec:
+  validationActions: [{{ if eq (default $root.Values.mode $k.mode) "Enforce" }}Deny{{ else }}Audit{{ end }}]
+  failurePolicy: {{ $root.Values.failurePolicy }}
+  evaluation:
+    background:
+      enabled: {{ $root.Values.background }}
+  {{- include "boccob.matchPods" (dict "root" $root "enforcedOnly" false) | nindent 2 }}
+  matchImageReferences:
+    {{- range $k.imageGlobs }}
+    - glob: {{ . | quote }}
+    {{- end }}
+  validationConfigurations:
+    mutateDigest: false
+    verifyDigest: false
+    required: false
+  attestors:
+    - name: upstream
+      cosign:
+        keyless:
+          identities:
+            - issuer: {{ $k.issuer | quote }}
+              subjectRegExp: {{ $k.subjectRegExp | quote }}
+        {{- with $k.tufMirror }}
+        tuf:
+          mirror: {{ . | quote }}
+        {{- end }}
+        {{- with $k.trustedRoot }}
+        trustedRoot:
+          value: {{ . | quote }}
+        {{- end }}
+  validations:
+    - expression: "(images.containers + images.initContainers).all(image, verifyImageSignatures(image, [attestors.upstream]) > 0)"
+      message: {{ printf "image must carry the upstream keyless signature (%s)" $k.name | quote }}
+{{- end }}

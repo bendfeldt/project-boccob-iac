@@ -1,0 +1,29 @@
+# All values are set by modules/kyverno-policies (main.tf); the defaults only
+# make `helm template` work on its own.
+registryPrefix: "registry.example.internal:5000/"
+# Audit | Enforce (cluster-wide default)
+mode: Audit
+# Namespaces carrying this label are enforced (Deny) even while mode=Audit.
+enforceLabel:
+  key: boccob.io/policy-enforce
+  value: "true"
+# Ignore | Fail: what the API server does when Kyverno cannot answer
+failurePolicy: Ignore
+excludedNamespaces: [kube-system]
+background: true
+policies:
+  restrict-image-registries: true
+  require-image-digest: true
+  disallow-latest-tag: true
+  require-run-as-non-root: true
+  require-read-only-root-filesystem: true
+  require-requests-limits: true
+signature:
+  enabled: false
+  imageGlobs: []
+  publicKeys: []
+  # Audit | Enforce | "" (= mode)
+  mode: ""
+keyless: []
+exceptions: []
+exceptionNamespace: kyverno

@@ -1,0 +1,27 @@
+{{- $root := . -}}
+{{- range $e := .Values.exceptions }}
+---
+apiVersion: policies.kyverno.io/v1
+kind: PolicyException
+metadata:
+  name: {{ $e.name }}
+  namespace: {{ $root.Values.exceptionNamespace }}
+  labels:
+    {{- include "boccob.labels" $root | nindent 4 }}
+  annotations:
+    boccob.io/justification: {{ $e.justification | quote }}
+spec:
+  policyRefs:
+    {{- range $p := $e.policies }}
+    {{- $kind := ternary "ImageValidatingPolicy" "ValidatingPolicy" (hasPrefix "verify-" $p) }}
+    - name: {{ $p }}
+      kind: {{ $kind }}
+    {{- if ne $root.Values.mode "Enforce" }}
+    - name: {{ $p }}-enforce
+      kind: {{ $kind }}
+    {{- end }}
+    {{- end }}
+  matchConditions:
+    - name: scope
+      expression: {{ $e.expression | quote }}
+{{- end }}
