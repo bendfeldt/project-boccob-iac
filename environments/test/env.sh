@@ -27,3 +27,6 @@ export OPENBAO_ROOT_TOKEN_PGP_KEY="${OPENBAO_ROOT_TOKEN_PGP_KEY:-}"
 # TOFU_STATE_PASSPHRASE (from the password vault / HSM-backed secret store);
 # never written to disk by the scripts in this mode.
 export STATE_ENCRYPTION="pbkdf2-env"
+
+# deploy.sh refuses to deploy while admission policies are in Audit mode
+export REQUIRE_POLICY_ENFORCE=1

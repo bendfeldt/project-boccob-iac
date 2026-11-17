@@ -16,6 +16,23 @@ require_cmd tofu kubectl
 
 kubectl get --raw /readyz >/dev/null 2>&1 || die "cluster not reachable with ${KUBECONFIG} (make cluster-up ENV=${ENV})"
 
+# Admission policies must enforce in prod (and wherever REQUIRE_POLICY_ENFORCE=1
+# in env.sh): refuse to deploy while 31-policy would run in Audit mode.
+# A staged roll-out can acknowledge it explicitly: POLICY_AUDIT_ACK=<env>.
+policy_enforced() {
+  local f="${REPO_ROOT}/environments/${ENV}/31-policy.tfvars"
+  [[ -f "$f" ]] \
+    && grep -Eq '^[[:space:]]*policy_mode[[:space:]]*=[[:space:]]*"Enforce"' "$f" \
+    && grep -Eq '^[[:space:]]*signature_mode[[:space:]]*=[[:space:]]*"Enforce"' "$f"
+}
+if [[ "$ENV" == "prod" || "${REQUIRE_POLICY_ENFORCE:-0}" == "1" ]] && ! policy_enforced; then
+  if [[ "${POLICY_AUDIT_ACK:-}" == "$ENV" ]]; then
+    warn "admission policies are NOT enforced in ${ENV} (acknowledged with POLICY_AUDIT_ACK)"
+  else
+    die "environments/${ENV}/31-policy.tfvars must set policy_mode and signature_mode to \"Enforce\" (or POLICY_AUDIT_ACK=${ENV} for a documented, temporary exception)"
+  fi
+fi
+
 stacks=()
 if [[ -n "$only" ]]; then
   [[ -d "${REPO_ROOT}/stacks/${only}" ]] || die "unknown stack: ${only}"
