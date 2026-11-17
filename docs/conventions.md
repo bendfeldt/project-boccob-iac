@@ -84,7 +84,8 @@ environments/<env>/NN-name.tfvars        (optional sizing per environment)
   (`provider "vault" { skip_child_token = true }`): port-forward, CA and token
   are handled by `scripts/tofu.sh`.
 - Keep states small (see architecture.md, "OpenTofu state"); split
-  `20-data-plane` into several stacks if needed.
+  a stack before it grows (the data plane is split into `20-catalog`,
+  `21-query`, `22-orchestration`).
 - Commit the `.terraform.lock.hcl` of the stack.
 
 ## 4. Add a mirrored image or chart

@@ -18,7 +18,9 @@
  |                         ClusterIssuer openbao-pki; ClusterSecretStores         |
  | 12-foundation-services  database (CNPG cluster), storage (RustFS + buckets),   |
  |                         identity (Keycloak realm lakehouse), ingress hosts     |
- | 20-data-plane           placeholder: Polaris, Trino + OPA, Dagster             |
+ | 20-catalog              catalog: Polaris (+ polaris-db), catalogs, principals  |
+ | 21-query                query: Trino + OPA (policy bundle from Zot)            |
+ | 22-orchestration        orchestration: Dagster (+ dagster-db), oauth2-proxy    |
  | 30-observability        Prometheus/Alertmanager, Loki (tenants platform/audit),|
  |                         OTel log collector, audit WORM archive, Grafana        |
  | 31-policy               Kyverno + policy set, cosign key (OpenBao transit)     |
@@ -111,7 +113,7 @@ done by the k3s embedded network policy controller (verified by
 | `database` | 12 | all CloudNativePG clusters |
 | `storage` | 12 | RustFS |
 | `identity` | 12 | Keycloak |
-| `catalog`, `query`, `orchestration` | 20 | Polaris, Trino + OPA, Dagster |
+| `catalog`, `query`, `orchestration` | 20, 21, 22 | Polaris, Trino + OPA, Dagster (docs/data-plane.md) |
 | `observability` | 30 | Prometheus, Alertmanager, Loki, Grafana, audit archive |
 | `observability-agent` | 30 | OTel log collector DaemonSet (PSS privileged: read-only hostPath) |
 | `kyverno` | 31 | Kyverno, PolicyExceptions |
