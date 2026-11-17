@@ -233,6 +233,14 @@ netpol_denied() {
 check "default-deny: foreign namespace cannot reach PostgreSQL" netpol_denied
 
 # ------------------------------------------------------------------------------
+# checks of the later work packages: scripts/verify.d/*.sh, sourced in name order
+for f in "${REPO_ROOT}"/scripts/verify.d/*.sh; do
+  [[ -f "$f" ]] || continue
+  # shellcheck source=/dev/null
+  source "$f"
+done
+
+# ------------------------------------------------------------------------------
 printf '\n== verify summary (%s): %d passed, %d failed\n' "$ENV" "$PASS" "$FAIL"
 if (( FAIL > 0 )); then
   printf '%s\n' "${RESULTS[@]}" | grep '^FAIL' || true
