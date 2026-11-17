@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Helpers for scripts that talk to the data plane (verify, dev e2e).
-# Requires scripts/lib/common.sh and load_env.
+# Source after load_env (needs BASE_DOMAIN).
 
 # ingress address as seen from this machine (dev: loopback of the node container)
 DP_INGRESS_IP="${INGRESS_IP:-127.0.0.1}"
