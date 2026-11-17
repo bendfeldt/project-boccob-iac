@@ -13,6 +13,17 @@ data "kubernetes_config_map_v1" "platform_ca" {
 }
 
 locals {
+  # continuous backup to s3://platform-backup/postgres/<cluster> (ops work
+  # package, stack 32-backup): credentials + CA Secret are created by stack 12
+  postgres_backup = var.postgres_backup == null ? null : {
+    destination_path   = "s3://platform-backup/postgres"
+    endpoint_url       = local.platform.s3_url
+    credentials_secret = "platform-backup-s3"
+    ca_secret          = "platform-ca"
+    retention_policy   = var.postgres_backup.retention_policy
+    schedule           = var.postgres_backup.schedule
+    encryption         = var.postgres_backup.encryption
+  }
   ns              = local.platform.namespaces
   platform_ca_pem = data.kubernetes_config_map_v1.platform_ca.data["ca.crt"]
   auth_labels     = { "app.kubernetes.io/name" = "dagster-auth" }
@@ -56,6 +67,7 @@ module "dagster_db" {
   namespace     = local.ns.database
   image         = module.versions.images["postgresql"].ref
   instances     = coalesce(var.postgres_instances, var.ha ? 3 : 1)
+  backup        = local.postgres_backup
   database      = "dagster"
   storage_size  = var.postgres_storage_size
   storage_class = var.storage_class

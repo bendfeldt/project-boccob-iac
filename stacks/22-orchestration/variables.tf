@@ -92,3 +92,13 @@ variable "orchestration_resource_quota" {
     "pods"            = "40"
   }
 }
+
+variable "postgres_backup" {
+  description = "Continuous backup (base backups + WAL, PITR) of this stack's PostgreSQL cluster to s3://platform-backup/postgres/<cluster>. null = off."
+  type = object({
+    retention_policy = optional(string, "7d")
+    schedule         = optional(string, "0 30 1 * * *")
+    encryption       = optional(string, "AES256")
+  })
+  default = {}
+}
