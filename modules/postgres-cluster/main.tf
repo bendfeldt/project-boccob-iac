@@ -69,6 +69,10 @@ locals {
     var.backup == null ? {} : {
       backup = {
         retentionPolicy = var.backup.retention_policy
+        # CloudNativePG's default, set explicitly: the admission webhook fills it
+        # in, which the kubernetes provider reports as an inconsistent result
+        # when backup is added to an existing cluster
+        target = "prefer-standby"
         barmanObjectStore = {
           # barman writes below <destinationPath>/<serverName = cluster name>/
           destinationPath = var.backup.destination_path

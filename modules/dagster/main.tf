@@ -45,10 +45,10 @@ locals {
     port               = 4000
     env                = local.env_list
     envSecrets         = [{ name = local.env_secret }]
-    # run pods inherit these: op outputs of the default fs IO manager go to
-    # $DAGSTER_HOME/storage (read-only root filesystem otherwise)
-    volumes                     = concat(local.volumes, [{ name = "dagster-storage", emptyDir = {} }])
-    volumeMounts                = concat(local.volume_mounts, [{ name = "dagster-storage", mountPath = "/opt/dagster/dagster_home/storage" }])
+    # run pods inherit these: writable $DAGSTER_HOME (op outputs of the default
+    # fs IO manager in storage/, history/), the root filesystem is read-only
+    volumes                     = concat(local.volumes, [{ name = "dagster-home", emptyDir = {} }])
+    volumeMounts                = concat(local.volume_mounts, [{ name = "dagster-home", mountPath = "/opt/dagster/dagster_home" }])
     includeConfigInLaunchedRuns = { enabled = true }
     podSecurityContext          = local.pod_secctx
     securityContext             = local.container_sctx
