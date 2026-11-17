@@ -76,8 +76,21 @@ variable "buckets" {
   description = "Additional buckets (name => { versioning }), merged over the contract buckets defined in main.tf (lakehouse-raw/clean/consolidated/curated, platform-backup, platform-logs)."
   type = map(object({
     versioning = optional(bool, true)
+    object_lock = optional(object({
+      mode = string
+      days = number
+    }))
   }))
   default = {}
+}
+
+variable "audit_archive_lock" {
+  description = "Object lock of the audit archive bucket platform-audit (WORM copy of the audit trail, written by stack 30-observability). mode compliance|governance, days = default retention of every archived object."
+  type = object({
+    mode = string
+    days = number
+  })
+  default = { mode = "compliance", days = 365 }
 }
 
 variable "s3_users" {

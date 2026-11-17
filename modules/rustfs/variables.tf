@@ -76,9 +76,20 @@ variable "ca_configmap" {
 }
 
 variable "buckets" {
-  description = "Buckets to create (idempotent). versioning = true enables S3 object versioning."
+  description = <<-EOT
+    Buckets to create (idempotent). versioning = true enables S3 object versioning.
+    object_lock = { mode = "compliance"|"governance", days } creates the bucket
+    with S3 object lock (only possible at creation: an existing bucket without
+    lock is NOT converted) and sets the default retention; with compliance no
+    one, including the RustFS root user, can delete a locked object version
+    before it expires (verified on RustFS 1.0.6).
+  EOT
   type = map(object({
     versioning = optional(bool, true)
+    object_lock = optional(object({
+      mode = string
+      days = number
+    }))
   }))
   default = {}
 }

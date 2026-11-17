@@ -174,8 +174,13 @@ locals {
       sleep 5
     done
     %{for bucket, cfg in var.buckets~}
+    %{if cfg.object_lock != null~}
+    rc bucket create "platform/${bucket}" --ignore-existing --with-lock
+    rc retention set --default "${cfg.object_lock.mode}" "${cfg.object_lock.days}d" "platform/${bucket}"
+    %{else~}
     rc bucket create "platform/${bucket}" --ignore-existing
-    %{if cfg.versioning~}
+    %{endif~}
+    %{if cfg.versioning || cfg.object_lock != null~}
     rc bucket version enable "platform/${bucket}"
     %{endif~}
     %{endfor~}

@@ -47,6 +47,8 @@ locals {
     "lakehouse-curated"      = {}
     "platform-backup"        = {}
     "platform-logs"          = {}
+    # WORM archive of the audit trail (object lock, default retention)
+    "platform-audit" = { object_lock = var.audit_archive_lock }
   }
   buckets = merge(local.default_buckets, var.buckets)
 
@@ -56,7 +58,7 @@ locals {
     # dlt landing
     "lakehouse-ingest" = { read_write_buckets = ["lakehouse-raw"] }
     "platform-backup"  = { read_write_buckets = ["platform-backup"] }
-    "platform-logs"    = { read_write_buckets = ["platform-logs"] }
+    "platform-logs"    = { read_write_buckets = ["platform-logs", "platform-audit"] }
   }
   s3_users = merge(local.default_s3_users, var.s3_users)
 }

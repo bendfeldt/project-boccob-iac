@@ -35,3 +35,6 @@ oidc_clients = {
     direct_access_grants = true
   }
 }
+
+# ops (stack 30-observability), dev only: short WORM retention of the audit archive
+audit_archive_lock = { mode = "compliance", days = 2 }
