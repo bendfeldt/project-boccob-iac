@@ -21,6 +21,20 @@ CFG
   for san in "${_sans[@]}"; do printf '  - "%s"\n' "$san"; done
   if [[ "$init" == "true" ]]; then echo 'cluster-init: true'; fi
   if [[ -n "$server_url" ]]; then printf 'server: "%s"\n' "$server_url"; fi
+  # embedded etcd (HA servers): scheduled, compressed snapshots on every server
+  # (/var/lib/rancher/k3s/server/db/snapshots). Optional copy to an S3 target
+  # OUTSIDE this cluster: K3S_ETCD_S3_CONFIG_SECRET = Secret in kube-system with
+  # the etcd-s3 settings (k3s --etcd-s3-config-secret). Snapshots contain the
+  # datastore incl. encrypted Secrets; restoring needs the server token.
+  if [[ "$init" == "true" || -n "$server_url" ]]; then
+    printf 'etcd-snapshot-schedule-cron: "%s"\n' "${K3S_ETCD_SNAPSHOT_CRON:-0 */6 * * *}"
+    printf 'etcd-snapshot-retention: %s\n' "${K3S_ETCD_SNAPSHOT_RETENTION:-28}"
+    echo 'etcd-snapshot-compress: true'
+    if [[ -n "${K3S_ETCD_S3_CONFIG_SECRET:-}" ]]; then
+      echo 'etcd-s3: true'
+      printf 'etcd-s3-config-secret: "%s"\n' "$K3S_ETCD_S3_CONFIG_SECRET"
+    fi
+  fi
   cat <<CFG
 # --- CIS / hardening ----------------------------------------------------------
 secrets-encryption: true
