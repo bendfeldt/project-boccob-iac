@@ -154,3 +154,13 @@ variable "postgres_backup" {
   })
   default = {}
 }
+
+variable "lakehouse_noncurrent_version_days" {
+  description = "Days after which noncurrent (deleted or overwritten) object versions in the four lakehouse buckets are removed by the RustFS lifecycle scanner; expired delete markers are removed too. Bounds how long erased or retention-deleted data stays recoverable from object versions; the erasure job additionally deletes versions explicitly. Minimum 1 (S3 lifecycle granularity is days)."
+  type        = number
+  default     = 1
+  validation {
+    condition     = var.lakehouse_noncurrent_version_days >= 1
+    error_message = "lakehouse_noncurrent_version_days must be at least 1."
+  }
+}

@@ -83,12 +83,22 @@ variable "buckets" {
     lock is NOT converted) and sets the default retention; with compliance no
     one, including the RustFS root user, can delete a locked object version
     before it expires (verified on RustFS 1.0.6).
+    lifecycle = { noncurrent_days, expired_delete_markers } expires noncurrent
+    versions (needed wherever deletions must become final, e.g. GDPR erasure).
   EOT
   type = map(object({
     versioning = optional(bool, true)
     object_lock = optional(object({
       mode = string
       days = number
+    }))
+    # Lifecycle (replaces the bucket's whole lifecycle configuration on every
+    # provisioning run). noncurrent_days: delete overwritten/deleted object
+    # versions after N days; expired_delete_markers: remove delete markers that
+    # no longer hide any version. Evaluated by the RustFS scanner (1-day granularity).
+    lifecycle = optional(object({
+      noncurrent_days        = number
+      expired_delete_markers = optional(bool, true)
     }))
   }))
   default = {}

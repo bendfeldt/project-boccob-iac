@@ -94,6 +94,13 @@ check "Kyverno exception honoured (keycloak: no read-only-rootfs failure reporte
   '! kubectl -n identity get policyreports.wgpolicyk8s.io -o json | jq -e "[.items[].results[]? | select(.policy == \"require-read-only-root-filesystem\" and .result == \"fail\")] | length > 0"'
 
 # ------------------------------------------------------------------------------
+step "Object storage lifecycle (erasure finality)"
+for b in lakehouse-raw lakehouse-clean lakehouse-consolidated lakehouse-curated; do
+  check "bucket ${b}: noncurrent versions + expired delete markers expire (lifecycle)" bash -c \
+    "$(declare -f s3_list icurl); ca='$ca' INGRESS_PORT='$INGRESS_PORT' INGRESS_IP='$INGRESS_IP' s3_host='$s3_host' s3_list '/${b}?lifecycle' > '${tmp}/lc-${b}'; grep -q '<NoncurrentDays>' '${tmp}/lc-${b}' && grep -q '<ExpiredObjectDeleteMarker>true' '${tmp}/lc-${b}'"
+done
+
+# ------------------------------------------------------------------------------
 step "Backup"
 check "every CloudNativePG cluster archives WAL (ContinuousArchiving=True)" bash -c \
   'kubectl -n database get clusters.postgresql.cnpg.io -o json | jq -e "[.items[] | select(.spec.backup.barmanObjectStore != null)] as \$b | (\$b | length) > 0 and all(\$b[]; any(.status.conditions[]?; .type == \"ContinuousArchiving\" and .status == \"True\"))"'

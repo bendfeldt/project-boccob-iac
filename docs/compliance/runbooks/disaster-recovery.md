@@ -15,9 +15,16 @@ from its business impact analysis **[manual]**. What the mechanisms give:
 | Cluster state (k3s datastore) | etcd snapshots on HA servers every 6 h, 28 kept (`scripts/lib/k3s-config.sh`) | 6 h | **[static]** |
 | Configuration | git (both repositories) + `versions.lock.yaml` + Zot | — | redeploy with `make deploy` |
 
-Retention: PostgreSQL `retention_policy` (stack 12 `postgres_backup`, default 7d),
-OpenBao snapshots `openbao_snapshot_retention_days`, deleted versions
-`noncurrent_version_retention_days` (S3 lifecycle, applied by the snapshot job).
+Retention:
+- PostgreSQL: `retention_policy` (stack 12 `postgres_backup`, default 7d).
+- OpenBao snapshots: `openbao_snapshot_retention_days`; deleted versions in
+  `platform-backup`: `noncurrent_version_retention_days` (S3 lifecycle on
+  `platform-backup` only, applied by the snapshot job).
+- Lakehouse buckets: versioned, but noncurrent versions expire after
+  `lakehouse_noncurrent_version_days` (stack 12, default 1 day) so that erasure
+  and retention deletes become final. Object versions are therefore **not** a
+  recovery mechanism for lake data beyond that window: use Iceberg snapshots
+  (within their expiry) and the off-site copy.
 
 ## Regular test
 

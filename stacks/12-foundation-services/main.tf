@@ -45,11 +45,18 @@ locals {
   }
   oidc_clients = merge(local.default_oidc_clients, var.oidc_clients)
 
+  lakehouse_lifecycle = {
+    noncurrent_days        = var.lakehouse_noncurrent_version_days
+    expired_delete_markers = true
+  }
   default_buckets = {
-    "lakehouse-raw"          = {}
-    "lakehouse-clean"        = {}
-    "lakehouse-consolidated" = {}
-    "lakehouse-curated"      = {}
+    # versioned for accidental-deletion protection, but deleted/overwritten
+    # versions expire quickly so that erasure and retention deletes become
+    # final (GDPR art. 17, 5(1)(e)); Iceberg snapshots give the time travel
+    "lakehouse-raw"          = { lifecycle = local.lakehouse_lifecycle }
+    "lakehouse-clean"        = { lifecycle = local.lakehouse_lifecycle }
+    "lakehouse-consolidated" = { lifecycle = local.lakehouse_lifecycle }
+    "lakehouse-curated"      = { lifecycle = local.lakehouse_lifecycle }
     "platform-backup"        = {}
     "platform-logs"          = {}
     # WORM archive of the audit trail (object lock, default retention)

@@ -183,6 +183,9 @@ locals {
     %{if cfg.versioning || cfg.object_lock != null~}
     rc bucket version enable "platform/${bucket}"
     %{endif~}
+    %{if cfg.lifecycle != null~}
+    rc bucket lifecycle rule import "platform/${bucket}" "/config/lifecycle-${bucket}.json"
+    %{endif~}
     %{endfor~}
     %{for name, user in var.users~}
     rc admin policy create platform/ "${name}" "/config/policy-${name}.json"
@@ -193,7 +196,7 @@ locals {
     rc bucket list platform/
   SH
 
-  provision_hash = substr(sha256(join("\n", [local.provision_script, jsonencode(local.user_policies), var.images["rc"].ref])), 0, 10)
+  provision_hash = substr(sha256(join("\n", [local.provision_script, jsonencode(local.user_policies), jsonencode(var.buckets), var.images["rc"].ref])), 0, 10)
 }
 
 resource "kubernetes_config_map_v1" "provision" {
@@ -205,6 +208,16 @@ resource "kubernetes_config_map_v1" "provision" {
   data = merge(
     { "provision.sh" = local.provision_script },
     { for name, policy in local.user_policies : "policy-${name}.json" => policy },
+    { for bucket, cfg in var.buckets : "lifecycle-${bucket}.json" => jsonencode({
+      rules = [merge(
+        {
+          id                          = "noncurrent-versions"
+          status                      = "Enabled"
+          noncurrentVersionExpiration = { noncurrentDays = cfg.lifecycle.noncurrent_days }
+        },
+        cfg.lifecycle.expired_delete_markers ? { expiredObjectDeleteMarker = true } : {},
+      )]
+    }) if cfg.lifecycle != null },
   )
 }
 
