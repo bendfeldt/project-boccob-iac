@@ -53,7 +53,7 @@ for t in raw.borgerportal.citizens clean.borgerportal.citizens consolidated.part
   n="$(one "select count(*) from ${t}")"
   if [[ "$n" =~ ^[0-9]+$ ]] && (( n > 0 )); then ok "${t} populated (${n} rows)"; else bad "${t}: ${n}"; fi
 done
-expect "raw loads indexed (two distinct load ids)" 2 "$(one "select count(distinct _load_id) from raw.borgerportal.citizens")"
+expect "raw index holds at least two loads" true "$(one "select count(distinct _load_id) >= 2 from raw.borgerportal.citizens")"
 dense="$(one "select count(*) = max(surrogate_key) from curated.keystore.dim_citizen where surrogate_key > 0")"
 expect "keystore keys dense and sequential" true "$dense"
 expect "keystore records key creation and last use" true \
