@@ -201,6 +201,13 @@ images:
     groups:
       - data-plane
     index_digest: sha256:c3415e8660af553f5e18f5d90db050614c02493c0ac6260ac59442f6d9b12048
+  dagster:
+    source: docker.io/dagster/dagster-celery-k8s
+    tag: 1.13.30
+    digest: sha256:91a36b78f1816563fdffb11442de324e5705fe2e1f0ac6ec909d9c768ea9f6c8
+    groups:
+      - data-plane
+    index_digest: sha256:d2a97760b77d3b3be68600a3bbab5272d7bbe519eb073a302b491612c2d90de3
   python:
     source: docker.io/library/python
     tag: 3.13-slim-bookworm

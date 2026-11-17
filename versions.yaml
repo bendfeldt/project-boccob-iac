@@ -147,6 +147,11 @@ images:
     source: quay.io/oauth2-proxy/oauth2-proxy
     tag: v7.15.6
     groups: [data-plane]
+  dagster:
+    # webserver + daemon (chart default image; the code location image has no dagster-webserver)
+    source: docker.io/dagster/dagster-celery-k8s
+    tag: 1.13.30
+    groups: [data-plane]
   python:
     # provisioning Jobs and small sidecars (Polaris provisioning, Trino group sync / audit sink)
     source: docker.io/library/python
