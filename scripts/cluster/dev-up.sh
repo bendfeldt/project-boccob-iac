@@ -121,6 +121,18 @@ kubectl get nodes -o wide >&2
 # `make openbao-unseal`).
 if kubectl -n secrets get statefulset openbao >/dev/null 2>&1 && [[ -f "${STATE_DIR}/openbao/init.json" ]]; then
   step "unseal OpenBao (dev)"
-  "${REPO_ROOT}/scripts/openbao/init.sh" "$ENV" --unseal
+  # after a host restart openbao-0 may still be (re)starting: wait until its
+  # container runs, then retry the unseal a few times
+  wait_for 300 "openbao-0 container running" bash -c \
+    "kubectl -n secrets get pod openbao-0 -o jsonpath='{.status.containerStatuses[0].state.running.startedAt}' | grep -q ."
+  for attempt in 1 2 3 4 5; do
+    "${REPO_ROOT}/scripts/openbao/init.sh" "$ENV" --unseal && break
+    (( attempt < 5 )) || die "OpenBao unseal failed 5 times (make openbao-unseal ENV=${ENV})"
+    warn "unseal attempt ${attempt} failed, retrying in 15 s"
+    sleep 15
+  done
+  # External Secrets marks the read store invalid while OpenBao is sealed; make
+  # it re-validate now instead of at its next periodic reconcile
+  kubectl annotate clustersecretstore openbao openbao-push "boccob.io/revalidate=$(date +%s)" --overwrite >/dev/null 2>&1 || true
 fi
 log "dev cluster is up. export KUBECONFIG=${KUBECONFIG}"
