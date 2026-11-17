@@ -31,3 +31,6 @@ export OPENBAO_KEY_THRESHOLD=1
 export OPENBAO_REPLICAS=1
 # state encryption key provider: pbkdf2 passphrase generated into ${STATE_DIR}
 export STATE_ENCRYPTION="pbkdf2"
+
+# optional components not deployed on dev (Grafana, ~480 MB): not mirrored, not checked
+export MIRROR_EXCLUDE_GROUPS="${MIRROR_EXCLUDE_GROUPS-observability-ui}"

@@ -110,12 +110,16 @@ lock_q() {
   lock_json | jq -r "$@" "$filter"
 }
 # lock_keys <images|charts|binaries> [groups-csv]  -> keys, optionally filtered by group
+# MIRROR_EXCLUDE_GROUPS=a,b drops entries whose groups are ALL excluded (optional
+# components an environment does not deploy, e.g. observability-ui on dev).
 lock_keys() {
   local kind="$1" groups="${2:-}"
-  lock_json | jq -r --arg kind "$kind" --arg groups "$groups" '
+  lock_json | jq -r --arg kind "$kind" --arg groups "$groups" --arg ex "${MIRROR_EXCLUDE_GROUPS:-}" '
     ($groups | split(",") | map(select(length > 0))) as $g
+    | ($ex | split(",") | map(select(length > 0))) as $x
     | .[$kind] | to_entries[]
-    | select(($g | length) == 0 or ((.value.groups // []) | any(. as $x | $g | index($x))))
+    | select(($g | length) == 0 or ((.value.groups // []) | any(. as $y | $g | index($y))))
+    | select(($x | length) == 0 or ((.value.groups // []) | length == 0) or ((.value.groups // []) | all(. as $y | $x | index($y))) | not)
     | .key'
 }
 # image_zot_repo <key>      -> <registry>/<source>
