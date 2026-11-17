@@ -97,7 +97,24 @@ locals {
   # every key version stays valid for verification until it is trimmed in OpenBao
   cosign_public_keys = [for k in vault_transit_secret_backend_key.cosign.keys : k.public_key]
 
-  builtin_exceptions = []
+  # Exceptions for foundation workloads, each with its reason. Remove an entry
+  # when the workload is fixed; `make verify` checks that they are honoured.
+  builtin_exceptions = [
+    {
+      name          = "keycloak-writable-rootfs"
+      policies      = ["require-read-only-root-filesystem"]
+      namespaces    = [local.platform.namespaces.identity]
+      name_prefixes = ["keycloak"]
+      justification = "The upstream Keycloak image augments itself (Quarkus build) into its root filesystem at start; an optimised custom image is an open hardening item (docs/runbook-bootstrap.md)."
+    },
+    {
+      name          = "rustfs-init-container-resources"
+      policies      = ["require-requests-limits"]
+      namespaces    = [local.platform.namespaces.storage]
+      name_prefixes = ["rustfs"]
+      justification = "The init container of the upstream RustFS chart has no resources block and no value to set one; the namespace LimitRange supplies defaults."
+    },
+  ]
 }
 
 module "policies" {
