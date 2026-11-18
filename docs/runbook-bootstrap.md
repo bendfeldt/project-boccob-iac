@@ -116,14 +116,33 @@ never written to disk. Consider auto-unseal (PKCS#11 HSM or a transit seal in
 a separate OpenBao) if unattended restarts are required; that is a change in
 `modules/openbao` (`seal` stanza) and replaces the Shamir procedure.
 
-Root token: needed once for stack `11-foundation-pki` (and until OIDC login is
-wired). Procedure: security officer decrypts it, exports `BAO_TOKEN` for
-`make deploy ENV=prod STACK=11-foundation-pki`, then
-`bao token revoke -self`. Later administrative runs use a short-lived token
-of an operator in the Keycloak group `platform-admin` (policy `platform-admin`
-exists; the OIDC auth method for people is **not configured yet** — see open
-items) or a new root token generated with `bao operator generate-root`
-(needs three custodians).
+OpenTofu never needs the root token: it runs with a token of the policy
+`tofu-deployer` (`scripts/openbao/tofu-deployer.hcl`: the secrets engines
+kv/pki/pki_int/transit, the kubernetes auth method and its roles, ACL policies
+except its own, PKI, transit key lifecycle; **no** secret values, transit
+signing, raft snapshots, seal, audit devices or token creation; verified on
+dev: kv read, raft snapshot, token create and rewriting its own policy are
+refused). Inherent limit: an identity that manages policies and auth roles can
+grant access indirectly, so the policy contains accidents and a leaked deploy
+token's blast radius, not a malicious operator (four-eyes review of the code).
+
+- dev: `scripts/tofu.sh` uses the root token of the init file only to (re)write
+  that policy and mint a 1 h, non-renewable `tofu-deployer` token, hands that
+  to OpenTofu and revokes it on exit (`OPENBAO_TOFU_ROOT=1` = old behaviour).
+- test/prod: root token once at bootstrap: the security officer decrypts it,
+  writes the policy and issues the deploy token, then revokes root:
+
+  ```
+  bao policy write tofu-deployer scripts/openbao/tofu-deployer.hcl
+  bao token create -policy=tofu-deployer -ttl=1h -explicit-max-ttl=2h -renewable=false -display-name=tofu-deployer
+  bao token revoke -self
+  ```
+
+  Every deploy exports `BAO_TOKEN` = such a token (issued by a platform-admin
+  token or, until the OIDC auth method for people is configured — open item —
+  by a root token from `bao operator generate-root` with three custodians).
+  Changes to `tofu-deployer.hcl` are applied with the same `bao policy write`
+  by an administrator, never by the deploy token itself.
 
 OpenTofu state passphrase (`TOFU_STATE_PASSPHRASE`, >= 32 characters): held in
 the same custody store, two sealed copies. Without it the state Secrets cannot
