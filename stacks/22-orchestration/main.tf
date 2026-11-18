@@ -114,8 +114,10 @@ module "dagster" {
     DBT_TARGET        = "password"
     SCHEDULES_ENABLED = tostring(var.schedules_enabled)
     SCHEDULE_TIMEZONE = "Europe/Copenhagen"
-    # thorough erasure: scan every object version of all layer buckets afterwards
-    ERASURE_VERIFY_STORAGE = "true"
+    # whole-lake scan of every object version after each erasure: O(size of the
+    # lake), so only where the lake is small (dev); test/prod verify with a
+    # separate periodic / targeted scan (docs/data-plane.md, "Erasure verification")
+    ERASURE_VERIFY_STORAGE = tostring(var.erasure_verify_storage)
   }, var.solution_env)
   solution_secrets = {
     S3_ACCESS_KEY_ID           = { kv_path = "storage/s3-users/${var.s3_user}", property = "access-key" }

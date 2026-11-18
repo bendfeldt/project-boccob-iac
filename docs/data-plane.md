@@ -127,7 +127,8 @@ same-namespace allow, so other pods there cannot query OPA [verified by `make ve
   `TRINO_HOST=trino.<base_domain>`, `TRINO_PORT=443` (through Traefik like every
   client: `X-Forwarded-For` in the audit trail can only be set by Traefik; direct
   access to 8443 is closed unless `trino_client_namespaces` lists a namespace).
-  `ERASURE_VERIFY_STORAGE=true` in all three environments (audit M-8).
+  `ERASURE_VERIFY_STORAGE` from `erasure_verify_storage`: `true` on dev only
+  (see "Erasure verification" below; audit M-8, N-1).
 - Concurrency: pool `lakehouse_writer` = 1 (Job running
   `dagster instance concurrency set`, idempotent; instance `pools.granularity: op`),
   queued run coordinator with `max_concurrent_runs`.
@@ -200,6 +201,49 @@ Trino's own query history (`system.runtime.queries`, in memory, visible to
 (`query.max-history`); the solution should stop putting keys into SQL (audit
 H-1, solution part).
 
+## Erasure verification
+
+`ERASURE_VERIFY_STORAGE=true` makes every erasure request read and decode
+**every object version of all four lake buckets** (solution
+`governance/erasure/storage_scan.py`, "O(size of the lake)"), while it holds the
+`lakehouse_writer` pool. At test/prod size that blocks `daily_refresh` for hours
+per request (audit N-1), so the switch is per environment:
+
+| Environment | `erasure_verify_storage` | Why |
+|---|---|---|
+| dev | `true` | the synthetic lake is a few MB; every erasure is proven physically |
+| test, prod | `false` | per-request whole-lake scan does not scale |
+
+What still runs on every request (solution, independent of the switch): the
+row counts of every plan step must be 0 afterwards (`verify_sql`), the subject's
+raw files are deleted with all their versions, Iceberg history is expired and
+the object versions of the affected objects are deleted explicitly. Separate
+verification in test/prod:
+
+1. **Periodic canary scan (test, monthly and after every release).** The
+   synthetic source carries a fictional canary subject; the run submits its
+   erasure and executes the erasure job with storage verification on (run
+   config, see below) in a quiet window. A hit fails the run and pages
+   through the Dagster failure alert. This proves the mechanism end to end on
+   the same code and storage layout as prod, without keeping any real
+   identifier for a later scan (the subject key is gone after the erasure, so a
+   later whole-lake search for a real subject is impossible by design).
+2. **Targeted scan on demand (prod).** For a request the DPO flags (e.g. a
+   complaint), the erasure job runs with storage verification enabled for that
+   run only, restricted to the object versions under the locations of the
+   tables in the plan plus the subject's raw file paths, in a maintenance
+   window outside `daily_refresh`.
+3. **Off-site copy.** The lake copy follows the source within one mirror run
+   plus the target's noncurrent-version expiry (stack 32, "Off-site copy and
+   erasure"); a canary scan of the off-site target is part of the yearly DR
+   exercise (runbook).
+
+Solution side (not in this repository): a run-config flag on the `erasure`
+job that overrides `ERASURE_VERIFY_STORAGE` for one run, and the targeted
+scope of the scan (table locations + raw paths instead of whole buckets). Until
+the flag exists, (1) runs in test by deploying stack 22 with
+`erasure_verify_storage = true` for the window and back to `false` afterwards.
+
 ## Alignment with the solution's platform contract
 
 `project-boccob/docs/platform-contract.md` (updated with the solution's audit
@@ -212,7 +256,7 @@ fixes) now describes the platform as deployed. Checked point by point:
 | groups `platform-admin`, `data-engineer`, `analyst`, `pii-reader`, `auditor`, `lakehouse-service`; service-account groups from static file entries, OPA `principals` overlay empty | Keycloak groups synced (five), `lakehouse-service` static only (`trino_service_accounts`; the group sync ignores static-only groups even if a Keycloak group of that name exists) | aligned |
 | `svc-dagster` in `data-engineer`, `pii-reader`, `lakehouse-service`; no person in `lakehouse-service` | stack 21 default | aligned |
 | `PURGE_S3_ACCESS_KEY_ID` / `PURGE_S3_SECRET_ACCESS_KEY`: ListBucket, ListBucketVersions, GetObject, GetObjectVersion, DeleteObject, DeleteObjectVersion on the four lakehouse buckets | S3 user `lakehouse-purge` (`purge_buckets` in `modules/rustfs`: exactly those actions + GetBucketLocation), delivered through `lakehouse-env` to code location and run pods; PutObject is refused [verified on dev] | aligned |
-| `ERASURE_VERIFY_STORAGE` recommended in test/prod | `true` by default in stack 22 (all environments) | aligned |
+| `ERASURE_VERIFY_STORAGE` | variable `erasure_verify_storage`: dev `true`, test/prod `false` (whole-lake scan per request is O(lake), audit N-1); see "Erasure verification" | **changed: the solution contract must drop "recommended in test/prod"** |
 | no object lock on the lakehouse buckets; lifecycle as second line of defence | buckets versioned, no object lock; lifecycle expires noncurrent versions (ops package) | aligned |
 | query text in the audit archive: no keys/CPR from the tooling; ad-hoc literals redacted by the platform | audit sink redaction (H-1) | aligned |
 | compute logs to stdout, no `dagster-aws` | `NoOpComputeLogManager` | aligned (open item on both sides) |

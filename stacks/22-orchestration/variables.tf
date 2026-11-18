@@ -6,9 +6,15 @@ variable "dagster_code_location_image" {
 }
 
 variable "solution_env" {
-  description = "Extra / overriding non-secret environment for the code location and run pods (e.g. ERASURE_VERIFY_STORAGE, INGEST_START_DATE, DBT_THREADS)."
+  description = "Extra / overriding non-secret environment for the code location and run pods (e.g. INGEST_START_DATE, DBT_THREADS; ERASURE_VERIFY_STORAGE has its own variable erasure_verify_storage)."
   type        = map(string)
   default     = {}
+}
+
+variable "erasure_verify_storage" {
+  description = "ERASURE_VERIFY_STORAGE: after every erasure request, read and decode every object version of all four lake buckets and search them for the subject. O(size of the lake) per request and holds the lakehouse_writer pool meanwhile, so false by default (test/prod); true only where the lake is small (dev). Physical removal in test/prod is proven by the periodic canary verification instead (docs/data-plane.md, \"Erasure verification\")."
+  type        = bool
+  default     = false
 }
 
 variable "schedules_enabled" {
