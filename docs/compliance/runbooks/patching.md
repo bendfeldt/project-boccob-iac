@@ -18,10 +18,42 @@ pinned by digest or tagged `latest` once `policy_mode = "Enforce"`.
 5. Gate: `FAIL_ON=CRITICAL make scan ENV=<env> GROUPS=<group>`; record
    accepted risks with a justification and expiry.
 6. Solution artefacts: built and pushed by the solution repo, then
-   `make sign ENV=<env> REFS="<registry>/boccob/<name>@sha256:…"`.
+   `make sign ENV=<env> REFS="<registry>/boccob/<name>@sha256:…"`. A solution
+   release follows "Solution release" below (lake backup before, `migrate` after).
 7. `make plan ENV=test STACK=<stack>` → review → `make deploy ENV=test STACK=<stack>` → `make verify ENV=test`.
 8. Same on prod in the change window; `make verify ENV=prod`; keep outputs.
 9. Commit `versions.yaml` + `versions.lock.yaml` (+ code changes) together.
+
+## Solution release (code location image + OPA bundle)
+
+The solution's release procedure is `project-boccob/docs/releases.md`; a
+release may carry schema migrations that rewrite lake data (not reversible
+without a backup). On the platform side, per environment (test first):
+
+1. **Lake backup before the deployment**: `make backup ENV=<env> WHAT=lake` —
+   base backup of `polaris-db` (the Iceberg table pointers) and a run of the
+   off-site lake copy (`offsite-lake-copy`), both at the same point in time;
+   check that both succeeded. Restoring this state (disaster-recovery runbook,
+   scenario C: polaris-db PITR to the backup time + copy back from the lake
+   target) is possible only while the replaced files still exist as noncurrent
+   versions: `lakehouse_noncurrent_version_days` at the source (default 7) and
+   `offsite.lake.max_noncurrent_days` at the target. Decide on a rollback within
+   that window. Without an off-site lake target (dev) the backup is the
+   polaris-db base backup plus the source buckets' version window.
+2. Set the new digests (`dagster_code_location_image` in
+   `environments/<env>/22-orchestration.tfvars`, the OPA bundle ref in
+   `21-query.tfvars`), `make sign`, `make deploy ENV=<env> STACK=21-query` and
+   `STACK=22-orchestration`. Let running jobs finish; schedules may stay on
+   (every writing job waits for the `lakehouse_writer` pool).
+3. **Migrate**: launch the Dagster job `migrate` (Dagster UI, or let the next
+   `daily_refresh` do it) and check its materialization metadata (`applied`,
+   `history_purged`) and `curated.audit.schema_migrations`. A failure leaves the
+   lake on the old shape (or partially migrated; the statements are idempotent):
+   fix forward with a new release, or restore step 1's backup within the window.
+4. `make verify ENV=<env>`; the next `daily_refresh` must pass all asset checks.
+
+Never run `dbt --full-refresh` outside dev: the code refuses it unless
+`LAKEHOUSE_ENV=dev` (stack 22 sets it to the environment name).
 
 ## Special cases
 

@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # On-demand backup of everything the schedules cover.
 #
-#   scripts/backup/backup.sh <env> [postgres|openbao|offsite|all]   (default all)
+#   scripts/backup/backup.sh <env> [postgres|openbao|offsite|lake|all]   (default all)
 #
 # postgres: a base backup of every CloudNativePG cluster with an object store
 # openbao:  a raft snapshot (Job from the CronJob openbao-snapshot)
-# offsite:  a run of the off-site copy (when configured)
+# offsite:  a run of the off-site copy of platform-backup (when configured)
+# lake:     before a solution release: base backup of polaris-db (Iceberg table
+#           pointers) + a run of the off-site lake copy, so that both describe
+#           the same point in time (docs/compliance/runbooks/patching.md)
 # shellcheck source=../lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 # shellcheck source=lib.sh
@@ -40,5 +43,13 @@ fi
 if [[ "$what" == all || "$what" == offsite ]]; then
   step "off-site copy"
   run_job offsite-copy || rc=1
+fi
+if [[ "$what" == all || "$what" == lake ]]; then
+  step "lake: polaris-db base backup + off-site lake copy"
+  if [[ "$what" == lake ]]; then
+    if clusters_with_backup | grep -qx polaris-db; then pg_backup polaris-db "polaris-db-manual-${ts}" || rc=1
+    else err "polaris-db has no object-store backup"; rc=1; fi
+  fi
+  run_job offsite-lake-copy || rc=1
 fi
 exit $rc

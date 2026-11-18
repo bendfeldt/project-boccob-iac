@@ -77,7 +77,7 @@ destroy: ## Destroy stacks (CONFIRM=<env> required; STACK=.. for one; CLUSTER=1 
 
 # --- backup & DR (stack 32-backup, scripts/backup) --------------------------------
 .PHONY: backup restore restore-test
-backup: ## On-demand backup: PostgreSQL base backups, OpenBao snapshot, off-site copy (WHAT=postgres|openbao|offsite)
+backup: ## On-demand backup: PostgreSQL base backups, OpenBao snapshot, off-site copies (WHAT=postgres|openbao|offsite|lake)
 	$(S)/backup/backup.sh $(ENV) $(or $(WHAT),all)
 restore: ## Restore: WHAT=postgres CLUSTER=.. TO=<new> [TIME=..] | WHAT=openbao [KEY=..] CONFIRM=<env>
 	$(S)/backup/restore.sh $(ENV) $(WHAT) $(if $(filter postgres,$(WHAT)),$(CLUSTER) $(TO) $(TIME),$(KEY))
