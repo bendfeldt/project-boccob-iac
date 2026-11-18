@@ -384,6 +384,7 @@ resource "helm_release" "this" {
             { name = "KEYCLOAK_CLIENT_ID", value = var.group_sync.client_id },
             { name = "KEYCLOAK_CLIENT_SECRET", valueFrom = { secretKeyRef = { name = module.group_sync_credentials.secret_name, key = "client-secret" } } },
             { name = "GROUP_NAMES", value = join(",", var.group_sync.group_names) },
+            { name = "STATIC_ONLY_GROUPS", value = join(",", setsubtract(keys(local.static_groups), var.group_sync.group_names)) },
             { name = "SYNC_INTERVAL_SECONDS", value = tostring(var.group_sync.interval_seconds) },
           ]
           resources = { requests = { cpu = "5m", memory = "24Mi" }, limits = { memory = "96Mi" } }

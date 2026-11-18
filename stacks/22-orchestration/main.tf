@@ -114,13 +114,17 @@ module "dagster" {
     DBT_TARGET        = "password"
     SCHEDULES_ENABLED = tostring(var.schedules_enabled)
     SCHEDULE_TIMEZONE = "Europe/Copenhagen"
+    # thorough erasure: scan every object version of all layer buckets afterwards
+    ERASURE_VERIFY_STORAGE = "true"
   }, var.solution_env)
   solution_secrets = {
-    S3_ACCESS_KEY_ID      = { kv_path = "storage/s3-users/${var.s3_user}", property = "access-key" }
-    S3_SECRET_ACCESS_KEY  = { kv_path = "storage/s3-users/${var.s3_user}", property = "secret-key" }
-    POLARIS_CLIENT_ID     = { kv_path = "catalog/polaris/principals/${var.polaris_principal}", property = "client-id" }
-    POLARIS_CLIENT_SECRET = { kv_path = "catalog/polaris/principals/${var.polaris_principal}", property = "client-secret" }
-    TRINO_PASSWORD        = { kv_path = "query/trino/service-accounts/${var.trino_service_account}", property = "password" }
+    S3_ACCESS_KEY_ID           = { kv_path = "storage/s3-users/${var.s3_user}", property = "access-key" }
+    S3_SECRET_ACCESS_KEY       = { kv_path = "storage/s3-users/${var.s3_user}", property = "secret-key" }
+    PURGE_S3_ACCESS_KEY_ID     = { kv_path = "storage/s3-users/${var.purge_s3_user}", property = "access-key" }
+    PURGE_S3_SECRET_ACCESS_KEY = { kv_path = "storage/s3-users/${var.purge_s3_user}", property = "secret-key" }
+    POLARIS_CLIENT_ID          = { kv_path = "catalog/polaris/principals/${var.polaris_principal}", property = "client-id" }
+    POLARIS_CLIENT_SECRET      = { kv_path = "catalog/polaris/principals/${var.polaris_principal}", property = "client-secret" }
+    TRINO_PASSWORD             = { kv_path = "query/trino/service-accounts/${var.trino_service_account}", property = "password" }
   }
   openbao             = { url = local.platform.openbao_url, kv_mount = local.platform.kv_mount }
   max_concurrent_runs = var.max_concurrent_runs

@@ -60,8 +60,12 @@ variable "trino_service_accounts" {
     groups = list(string)
   }))
   default = {
-    # Dagster / dbt: transforms clear values, so it must be a pii-reader (platform contract)
-    "svc-dagster" = { groups = ["data-engineer", "pii-reader"] }
+    # Dagster / dbt (platform contract 1.2): pii-reader to transform clear values,
+    # lakehouse-service to write curated.keystore / curated.audit / raw.governance
+    # and lower the snapshot retention floor. lakehouse-service exists only here:
+    # it is not a Keycloak group and not in the group sync's group_names, so no
+    # person can obtain it through Keycloak.
+    "svc-dagster" = { groups = ["data-engineer", "pii-reader", "lakehouse-service"] }
   }
 }
 

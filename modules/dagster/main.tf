@@ -50,10 +50,12 @@ locals {
     volumes                     = concat(local.volumes, [{ name = "dagster-home", emptyDir = {} }])
     volumeMounts                = concat(local.volume_mounts, [{ name = "dagster-home", mountPath = "/opt/dagster/dagster_home" }])
     includeConfigInLaunchedRuns = { enabled = true }
-    podSecurityContext          = local.pod_secctx
-    securityContext             = local.container_sctx
-    resources                   = var.resources["code_location"]
-    labels                      = var.labels
+    # roll the code server when the set of secret variables changes (envFrom is read at start)
+    annotations        = { "boccob.io/env-secret-keys" = substr(sha256(join(",", sort(keys(var.solution_secrets)))), 0, 16) }
+    podSecurityContext = local.pod_secctx
+    securityContext    = local.container_sctx
+    resources          = var.resources["code_location"]
+    labels             = var.labels
   }
 }
 

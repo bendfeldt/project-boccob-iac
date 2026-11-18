@@ -23,6 +23,8 @@ import urllib.request
 GROUP_FILE = os.environ.get("GROUP_FILE", "/groups/group.db")
 STATIC = json.loads(os.environ.get("STATIC_GROUPS", "{}"))
 INTERVAL = int(os.environ.get("SYNC_INTERVAL_SECONDS", "30"))
+# groups that only service accounts may hold (static entries); never taken from Keycloak
+STATIC_ONLY = set(filter(None, os.environ.get("STATIC_ONLY_GROUPS", "").split(",")))
 
 
 def log(msg):
@@ -67,7 +69,7 @@ def fetch(ctx):
     groups = {}
     for group in get(ctx, f"{admin}/groups?max=1000", token):
         name = group["name"]
-        if wanted and name not in wanted:
+        if (wanted and name not in wanted) or name in STATIC_ONLY:
             continue
         members, first = set(), 0
         while True:

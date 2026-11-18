@@ -23,6 +23,12 @@ variable "s3_user" {
   default     = "lakehouse-orchestration"
 }
 
+variable "purge_s3_user" {
+  description = "S3 user (stack 12) that may delete object versions on the layer buckets (PURGE_S3_*: erasure, retention, maintenance)."
+  type        = string
+  default     = "lakehouse-purge"
+}
+
 variable "polaris_principal" {
   description = "Polaris principal of the ingestion (index) stage (stack 20)."
   type        = string

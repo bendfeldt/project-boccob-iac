@@ -42,6 +42,8 @@ if kubectl get namespace catalog query orchestration >/dev/null 2>&1; then
     "test \"\$(curl -sS -o /dev/null -w '%{http_code}' --noproxy '*' --cacert '$ca' --resolve 'trino.${BASE_DOMAIN}:443:${DP_INGRESS_IP}' -H 'X-Trino-User: svc-dagster' -X POST --data 'select 1' https://trino.${BASE_DOMAIN}/v1/statement)\" = 401"
   check "Trino group provider has the Keycloak groups (group sync)" bash -c \
     "kubectl -n query exec deploy/trino-coordinator -c trino-coordinator -- cat /groups/group.db | grep -q '^data-engineer:.*svc-dagster'"
+  check "lakehouse-service held only by service accounts (svc-dagster), never synced from Keycloak" bash -c \
+    "kubectl -n query exec deploy/trino-coordinator -c trino-coordinator -- cat /groups/group.db | grep -qx 'lakehouse-service:svc-dagster'"
   check "Trino writes query audit events to stdout" bash -c \
     "kubectl -n query logs deploy/trino-coordinator -c audit-log --tail=200 | grep -q '\"log_type\":\"trino-query-audit\"'"
   check "OPA writes decision logs to stdout" bash -c \
@@ -65,6 +67,8 @@ if kubectl get namespace catalog query orchestration >/dev/null 2>&1; then
     "$(declare -f dp_dagster_graphql); echo '{\"query\":\"{ instance { concurrencyLimit(concurrencyKey: \\\"lakehouse_writer\\\") { slotCount } } }\"}' | dp_dagster_graphql | jq -e '.data.instance.concurrencyLimit.slotCount == 1'"
   check "pseudonym pepper present in the code location environment (value not shown)" bash -c \
     "kubectl -n orchestration get secret lakehouse-env -o jsonpath='{.data.PSEUDONYM_PEPPER}' | base64 -d | wc -c | awk '{exit !(\$1 >= 32)}'"
+  check "purge S3 key delivered to the code location (PURGE_S3_*)" bash -c \
+    "kubectl -n orchestration get secret lakehouse-env -o json | jq -e '.data | has(\"PURGE_S3_ACCESS_KEY_ID\") and has(\"PURGE_S3_SECRET_ACCESS_KEY\")'"
   # supply chain: the artefacts the cluster actually runs carry the platform signature
   dp_solution_refs() {
     kubectl -n orchestration get deploy dagster-code-dagster-user-deployments-lakehouse -o jsonpath='{.spec.template.spec.containers[0].image}'
