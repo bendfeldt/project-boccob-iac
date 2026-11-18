@@ -70,10 +70,12 @@ module "ns_backup" {
 
 # S3 user platform-backup (rw platform-backup), mapped to the AWS-style keys
 module "backup_s3_credentials" {
-  source    = "../../modules/external-secret"
-  name      = "platform-backup-s3"
-  namespace = module.ns_backup.name
-  kv_path   = "storage/s3-users/platform-backup"
+  source     = "../../modules/external-secret"
+  store      = module.ns_backup.secret_stores.read
+  store_kind = module.ns_backup.secret_stores.kind
+  name       = "platform-backup-s3"
+  namespace  = module.ns_backup.name
+  kv_path    = "storage/s3-users/platform-backup"
   template = {
     access_key_id     = "{{ index . \"access-key\" }}"
     secret_access_key = "{{ index . \"secret-key\" }}"
@@ -127,11 +129,13 @@ module "openbao_snapshot" {
 # Off-site copy (optional)
 # =============================================================================
 module "offsite_s3_credentials" {
-  count     = var.offsite == null ? 0 : 1
-  source    = "../../modules/external-secret"
-  name      = "offsite-s3"
-  namespace = module.ns_backup.name
-  kv_path   = var.offsite.credentials
+  count      = var.offsite == null ? 0 : 1
+  source     = "../../modules/external-secret"
+  store      = module.ns_backup.secret_stores.read
+  store_kind = module.ns_backup.secret_stores.kind
+  name       = "offsite-s3"
+  namespace  = module.ns_backup.name
+  kv_path    = var.offsite.credentials
   template = {
     access_key_id     = "{{ index . \"access-key\" }}"
     secret_access_key = "{{ index . \"secret-key\" }}"

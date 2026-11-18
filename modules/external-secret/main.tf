@@ -9,7 +9,7 @@ resource "kubernetes_manifest" "this" {
     }
     spec = {
       refreshInterval = var.refresh_interval
-      secretStoreRef  = { name = var.store, kind = "ClusterSecretStore" }
+      secretStoreRef  = { name = var.store, kind = var.store_kind }
       target = {
         name           = var.name
         creationPolicy = "Owner"

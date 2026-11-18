@@ -367,3 +367,48 @@ resource "kubernetes_config_map_v1" "platform_ca" {
     "ca.crt" = var.ca_bundle_pem
   }
 }
+
+# --- per-namespace External Secrets stores ----------------------------------------
+locals {
+  secret_stores = var.secrets_access ? {
+    "openbao"      = { sa = "eso-read", role = "eso-${var.name}-read" }
+    "openbao-push" = { sa = "eso-push", role = "eso-${var.name}-push" }
+  } : {}
+}
+
+resource "kubernetes_service_account_v1" "eso" {
+  for_each = local.secret_stores
+  metadata {
+    name      = each.value.sa
+    namespace = local.ns
+    labels    = local.labels
+  }
+  automount_service_account_token = false
+}
+
+resource "kubernetes_manifest" "secret_store" {
+  for_each = local.secret_stores
+  manifest = {
+    apiVersion = "external-secrets.io/v1"
+    kind       = "SecretStore"
+    metadata   = { name = each.key, namespace = local.ns, labels = local.labels }
+    spec = {
+      provider = {
+        vault = {
+          server     = var.secret_store.server
+          path       = var.secret_store.kv_mount
+          version    = "v2"
+          caProvider = { type = "ConfigMap", name = "platform-ca", key = "ca.crt" }
+          auth = {
+            kubernetes = {
+              mountPath         = var.secret_store.auth_path
+              role              = each.value.role
+              serviceAccountRef = { name = kubernetes_service_account_v1.eso[each.key].metadata[0].name }
+            }
+          }
+        }
+      }
+    }
+  }
+  depends_on = [kubernetes_config_map_v1.platform_ca]
+}

@@ -53,3 +53,18 @@ variable "external_secrets" {
     namespace       = string
   })
 }
+
+variable "namespace_stores" {
+  description = <<-EOT
+    Per-namespace External Secrets access (replaces the cluster-wide stores).
+    For every namespace: role eso-<ns>-read (bound to ServiceAccount eso-read in
+    that namespace) reads kv/<ns>/* plus the listed cross-namespace `reads`;
+    role eso-<ns>-push (ServiceAccount eso-push) writes kv/<ns>/* only, and
+    never the `deny_write` paths (e.g. a pepper written by its own Job).
+  EOT
+  type = map(object({
+    reads      = optional(list(string), [])
+    deny_write = optional(list(string), [])
+  }))
+  default = {}
+}

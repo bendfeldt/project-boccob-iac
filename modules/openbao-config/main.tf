@@ -236,3 +236,76 @@ resource "vault_kubernetes_auth_backend_role" "eso_push" {
   token_ttl                        = 600
   token_max_ttl                    = 900
 }
+
+# --- per-namespace External Secrets access ------------------------------------------
+resource "vault_policy" "ns_read" {
+  for_each = var.namespace_stores
+  name     = "eso-${each.key}-read"
+  policy = join("\n", concat(
+    [<<-HCL
+      path "${vault_mount.kv.path}/data/${each.key}/*" {
+        capabilities = ["read"]
+      }
+      path "${vault_mount.kv.path}/metadata/${each.key}/*" {
+        capabilities = ["read", "list"]
+      }
+    HCL
+    ],
+    [for p in each.value.reads : <<-HCL
+      path "${vault_mount.kv.path}/data/${p}" {
+        capabilities = ["read"]
+      }
+      path "${vault_mount.kv.path}/metadata/${p}" {
+        capabilities = ["read"]
+      }
+    HCL
+    ],
+  ))
+}
+
+resource "vault_policy" "ns_push" {
+  for_each = var.namespace_stores
+  name     = "eso-${each.key}-push"
+  policy = join("\n", concat(
+    [<<-HCL
+      path "${vault_mount.kv.path}/data/${each.key}/*" {
+        capabilities = ["create", "update", "read"]
+      }
+      path "${vault_mount.kv.path}/metadata/${each.key}/*" {
+        capabilities = ["read", "list"]
+      }
+    HCL
+    ],
+    [for p in each.value.deny_write : <<-HCL
+      path "${vault_mount.kv.path}/data/${p}" {
+        capabilities = ["deny"]
+      }
+      path "${vault_mount.kv.path}/metadata/${p}" {
+        capabilities = ["deny"]
+      }
+    HCL
+    ],
+  ))
+}
+
+resource "vault_kubernetes_auth_backend_role" "ns_read" {
+  for_each                         = var.namespace_stores
+  backend                          = vault_auth_backend.kubernetes.path
+  role_name                        = "eso-${each.key}-read"
+  bound_service_account_names      = ["eso-read"]
+  bound_service_account_namespaces = [each.key]
+  token_policies                   = [vault_policy.ns_read[each.key].name]
+  token_ttl                        = 600
+  token_max_ttl                    = 900
+}
+
+resource "vault_kubernetes_auth_backend_role" "ns_push" {
+  for_each                         = var.namespace_stores
+  backend                          = vault_auth_backend.kubernetes.path
+  role_name                        = "eso-${each.key}-push"
+  bound_service_account_names      = ["eso-push"]
+  bound_service_account_namespaces = [each.key]
+  token_policies                   = [vault_policy.ns_push[each.key].name]
+  token_ttl                        = 600
+  token_max_ttl                    = 900
+}

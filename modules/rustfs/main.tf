@@ -23,25 +23,31 @@ locals {
 
 # --- root credentials: generated in-cluster, stored in OpenBao -----------------------
 module "root_credentials" {
-  source    = "../generated-secret"
-  name      = local.root_secret
-  namespace = var.namespace
-  kv_path   = "${var.namespace}/rustfs-root"
-  keys      = ["RUSTFS_ACCESS_KEY", "RUSTFS_SECRET_KEY"]
-  length    = 32
-  labels    = var.labels
+  source     = "../generated-secret"
+  read_store = var.secret_stores.read
+  push_store = var.secret_stores.push
+  store_kind = var.secret_stores.kind
+  name       = local.root_secret
+  namespace  = var.namespace
+  kv_path    = "${var.namespace}/rustfs-root"
+  keys       = ["RUSTFS_ACCESS_KEY", "RUSTFS_SECRET_KEY"]
+  length     = 32
+  labels     = var.labels
 }
 
 module "user_credentials" {
-  for_each  = var.users
-  source    = "../generated-secret"
-  name      = "s3-user-${each.key}"
-  namespace = var.namespace
-  kv_path   = "${var.namespace}/s3-users/${each.key}"
-  keys      = ["secret-key"]
-  literals  = { "access-key" = each.key }
-  length    = 40
-  labels    = var.labels
+  for_each   = var.users
+  source     = "../generated-secret"
+  read_store = var.secret_stores.read
+  push_store = var.secret_stores.push
+  store_kind = var.secret_stores.kind
+  name       = "s3-user-${each.key}"
+  namespace  = var.namespace
+  kv_path    = "${var.namespace}/s3-users/${each.key}"
+  keys       = ["secret-key"]
+  literals   = { "access-key" = each.key }
+  length     = 40
+  labels     = var.labels
 }
 
 # --- TLS ---------------------------------------------------------------------------

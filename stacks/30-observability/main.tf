@@ -145,10 +145,12 @@ module "ns_agent" {
 # Loki (logs + audit trail on S3 platform-logs)
 # =============================================================================
 module "logs_s3_credentials" {
-  source    = "../../modules/external-secret"
-  name      = "platform-logs-s3"
-  namespace = module.ns_observability.name
-  kv_path   = "storage/s3-users/platform-logs"
+  source     = "../../modules/external-secret"
+  store      = module.ns_observability.secret_stores.read
+  store_kind = module.ns_observability.secret_stores.kind
+  name       = "platform-logs-s3"
+  namespace  = module.ns_observability.name
+  kv_path    = "storage/s3-users/platform-logs"
   template = {
     access_key_id     = "{{ index . \"access-key\" }}"
     secret_access_key = "{{ index . \"secret-key\" }}"
@@ -306,12 +308,14 @@ locals {
 }
 
 module "grafana_oidc_client" {
-  for_each  = var.grafana_enabled ? toset(["grafana", "grafana-audit"]) : toset([])
-  source    = "../../modules/external-secret"
-  name      = "oidc-client-${each.key}"
-  namespace = module.ns_observability.name
-  kv_path   = "identity/oidc-clients/${each.key}"
-  labels    = local.common_labels
+  for_each   = var.grafana_enabled ? toset(["grafana", "grafana-audit"]) : toset([])
+  source     = "../../modules/external-secret"
+  store      = module.ns_observability.secret_stores.read
+  store_kind = module.ns_observability.secret_stores.kind
+  name       = "oidc-client-${each.key}"
+  namespace  = module.ns_observability.name
+  kv_path    = "identity/oidc-clients/${each.key}"
+  labels     = local.common_labels
 }
 
 module "grafana" {

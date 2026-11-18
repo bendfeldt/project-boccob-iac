@@ -39,6 +39,12 @@ module "openbao_config" {
     service_account = "external-secrets"
     namespace       = local.platform.namespaces.platform
   }
+  namespace_stores = {
+    for ns, cfg in var.namespace_secret_stores : ns => {
+      reads      = concat(cfg.reads, lookup(var.extra_namespace_secret_reads, ns, []))
+      deny_write = cfg.deny_write
+    }
+  }
 }
 
 # --- trust bundle ------------------------------------------------------------------
@@ -146,9 +152,13 @@ resource "kubernetes_manifest" "cluster_secret_store" {
     kind       = "ClusterSecretStore"
     metadata   = { name = each.key }
     spec = {
-      # only namespaces that opted in through modules/namespace-baseline
+      # legacy, full kv/* access: only namespaces not yet migrated to their own
+      # SecretStores (modules/namespace-baseline); an empty list closes the
+      # store (a condition that matches no namespace)
       conditions = [
-        { namespaceSelector = { matchLabels = { "boccob.io/secrets-access" = "true" } } },
+        length(var.legacy_cluster_store_namespaces) > 0
+        ? { namespaces = var.legacy_cluster_store_namespaces }
+        : { namespaces = ["-none-"] },
       ]
       provider = {
         vault = {

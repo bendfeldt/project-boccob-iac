@@ -138,3 +138,19 @@ variable "ca_bundle_pem" {
   type        = string
   default     = null
 }
+
+variable "secret_store" {
+  description = <<-EOT
+    Namespaced External Secrets stores created when secrets_access = true:
+    SecretStore `openbao` (role eso-<ns>-read, ServiceAccount eso-read) and
+    `openbao-push` (role eso-<ns>-push, ServiceAccount eso-push). The OpenBao
+    roles/policies come from stack 11 (namespace_secret_stores). Needs
+    ca_bundle_pem (the stores trust OpenBao through the platform-ca ConfigMap).
+  EOT
+  type = object({
+    server    = optional(string, "https://openbao.secrets.svc:8200")
+    kv_mount  = optional(string, "kv")
+    auth_path = optional(string, "kubernetes")
+  })
+  default = {}
+}

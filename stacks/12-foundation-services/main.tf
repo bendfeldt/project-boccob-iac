@@ -122,10 +122,12 @@ module "ns_database" {
 # Shared by every cluster in the namespace: pass local.postgres_backup to
 # modules/postgres-cluster (see docs/conventions.md, "Add a database").
 module "postgres_backup_credentials" {
-  source    = "../../modules/external-secret"
-  name      = "platform-backup-s3"
-  namespace = module.ns_database.name
-  kv_path   = "storage/s3-users/platform-backup"
+  source     = "../../modules/external-secret"
+  store      = module.ns_database.secret_stores.read
+  store_kind = module.ns_database.secret_stores.kind
+  name       = "platform-backup-s3"
+  namespace  = module.ns_database.name
+  kv_path    = "storage/s3-users/platform-backup"
   template = {
     access_key_id     = "{{ index . \"access-key\" }}"
     secret_access_key = "{{ index . \"secret-key\" }}"
@@ -161,6 +163,8 @@ locals {
 
 module "keycloak_db" {
   source        = "../../modules/postgres-cluster"
+  push_store    = module.ns_database.secret_stores.push
+  store_kind    = module.ns_database.secret_stores.kind
   name          = "keycloak-db"
   namespace     = module.ns_database.name
   image         = module.versions.images["postgresql"].ref
@@ -203,21 +207,25 @@ module "ns_storage" {
 
 # SSE-S3 master key: 32 random characters, stored base64-encoded (32 bytes)
 module "rustfs_sse" {
-  count     = var.rustfs_sse_enabled ? 1 : 0
-  source    = "../../modules/generated-secret"
-  name      = "rustfs-sse"
-  namespace = module.ns_storage.name
-  kv_path   = "storage/rustfs-sse"
-  keys      = ["seed"]
-  length    = 32
-  literals  = { "master-key" = "{{ .seed | b64enc }}" }
-  labels    = local.common_labels
+  count      = var.rustfs_sse_enabled ? 1 : 0
+  source     = "../../modules/generated-secret"
+  read_store = module.ns_storage.secret_stores.read
+  push_store = module.ns_storage.secret_stores.push
+  store_kind = module.ns_storage.secret_stores.kind
+  name       = "rustfs-sse"
+  namespace  = module.ns_storage.name
+  kv_path    = "storage/rustfs-sse"
+  keys       = ["seed"]
+  length     = 32
+  literals   = { "master-key" = "{{ .seed | b64enc }}" }
+  labels     = local.common_labels
 }
 
 module "rustfs" {
-  source    = "../../modules/rustfs"
-  namespace = module.ns_storage.name
-  chart     = module.versions.charts["rustfs"]
+  source        = "../../modules/rustfs"
+  secret_stores = module.ns_storage.secret_stores
+  namespace     = module.ns_storage.name
+  chart         = module.versions.charts["rustfs"]
   images = {
     rustfs = module.versions.images["rustfs"]
     init   = module.versions.images["busybox"]
@@ -301,19 +309,22 @@ module "ns_identity" {
 }
 
 module "keycloak_db_credentials" {
-  source    = "../../modules/external-secret"
-  name      = "keycloak-db"
-  namespace = module.ns_identity.name
-  kv_path   = module.keycloak_db.kv_path
-  labels    = local.common_labels
+  source     = "../../modules/external-secret"
+  store      = module.ns_identity.secret_stores.read
+  store_kind = module.ns_identity.secret_stores.kind
+  name       = "keycloak-db"
+  namespace  = module.ns_identity.name
+  kv_path    = module.keycloak_db.kv_path
+  labels     = local.common_labels
 }
 
 module "keycloak" {
-  source    = "../../modules/keycloak"
-  namespace = module.ns_identity.name
-  image     = module.versions.images["keycloak"].ref
-  replicas  = coalesce(var.keycloak_replicas, var.ha ? 2 : 1)
-  hostname  = "keycloak.${var.base_domain}"
+  source        = "../../modules/keycloak"
+  secret_stores = module.ns_identity.secret_stores
+  namespace     = module.ns_identity.name
+  image         = module.versions.images["keycloak"].ref
+  replicas      = coalesce(var.keycloak_replicas, var.ha ? 2 : 1)
+  hostname      = "keycloak.${var.base_domain}"
   database = {
     host   = module.keycloak_db.host
     name   = module.keycloak_db.database

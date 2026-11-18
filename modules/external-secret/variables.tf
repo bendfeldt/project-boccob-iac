@@ -42,3 +42,9 @@ variable "labels" {
   type        = map(string)
   default     = {}
 }
+
+variable "store_kind" {
+  description = "ClusterSecretStore (legacy cluster-wide store, full kv/* read) or SecretStore (the namespace's own store from modules/namespace-baseline, kv/<ns>/* + granted reads)."
+  type        = string
+  default     = "ClusterSecretStore"
+}

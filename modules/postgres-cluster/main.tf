@@ -193,7 +193,7 @@ resource "kubernetes_manifest" "push_app_credentials" {
       updatePolicy    = "Replace"
       deletionPolicy  = "None"
       secretStoreRefs = [
-        { name = var.push_store, kind = "ClusterSecretStore" },
+        { name = var.push_store, kind = var.store_kind },
       ]
       selector = { secret = { name = "${var.name}-app" } }
       data = [

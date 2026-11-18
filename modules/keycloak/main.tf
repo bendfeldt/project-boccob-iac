@@ -10,22 +10,28 @@ locals {
 
 # --- credentials (generated in-cluster, stored in OpenBao) ---------------------------
 module "admin_credentials" {
-  source    = "../generated-secret"
-  name      = "${local.name}-admin"
-  namespace = var.namespace
-  kv_path   = "${var.namespace}/keycloak-admin"
-  keys      = ["password"]
-  literals  = { username = "bootstrap-admin" }
-  labels    = var.labels
+  source     = "../generated-secret"
+  read_store = var.secret_stores.read
+  push_store = var.secret_stores.push
+  store_kind = var.secret_stores.kind
+  name       = "${local.name}-admin"
+  namespace  = var.namespace
+  kv_path    = "${var.namespace}/keycloak-admin"
+  keys       = ["password"]
+  literals   = { username = "bootstrap-admin" }
+  labels     = var.labels
 }
 
 module "client_credentials" {
-  for_each  = var.oidc_clients
-  source    = "../generated-secret"
-  name      = "oidc-client-${each.key}"
-  namespace = var.namespace
-  kv_path   = "${var.namespace}/oidc-clients/${each.key}"
-  keys      = ["client-secret"]
+  for_each   = var.oidc_clients
+  source     = "../generated-secret"
+  read_store = var.secret_stores.read
+  push_store = var.secret_stores.push
+  store_kind = var.secret_stores.kind
+  name       = "oidc-client-${each.key}"
+  namespace  = var.namespace
+  kv_path    = "${var.namespace}/oidc-clients/${each.key}"
+  keys       = ["client-secret"]
   literals = {
     "client-id" = each.key
     "issuer"    = local.issuer

@@ -65,6 +65,16 @@ if kubectl get namespace catalog query orchestration >/dev/null 2>&1; then
     "$(declare -f dp_dagster_graphql); echo '{\"query\":\"{ instance { concurrencyLimit(concurrencyKey: \\\"lakehouse_writer\\\") { slotCount } } }\"}' | dp_dagster_graphql | jq -e '.data.instance.concurrencyLimit.slotCount == 1'"
   check "pseudonym pepper present in the code location environment (value not shown)" bash -c \
     "kubectl -n orchestration get secret lakehouse-env -o jsonpath='{.data.PSEUDONYM_PEPPER}' | base64 -d | wc -c | awk '{exit !(\$1 >= 32)}'"
+  # supply chain: the artefacts the cluster actually runs carry the platform signature
+  dp_solution_refs() {
+    kubectl -n orchestration get deploy dagster-code-dagster-user-deployments-lakehouse -o jsonpath='{.spec.template.spec.containers[0].image}'
+    echo
+    kubectl -n query get configmap opa-config -o jsonpath='{.data.config\.yaml}' | grep -Eo '[^" ]+@sha256:[0-9a-f]{64}' | head -1
+  }
+  check "solution artefacts in use (code-location image, OPA bundle) carry a valid cosign signature (OpenBao transit key)" bash -c \
+    "refs=\$($(declare -f dp_solution_refs); dp_solution_refs | tr '\n' ' '); [[ \$(wc -w <<<\"\$refs\") -eq 2 ]] && '${REPO_ROOT}/scripts/supply-chain/sign.sh' '$ENV' verify \$refs"
+  check "Kyverno: running solution pods pass verify-solution-image-signatures" bash -c \
+    "! kubectl -n orchestration get policyreports -o json | jq -e -r '.items[] | select(.scope.kind == \"Pod\") | .scope.name as \$n | .results[]? | select(.policy == \"verify-solution-image-signatures\" and .result != \"pass\") | \$n' | grep ."
   check "Dagster UI requires a Keycloak login (oauth2-proxy redirect)" bash -c \
     "curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' --noproxy '*' --cacert '$ca' --resolve 'dagster.${BASE_DOMAIN}:443:${DP_INGRESS_IP}' https://dagster.${BASE_DOMAIN}/ | grep -Eq '^(302|403) '"
 fi
