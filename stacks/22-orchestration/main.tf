@@ -114,10 +114,11 @@ module "dagster" {
     DBT_TARGET        = "password"
     SCHEDULES_ENABLED = tostring(var.schedules_enabled)
     SCHEDULE_TIMEZONE = "Europe/Copenhagen"
-    # whole-lake scan of every object version after each erasure: O(size of the
-    # lake), so only where the lake is small (dev); test/prod verify with a
-    # separate periodic / targeted scan (docs/data-plane.md, "Erasure verification")
-    ERASURE_VERIFY_STORAGE = tostring(var.erasure_verify_storage)
+    # object scan after each erasure: scoped (test/prod) | full (dev: whole lake,
+    # O(size of the lake)) | false (docs/data-plane.md, "Erasure verification")
+    ERASURE_VERIFY_STORAGE = var.erasure_verify_storage
+    # dbt --full-refresh of incremental models is refused unless dev (solution docs/releases.md)
+    LAKEHOUSE_ENV = var.environment
   }, var.solution_env)
   solution_secrets = {
     S3_ACCESS_KEY_ID      = { kv_path = "storage/s3-users/${var.s3_user}", property = "access-key" }
@@ -127,7 +128,7 @@ module "dagster" {
     TRINO_PASSWORD        = { kv_path = "query/trino/service-accounts/${var.trino_service_account}", property = "password" }
   }
   # the purge credential (s3:DeleteObjectVersion on the lake buckets) is not in
-  # lakehouse-env: Secret lakehouse-purge-env (PURGE_ENV_SECRET), attached only by
+  # lakehouse-env: Secret lakehouse-purge-env (PURGE_CREDENTIALS_SECRET), attached only by
   # the purge_jobs through their dagster-k8s/config tag; admission-guarded (audit N-3)
   job_secrets = {
     purge = {
@@ -135,9 +136,16 @@ module "dagster" {
         PURGE_S3_ACCESS_KEY_ID     = { kv_path = "storage/s3-users/${var.purge_s3_user}", property = "access-key" }
         PURGE_S3_SECRET_ACCESS_KEY = { kv_path = "storage/s3-users/${var.purge_s3_user}", property = "secret-key" }
       }
-      jobs = var.purge_jobs
+      jobs     = var.purge_jobs
+      name_env = "PURGE_CREDENTIALS_SECRET" # read by the solution (orchestration/jobs.py)
     }
   }
+  compute_logs = var.compute_logs_s3 ? {
+    bucket       = "dagster-compute-logs"
+    endpoint_url = local.platform.s3_url
+    region       = local.platform.s3_region
+    kv_path      = "storage/s3-users/dagster-compute-logs"
+  } : null
   openbao             = { url = local.platform.openbao_url, kv_mount = local.platform.kv_mount }
   max_concurrent_runs = var.max_concurrent_runs
   webserver_replicas  = coalesce(var.webserver_replicas, var.ha ? 2 : 1)

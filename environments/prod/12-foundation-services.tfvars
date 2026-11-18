@@ -21,6 +21,8 @@ keycloak_resources = {
 }
 
 # --- registered by the data plane (stacks 20-catalog, 21-query, 22-orchestration) ---
+# Dagster step logs (S3ComputeLogManager), kept 90 days (may contain whatever a step prints)
+buckets = { "dagster-compute-logs" = { versioning = false, lifecycle = { expiration_days = 90 } } }
 s3_users = {
   # Trino: reads and writes Iceberg data files of all layers
   "lakehouse-query" = { read_write_buckets = ["lakehouse-raw", "lakehouse-clean", "lakehouse-consolidated", "lakehouse-curated"] }
@@ -31,6 +33,9 @@ s3_users = {
   }
   # Dagster erasure / retention / maintenance: remove object versions on the layer buckets
   "lakehouse-purge" = { purge_buckets = ["lakehouse-raw", "lakehouse-clean", "lakehouse-consolidated", "lakehouse-curated"] }
+  # Dagster S3ComputeLogManager (webserver, daemon, run pods): own bucket only - never
+  # platform-logs, whose credential also writes Loki's audit tenant and platform-audit
+  "dagster-compute-logs" = { read_write_buckets = ["dagster-compute-logs"] }
 }
 oidc_clients = {
   # service account that reads group memberships for the Trino file group provider

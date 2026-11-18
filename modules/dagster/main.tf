@@ -38,8 +38,15 @@ locals {
   }
   # job-scoped secrets (not in the code server, not in other runs): see var.job_secrets
   job_secret_names = { for name, _ in var.job_secrets : name => "${var.code_location_name}-${name}-env" }
-  job_secret_env   = { for name, secret in local.job_secret_names : "${upper(replace(name, "-", "_"))}_ENV_SECRET" => secret }
-  env_list         = [for k, v in merge(local.tls_env, local.job_secret_env, var.solution_env) : { name = k, value = v }]
+  job_secret_env = { for name, secret in local.job_secret_names :
+    coalesce(var.job_secrets[name].name_env, "${upper(replace(name, "-", "_"))}_ENV_SECRET") => secret
+  }
+  # S3 compute logs: credential Secret + region for every pod that loads the instance
+  compute_logs_secret = "${local.name}-compute-logs-s3"
+  compute_logs_env    = var.compute_logs == null ? {} : { AWS_DEFAULT_REGION = var.compute_logs.region }
+  system_env          = concat([{ name = "HOME", value = "/tmp" }], [for k, v in local.compute_logs_env : { name = k, value = v }])
+  system_env_secrets  = var.compute_logs == null ? [] : [{ name = local.compute_logs_secret }]
+  env_list            = [for k, v in merge(local.tls_env, local.job_secret_env, local.compute_logs_env, var.solution_env) : { name = k, value = v }]
 
   code_location = {
     name               = var.code_location_name
@@ -47,7 +54,7 @@ locals {
     dagsterApiGrpcArgs = ["--module-name", var.code_location_module]
     port               = 4000
     env                = local.env_list
-    envSecrets         = [{ name = local.env_secret }]
+    envSecrets         = concat([{ name = local.env_secret }], local.system_env_secrets)
     # run pods inherit these: writable $DAGSTER_HOME (op outputs of the default
     # fs IO manager in storage/, history/), the root filesystem is read-only
     volumes                     = concat(local.volumes, [{ name = "dagster-home", emptyDir = {} }])
@@ -243,6 +250,22 @@ resource "kubernetes_manifest" "solution_env" {
   depends_on = [kubernetes_job_v1.pepper]
 }
 
+# S3 user of the compute log manager, mapped to the AWS SDK variables
+module "compute_logs_credentials" {
+  count      = var.compute_logs == null ? 0 : 1
+  source     = "../external-secret"
+  store      = var.secret_stores.read
+  store_kind = var.secret_stores.kind
+  name       = local.compute_logs_secret
+  namespace  = var.namespace
+  kv_path    = var.compute_logs.kv_path
+  template = {
+    AWS_ACCESS_KEY_ID     = "{{ index . \"access-key\" }}"
+    AWS_SECRET_ACCESS_KEY = "{{ index . \"secret-key\" }}"
+  }
+  labels = var.labels
+}
+
 # job-scoped secrets: one Secret per entry, attached only by the listed jobs
 resource "kubernetes_manifest" "job_secret" {
   for_each = var.job_secrets
@@ -405,7 +428,8 @@ resource "helm_release" "this" {
       resources              = var.resources["webserver"]
       volumes                = local.volumes
       volumeMounts           = local.volume_mounts
-      env                    = [{ name = "HOME", value = "/tmp" }]
+      env                    = local.system_env
+      envSecrets             = local.system_env_secrets
       logFormat              = "json"
     }
 
@@ -417,7 +441,8 @@ resource "helm_release" "this" {
       resources              = var.resources["daemon"]
       volumes                = local.volumes
       volumeMounts           = local.volume_mounts
-      env                    = [{ name = "HOME", value = "/tmp" }]
+      env                    = local.system_env
+      envSecrets             = local.system_env_secrets
       logFormat              = "json"
       runCoordinator = {
         enabled = true
@@ -451,9 +476,20 @@ resource "helm_release" "this" {
       }
     }
 
-    # compute logs: run pods log to stdout (collected by the cluster log
-    # pipeline); see docs/data-plane.md for why not S3
-    computeLogManager = { type = "NoOpComputeLogManager" }
+    # compute logs: run pods always log to stdout (cluster log pipeline); with
+    # var.compute_logs also to S3 (own bucket), readable in the Dagster UI
+    computeLogManager = var.compute_logs == null ? { type = "NoOpComputeLogManager", config = {} } : {
+      type = "S3ComputeLogManager"
+      config = {
+        s3ComputeLogManager = {
+          bucket         = var.compute_logs.bucket
+          prefix         = var.compute_logs.prefix
+          endpointUrl    = var.compute_logs.endpoint_url
+          verifyCertPath = local.ca_path
+          skipEmptyFiles = true
+        }
+      }
+    }
 
     concurrency = {
       enabled = true
@@ -462,7 +498,7 @@ resource "helm_release" "this" {
     }
   })]
 
-  depends_on = [kubernetes_manifest.solution_env]
+  depends_on = [kubernetes_manifest.solution_env, module.compute_logs_credentials]
 }
 
 # code location (gRPC server with the solution image); run pods inherit its
@@ -484,7 +520,7 @@ resource "helm_release" "code_location" {
     deployments = [local.code_location]
   })]
 
-  depends_on = [kubernetes_manifest.solution_env]
+  depends_on = [kubernetes_manifest.solution_env, module.compute_logs_credentials]
 }
 
 # --- pool limits (instance setting, idempotent) ------------------------------------------

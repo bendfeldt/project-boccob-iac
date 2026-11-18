@@ -129,8 +129,9 @@ same-namespace allow, so other pods there cannot query OPA [verified by `make ve
   `TRINO_HOST=trino.<base_domain>`, `TRINO_PORT=443` (through Traefik like every
   client: `X-Forwarded-For` in the audit trail can only be set by Traefik; direct
   access to 8443 is closed unless `trino_client_namespaces` lists a namespace).
-  `ERASURE_VERIFY_STORAGE` from `erasure_verify_storage`: `true` on dev only
-  (see "Erasure verification" below; audit M-8, N-1).
+  `ERASURE_VERIFY_STORAGE` from `erasure_verify_storage`: `full` on dev,
+  `scoped` in test/prod (see "Erasure verification" below; audit M-8, N-1).
+  `LAKEHOUSE_ENV` = the environment name (dev/test/prod).
 - Concurrency: pool `lakehouse_writer` = 1 (Job running
   `dagster instance concurrency set`, idempotent; instance `pools.granularity: op`),
   queued run coordinator with `max_concurrent_runs`.
@@ -138,14 +139,21 @@ same-namespace allow, so other pods there cannot query OPA [verified by `make ve
   `data-engineer`; Dagster OSS has no roles, so anybody who passes may launch
   runs). The `orchestration` namespace has no same-namespace allow: the
   webserver port is reachable only from the proxy.
-- Compute logs: `NoOpComputeLogManager`; run pods log to stdout (collected by
-  the ops log pipeline), structured run events are in `dagster-db`.
-  S3 compute logs to `platform-logs` are **not** enabled: the S3 compute log
-  manager (dagster-aws) is not installed in the solution image and the
-  instance configuration is loaded by every run pod. Open item for the
-  solution repository: add `dagster-aws`, then set
-  `computeLogManager.type = S3ComputeLogManager` (bucket `platform-logs`,
-  S3 user `platform-logs`, `verifyCertPath` = platform CA).
+- Compute logs: run pods always log to stdout (collected by the ops log
+  pipeline); structured run events are in `dagster-db`. With
+  `compute_logs_s3 = true` (stack 22 default; test/prod) the instance uses
+  `dagster_aws` `S3ComputeLogManager`: bucket `dagster-compute-logs` (prefix
+  `dagster`, unversioned, expiry 90 days test/prod, 30 days dev), S3 user
+  `dagster-compute-logs` (rw on that bucket only; `AWS_ACCESS_KEY_ID` /
+  `AWS_SECRET_ACCESS_KEY` + `AWS_DEFAULT_REGION` for webserver, daemon, code
+  server and run pods; `verifyCertPath` = platform CA). Deliberately **not**
+  `platform-logs`: its S3 user also writes Loki's audit tenant and the WORM
+  bucket `platform-audit`, and every run pod would hold it. The webserver/daemon
+  image has dagster-aws 0.29.30 [verified]; the code location image has it from
+  solution commit 0112d93 on — the image deployed on dev predates it, so dev
+  keeps `compute_logs_s3 = false` until the next image (with an older image the
+  run pods cannot load the instance). [verified on dev: the user can write its
+  bucket, is refused on `platform-logs`; the bucket expiry rule is active]
 
 ### Pseudonymisation pepper
 
@@ -217,7 +225,7 @@ N-3 it is handed only to the runs that need it:
 - A purge job attaches it with the Dagster K8sRunLauncher's per-job Kubernetes
   config (pinned dagster-k8s 0.29.30: tag `dagster-k8s/config`,
   `container_config.env_from`, merged DEEP with the code location's container
-  context, lists appended). The Secret name is in `PURGE_ENV_SECRET`.
+  context, lists appended). The Secret name is in `PURGE_CREDENTIALS_SECRET`.
   [verified on dev: an `erasure` run launched with the tag got
   `envFrom: [user-env ConfigMap, lakehouse-env, lakehouse-purge-env]` and
   succeeded]
@@ -234,22 +242,17 @@ N-3 it is handed only to the runs that need it:
   `data-engineer`) can launch a purge job, including with extra run tags; that
   is the intended authority over erasure/retention/maintenance.
 
-What the solution must add (not in this repository): on the jobs `erasure`,
-`retention` and `iceberg_maintenance` (`orchestration/jobs.py`)
-
-```python
-PURGE_TAGS = {"dagster-k8s/config": {"container_config": {"env_from": [
-    {"secret_ref": {"name": os.environ.get("PURGE_ENV_SECRET", "lakehouse-purge-env")}}]}}}
-
-@dg.job(..., tags={"lakehouse/kind": "erasure", **PURGE_TAGS})
-```
-
-(Dagster serialises a dict tag value to JSON; the default multiprocess executor
-runs every op inside the run pod, so no step-level config is needed). Until that
-release is deployed these jobs run without `PURGE_S3_*`:
-`S3Settings.for_purge()` then falls back to the ordinary credential and the
-version deletes fail loudly (AccessDenied) instead of being skipped. A renamed
-or additional purge job must be added to `purge_jobs`.
+Solution side (`orchestration/jobs.py`, solution commit 4d79fed): with
+`PURGE_CREDENTIALS_SECRET` set, the jobs `erasure`, `retention` and
+`iceberg_maintenance` carry the tag
+`{"dagster-k8s/config": {"container_config": {"env_from": [{"secret_ref": {"name": <secret>}}]}}}`
+(the default multiprocess executor runs every op inside the run pod, so no
+step-level config is needed). Until an image with that code is deployed,
+these jobs run without `PURGE_S3_*`: `S3Settings.for_purge()` falls back to the
+ordinary credential and the version deletes fail loudly (AccessDenied) instead
+of being skipped. A renamed or additional purge job must be added to
+`purge_jobs`. The run pods' ServiceAccount needs no RBAC on Secrets: `envFrom`
+is resolved by the kubelet; the admission policies above are the gate.
 
 Delayed-deletion window: `lakehouse_noncurrent_version_days` (stack 12) is 7
 days by default (was 1). Trade-off:
@@ -269,46 +272,32 @@ The off-site lake copy keeps its own short expiry
 
 ## Erasure verification
 
-`ERASURE_VERIFY_STORAGE=true` makes every erasure request read and decode
-**every object version of all four lake buckets** (solution
-`governance/erasure/storage_scan.py`, "O(size of the lake)"), while it holds the
-`lakehouse_writer` pool. At test/prod size that blocks `daily_refresh` for hours
-per request (audit N-1), so the switch is per environment:
+`ERASURE_VERIFY_STORAGE` (stack 22 `erasure_verify_storage`) chooses the object
+scan after each erasure request, which runs while the request holds the
+`lakehouse_writer` pool (audit N-1):
 
-| Environment | `erasure_verify_storage` | Why |
+| Value | Scope (solution `governance/erasure`) | Used in |
 |---|---|---|
-| dev | `true` | the synthetic lake is a few MB; every erasure is proven physically |
-| test, prod | `false` | per-request whole-lake scan does not scale |
+| `full` | every object version of all four lake buckets: O(size of the lake) per request | dev (the synthetic lake is a few MB) and explicit audits |
+| `scoped` | every object version under the locations of the tables the plan touched plus the subject's raw files: cost grows with those tables, not with the lake | test, prod (default of the variable) |
+| `false` | SQL verification only | not used |
 
-What still runs on every request (solution, independent of the switch): the
-row counts of every plan step must be 0 afterwards (`verify_sql`), the subject's
-raw files are deleted with all their versions, Iceberg history is expired and
-the object versions of the affected objects are deleted explicitly. Separate
-verification in test/prod:
+What runs on every request regardless (solution): the row counts of every plan
+step must be 0 afterwards, the subject's raw files are deleted with all their
+versions, Iceberg history is expired and the versions of the touched objects
+are deleted explicitly. Periodic verification on top:
 
-1. **Periodic canary scan (test, monthly and after every release).** The
-   synthetic source carries a fictional canary subject; the run submits its
-   erasure and executes the erasure job with storage verification on (run
-   config, see below) in a quiet window. A hit fails the run and pages
-   through the Dagster failure alert. This proves the mechanism end to end on
-   the same code and storage layout as prod, without keeping any real
-   identifier for a later scan (the subject key is gone after the erasure, so a
-   later whole-lake search for a real subject is impossible by design).
-2. **Targeted scan on demand (prod).** For a request the DPO flags (e.g. a
-   complaint), the erasure job runs with storage verification enabled for that
-   run only, restricted to the object versions under the locations of the
-   tables in the plan plus the subject's raw file paths, in a maintenance
-   window outside `daily_refresh`.
-3. **Off-site copy.** The lake copy follows the source within one mirror run
-   plus the target's noncurrent-version expiry (stack 32, "Off-site copy and
-   erasure"); a canary scan of the off-site target is part of the yearly DR
-   exercise (runbook).
-
-Solution side (not in this repository): a run-config flag on the `erasure`
-job that overrides `ERASURE_VERIFY_STORAGE` for one run, and the targeted
-scope of the scan (table locations + raw paths instead of whole buckets). Until
-the flag exists, (1) runs in test by deploying stack 22 with
-`erasure_verify_storage = true` for the window and back to `false` afterwards.
+1. **Canary in test (monthly and after every release).** The synthetic source
+   carries a fictional canary subject; submit its erasure and run the `erasure`
+   job with stack 22 deployed with `erasure_verify_storage = "full"` for that
+   window, then back to `scoped`. This proves the mechanism over the whole lake
+   on the same code and storage layout as prod without keeping any real
+   identifier (the subject key is gone after the erasure, so a later
+   whole-lake search for a real subject is impossible by design).
+2. **Off-site copy.** The lake copy follows the source within one mirror run
+   plus the target's noncurrent-version expiry (stack 32 README, "Off-site copy
+   and erasure"); a canary scan of the off-site target is part of the yearly DR
+   exercise.
 
 ## Alignment with the solution's platform contract
 
@@ -321,11 +310,12 @@ fixes) now describes the platform as deployed. Checked point by point:
 | `TRINO_HOST=trino.<base_domain>`, `TRINO_PORT=443` (through Traefik) | stack 22 `solution_env` | aligned |
 | groups `platform-admin`, `data-engineer`, `analyst`, `pii-reader`, `auditor`, `lakehouse-service`; service-account groups from static file entries, OPA `principals` overlay empty | Keycloak groups synced (five), `lakehouse-service` static only (`trino_service_accounts`; the group sync ignores static-only groups even if a Keycloak group of that name exists) | aligned |
 | `svc-dagster` in `data-engineer`, `pii-reader`, `lakehouse-service`; no person in `lakehouse-service` | stack 21 default | aligned |
-| `PURGE_S3_ACCESS_KEY_ID` / `PURGE_S3_SECRET_ACCESS_KEY`: ListBucket, ListBucketVersions, GetObject, GetObjectVersion, DeleteObject, DeleteObjectVersion on the four lakehouse buckets | S3 user `lakehouse-purge` (`purge_buckets` in `modules/rustfs`: exactly those actions + GetBucketLocation; PutObject is refused [verified on dev]) in Secret `lakehouse-purge-env` (name in `PURGE_ENV_SECRET`), attached only by `erasure`, `retention`, `iceberg_maintenance` through their `dagster-k8s/config` tag (audit N-3) | **changed: the solution must add the tag** (see "Purge credential and deletion safety window") |
-| `ERASURE_VERIFY_STORAGE` | variable `erasure_verify_storage`: dev `true`, test/prod `false` (whole-lake scan per request is O(lake), audit N-1); see "Erasure verification" | **changed: the solution contract must drop "recommended in test/prod"** |
+| `PURGE_S3_ACCESS_KEY_ID` / `PURGE_S3_SECRET_ACCESS_KEY`: ListBucket, ListBucketVersions, GetObject, GetObjectVersion, DeleteObject, DeleteObjectVersion on the four lakehouse buckets | S3 user `lakehouse-purge` (`purge_buckets` in `modules/rustfs`: exactly those actions + GetBucketLocation; PutObject is refused [verified on dev]) in Secret `lakehouse-purge-env` (name in `PURGE_CREDENTIALS_SECRET`), attached only by `erasure`, `retention`, `iceberg_maintenance` through their `dagster-k8s/config` tag (audit N-3) | **changed: the solution must add the tag** (see "Purge credential and deletion safety window") |
+| `ERASURE_VERIFY_STORAGE` = `false`/`scoped`/`full` | variable `erasure_verify_storage`: dev `full`, test/prod `scoped` (audit N-1); see "Erasure verification" | aligned |
+| `LAKEHOUSE_ENV` (only `dev` permits `dbt --full-refresh` of incremental models) | stack 22: `var.environment` (dev/test/prod) | aligned |
 | no object lock on the lakehouse buckets; lifecycle as second line of defence | buckets versioned, no object lock; lifecycle expires noncurrent versions (ops package) | aligned |
 | query text in the audit archive: no keys/CPR from the tooling; ad-hoc literals redacted by the platform | audit sink redaction (H-1) | aligned |
-| compute logs to stdout, no `dagster-aws` | `NoOpComputeLogManager` | aligned (open item on both sides) |
+| compute logs to stdout; image contains `dagster-aws`, S3ComputeLogManager allowed | stdout + `S3ComputeLogManager` on bucket `dagster-compute-logs` (own S3 user, not `platform-logs`; dev off until the image with dagster-aws is deployed) | aligned |
 
 Not yet deployed on dev: the solution's new image and bundle (they need the
 user's approval before they are published to Zot); dev still runs
@@ -368,7 +358,8 @@ with it (an extra group and extra environment variables are ignored).
 ## Open items
 
 - HA profile (Polaris 2, OPA 2, Trino workers + HPA/KEDA, CNPG 3) validated statically only.
-- Dagster compute logs to S3 (see above); Dagster UI has no per-group roles.
+- Dev: set `compute_logs_s3 = true` with the next code location image (see
+  Dagster above); Dagster UI has no per-group roles.
 - Trino internal TLS and the Dagster plaintext hops (see "TLS exceptions"; CNI encryption recommended).
 - Kyverno policy `verify-solution-image-signatures` (ops package, Audit mode)
   reports the code-location image as unsigned: sign it with

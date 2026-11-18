@@ -221,14 +221,21 @@ resource "kubernetes_config_map_v1" "provision" {
     { "provision.sh" = local.provision_script },
     { for name, policy in local.user_policies : "policy-${name}.json" => policy },
     { for bucket, cfg in var.buckets : "lifecycle-${bucket}.json" => jsonencode({
-      rules = [merge(
-        {
-          id                          = "noncurrent-versions"
-          status                      = "Enabled"
-          noncurrentVersionExpiration = { noncurrentDays = cfg.lifecycle.noncurrent_days }
-        },
-        cfg.lifecycle.expired_delete_markers ? { expiredObjectDeleteMarker = true } : {},
-      )]
+      rules = concat(
+        cfg.lifecycle.noncurrent_days == null ? [] : [merge(
+          {
+            id                          = "noncurrent-versions"
+            status                      = "Enabled"
+            noncurrentVersionExpiration = { noncurrentDays = cfg.lifecycle.noncurrent_days }
+          },
+          cfg.lifecycle.expired_delete_markers ? { expiredObjectDeleteMarker = true } : {},
+        )],
+        cfg.lifecycle.expiration_days == null ? [] : [{
+          id         = "expiration"
+          status     = "Enabled"
+          expiration = { days = cfg.lifecycle.expiration_days }
+        }],
+      )
     }) if cfg.lifecycle != null },
   )
 }

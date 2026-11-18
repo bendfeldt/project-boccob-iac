@@ -149,7 +149,8 @@ variable "job_secrets" {
     code server or to other runs: a job attaches it through its tag
     `dagster-k8s/config` = {"container_config": {"env_from": [{"secret_ref":
     {"name": "<secret>"}}]}}; the Secret name is in the environment variable
-    <NAME>_ENV_SECRET (e.g. PURGE_ENV_SECRET). ValidatingAdmissionPolicies
+    `name_env` (default <NAME>_ENV_SECRET) of the code location and the runs.
+    ValidatingAdmissionPolicies
     admit a Job or Pod in the namespace that references the Secret only when
     it carries the label dagster/job of a listed job and was created by the
     run launcher (Job: ServiceAccount `run_launcher_service_account`; Pod: the
@@ -160,7 +161,8 @@ variable "job_secrets" {
       kv_path  = string
       property = string
     }))
-    jobs = list(string)
+    jobs     = list(string)
+    name_env = optional(string)
   }))
   default = {}
 }
@@ -169,4 +171,16 @@ variable "run_launcher_service_account" {
   description = "ServiceAccount that creates the run Jobs (the queued run coordinator launches every run from the daemon; the chart's ServiceAccount `dagster`)."
   type        = string
   default     = "dagster"
+}
+
+variable "compute_logs" {
+  description = "Step logs (stdout/stderr) to S3 with dagster_aws S3ComputeLogManager (webserver/daemon image and the code location image must contain dagster-aws). bucket/prefix on the platform S3 endpoint; kv_path: OpenBao KV path with access-key / secret-key of an S3 user limited to that bucket (delivered as AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY to webserver, daemon, code server and run pods). null = NoOpComputeLogManager (stdout only)."
+  type = object({
+    bucket       = string
+    prefix       = optional(string, "dagster")
+    endpoint_url = string
+    region       = optional(string, "us-east-1")
+    kv_path      = string
+  })
+  default = null
 }

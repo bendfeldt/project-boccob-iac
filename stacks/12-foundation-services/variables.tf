@@ -81,8 +81,9 @@ variable "buckets" {
       days = number
     }))
     lifecycle = optional(object({
-      noncurrent_days        = number
+      noncurrent_days        = optional(number)
       expired_delete_markers = optional(bool, true)
+      expiration_days        = optional(number) # delete current objects after N days (log buckets)
     }))
   }))
   default = {}

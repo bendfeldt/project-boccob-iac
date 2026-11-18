@@ -12,9 +12,13 @@ variable "solution_env" {
 }
 
 variable "erasure_verify_storage" {
-  description = "ERASURE_VERIFY_STORAGE: after every erasure request, read and decode every object version of all four lake buckets and search them for the subject. O(size of the lake) per request and holds the lakehouse_writer pool meanwhile, so false by default (test/prod); true only where the lake is small (dev). Physical removal in test/prod is proven by the periodic canary verification instead (docs/data-plane.md, \"Erasure verification\")."
-  type        = bool
-  default     = false
+  description = "ERASURE_VERIFY_STORAGE (object scan after each erasure request, while the lakehouse_writer pool is held): `scoped` = every object version under the locations of the touched tables plus the subject's raw files (default; test/prod), `full` = every version of all four lake buckets, O(size of the lake) per request (dev, audits), `false` = SQL verification only. See docs/data-plane.md, \"Erasure verification\"."
+  type        = string
+  default     = "scoped"
+  validation {
+    condition     = contains(["false", "scoped", "full"], var.erasure_verify_storage)
+    error_message = "erasure_verify_storage must be one of false, scoped, full."
+  }
 }
 
 variable "schedules_enabled" {
@@ -33,6 +37,12 @@ variable "purge_s3_user" {
   description = "S3 user (stack 12) that may delete object versions on the layer buckets (PURGE_S3_*: erasure, retention, maintenance)."
   type        = string
   default     = "lakehouse-purge"
+}
+
+variable "compute_logs_s3" {
+  description = "Step logs also to S3 (dagster_aws S3ComputeLogManager, bucket dagster-compute-logs, S3 user dagster-compute-logs; both registered in the stack 12 tfvars). Needs dagster-aws in the code location image (solution >= 0112d93) - with an older image the run pods cannot load the instance. false = stdout only."
+  type        = bool
+  default     = true
 }
 
 variable "purge_jobs" {
