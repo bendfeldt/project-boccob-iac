@@ -73,12 +73,16 @@ variable "rustfs_resources" {
 }
 
 variable "buckets" {
-  description = "Additional buckets (name => { versioning }), merged over the contract buckets defined in main.tf (lakehouse-raw/clean/consolidated/curated, platform-backup, platform-logs)."
+  description = "Additional buckets (name => { versioning, object_lock, lifecycle }), merged over the contract buckets defined in main.tf (lakehouse-raw/clean/consolidated/curated, platform-backup, platform-logs, platform-audit). See modules/rustfs `buckets`."
   type = map(object({
     versioning = optional(bool, true)
     object_lock = optional(object({
       mode = string
       days = number
+    }))
+    lifecycle = optional(object({
+      noncurrent_days        = number
+      expired_delete_markers = optional(bool, true)
     }))
   }))
   default = {}
@@ -94,7 +98,7 @@ variable "audit_archive_lock" {
 }
 
 variable "s3_users" {
-  description = "Additional S3 users (access key => bucket grants), merged over the built-in ones (lakehouse-catalog, lakehouse-ingest, platform-backup, platform-logs). Secret keys are generated and stored in OpenBao at kv/storage/s3-users/<name>."
+  description = "Additional S3 users (access key => bucket grants), merged over the built-in ones (lakehouse-catalog, lakehouse-ingest, platform-backup, platform-offsite-reader, platform-logs). Secret keys are generated and stored in OpenBao at kv/storage/s3-users/<name>."
   type = map(object({
     read_write_buckets = optional(list(string), [])
     read_only_buckets  = optional(list(string), [])

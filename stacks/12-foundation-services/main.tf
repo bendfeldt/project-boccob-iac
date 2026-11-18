@@ -69,12 +69,13 @@ locals {
     "lakehouse-catalog" = { read_write_buckets = ["lakehouse-raw", "lakehouse-clean", "lakehouse-consolidated", "lakehouse-curated"] }
     # dlt landing
     "lakehouse-ingest" = { read_write_buckets = ["lakehouse-raw"] }
-    # read on the lake buckets: off-site copy (stack 32-backup)
-    "platform-backup" = {
-      read_write_buckets = ["platform-backup"]
-      read_only_buckets  = ["lakehouse-raw", "lakehouse-clean", "lakehouse-consolidated", "lakehouse-curated"]
-    }
-    "platform-logs" = { read_write_buckets = ["platform-logs", "platform-audit"] }
+    # CloudNativePG barman (namespace database) and backup Jobs: own bucket only
+    "platform-backup" = { read_write_buckets = ["platform-backup"] }
+    # off-site copy of the lake (stack 32-backup): read only, readable only from
+    # the backup namespace (stack 11 namespace_secret_stores) - never by the
+    # database namespace, whose WAL archiver must not see raw PII (audit N-4)
+    "platform-offsite-reader" = { read_only_buckets = ["lakehouse-raw", "lakehouse-clean", "lakehouse-consolidated", "lakehouse-curated"] }
+    "platform-logs"           = { read_write_buckets = ["platform-logs", "platform-audit"] }
   }
   s3_users = merge(local.default_s3_users, var.s3_users)
 }

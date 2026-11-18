@@ -230,7 +230,9 @@ s3_users = { "trino" = { read_write_buckets = ["lakehouse-clean"], read_only_buc
 `make deploy ENV=<env> STACK=12-foundation-services` re-runs the idempotent
 provisioning Job. Credentials: `kv/storage/s3-users/<name>` (`access-key`,
 `secret-key`). Built-in users: `lakehouse-catalog` (rw on the four layer
-buckets), `lakehouse-ingest` (rw raw), `platform-backup`, `platform-logs`.
+buckets), `lakehouse-ingest` (rw raw), `platform-backup` (own bucket only),
+`platform-offsite-reader` (read on the lake buckets; only namespace `backup`),
+`platform-logs`.
 S3 clients: endpoint `https://rustfs-svc.storage.svc:9000`, path-style access,
 region `us-east-1`, CA from `platform-ca`; the namespace must be in
 `s3_client_namespaces` (default: database, secrets, catalog, query,

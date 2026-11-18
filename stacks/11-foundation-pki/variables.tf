@@ -26,7 +26,7 @@ variable "namespace_secret_stores" {
     storage       = {}
     identity      = { reads = ["database/keycloak-db"] }
     observability = { reads = ["storage/s3-users/platform-logs", "identity/oidc-clients/grafana", "identity/oidc-clients/grafana-audit"] }
-    backup        = { reads = ["storage/s3-users/platform-backup"] }
+    backup        = { reads = ["storage/s3-users/platform-backup", "storage/s3-users/platform-offsite-reader"] }
     catalog       = { reads = ["database/polaris-db", "storage/s3-users/lakehouse-catalog"] }
     query = { reads = [
       "catalog/polaris/principals/trino",
