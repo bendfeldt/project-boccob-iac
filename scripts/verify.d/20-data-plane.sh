@@ -52,7 +52,7 @@ if kubectl get namespace catalog query orchestration >/dev/null 2>&1; then
     # a pod of the query namespace that is not the Trino coordinator must not reach OPA
     kubectl -n query run verify-smoke-opa --restart=Never --quiet --rm -i --pod-running-timeout=120s \
       --image="$(image_zot_ref busybox)" \
-      --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":65534,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"verify-smoke-opa","image":"'"$dp_busybox"'","command":["sh","-c","if nc -w 4 -z opa.query.svc.cluster.local 8181; then echo CONNECTED; else echo BLOCKED; fi"],"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"resources":{"limits":{"memory":"32Mi"}}}]}}' \
+      --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":65534,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"verify-smoke-opa","image":"'"$(image_zot_ref busybox)"'","command":["sh","-c","if nc -w 4 -z opa.query.svc.cluster.local 8181; then echo CONNECTED; else echo BLOCKED; fi"],"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"resources":{"limits":{"memory":"32Mi"}}}]}}' \
       2>/dev/null | grep -q '^BLOCKED'
   }
   check "NetworkPolicy: only the Trino coordinator can query OPA" opa_isolated
