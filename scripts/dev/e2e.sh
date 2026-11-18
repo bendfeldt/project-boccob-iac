@@ -9,6 +9,10 @@
 #      clear values (OAuth2 bearer tokens from Keycloak, groups via the group sync)
 #   5. right to erasure: request queued with the solution CLI in the code-location
 #      pod, Dagster job `erasure`, subject gone from clean/curated/keystore, audit row
+#   6. deregistration-scope erasure: person gone, payments/cases kept anonymised
+#   7. platform guarantees on the runs: only the erasure run pod gets the purge
+#      Secret (audit N-3); step logs land in bucket dagster-compute-logs; dbt
+#      refuses a full refresh of incremental models when LAKEHOUSE_ENV != dev
 #
 #   scripts/dev/e2e.sh dev                 everything
 #   E2E_SKIP_LOADS=1 scripts/dev/e2e.sh dev   reuse loads that already ran
@@ -116,6 +120,67 @@ else
   ok "subject key absent from the Trino query audit trail (last hour)"
 fi
 expect "erasure queue empty (raw.governance.erasure_requests, written via pyiceberg)" 0 "$(one "select count(*) from raw.governance.erasure_requests")"
+
+step "deregistration-scope erasure (retention policy path): person gone, bookings kept anonymised"
+# a citizen (not the one above) with payments and cases; queued with scope=deregistration
+# the way the retention policy does (pyiceberg, key over stdin)
+dkey="$(one "select c.citizen_id from clean.borgerportal.citizens c join clean.borgerportal.payments p on p.citizen_id = c.citizen_id join clean.borgerportal.cases k on k.citizen_id = c.citizen_id where c.citizen_id <> '${key}' group by c.citizen_id order by c.citizen_id limit 1")"
+if [[ -z "$dkey" || "$dkey" == null ]]; then
+  bad "no deregistration candidate (citizen with payments and cases)"
+else
+  pay_ids="$(sa "select payment_id from clean.borgerportal.payments where citizen_id = '${dkey}'" | jq -r '.[0]' | sed "s/.*/'&'/" | paste -sd, -)"
+  case_ids="$(sa "select case_id from clean.borgerportal.cases where citizen_id = '${dkey}'" | jq -r '.[0]' | sed "s/.*/'&'/" | paste -sd, -)"
+  n_pay="$(tr ',' '\n' <<<"$pay_ids" | grep -c .)"; n_case="$(tr ',' '\n' <<<"$case_ids" | grep -c .)"
+  dreason="e2e-dereg-$(date -u +%Y%m%dT%H%M%SZ)"
+  printf '%s\n' "$dkey" | kubectl -n orchestration exec -i deploy/dagster-code-dagster-user-deployments-lakehouse -- \
+    python -c 'import sys; from governance.erasure.queue import enqueue; k = sys.stdin.readline().strip(); print(enqueue(k, identifier_type="subject_key", requested_by="retention-policy", reason=sys.argv[1], scope="deregistration"))' \
+    "$dreason" > "${tmp}/dereg.out" 2>"${tmp}/dereg.err" \
+    && ok "deregistration request queued (${n_pay} payments, ${n_case} cases)" || bad "enqueue: $(tail -2 "${tmp}/dereg.err")"
+  drun="$(dp_dagster_launch erasure)"
+  log "run ${drun}"
+  if dp_dagster_wait "$drun" 1800; then ok "erasure run ${drun} SUCCESS"; else bad "erasure run ${drun}"; fi
+  expect "deregistered person gone from clean.borgerportal.citizens" 0 "$(one "select count(*) from clean.borgerportal.citizens where citizen_id = '${dkey}'")"
+  expect "deregistered person gone from the keystore" 0 "$(one "select count(*) from curated.keystore.dim_citizen where business_key = '${dkey}'")"
+  expect "payments kept, anonymised (no person link, no case number, _anonymised_at set)" "$n_pay" \
+    "$(one "select count(*) from clean.borgerportal.payments where payment_id in (${pay_ids}) and citizen_id is null and case_id is null and _anonymised_at is not null")"
+  expect "cases kept, anonymised (no person link, _anonymised_at set)" "$n_case" \
+    "$(one "select count(*) from clean.borgerportal.cases where case_id in (${case_ids}) and citizen_id is null and _anonymised_at is not null")"
+fi
+
+step "platform guarantees on the runs"
+# dp_run_envfrom <run id> -> Secrets the run pod gets through envFrom
+dp_run_envfrom() {
+  kubectl -n orchestration get job -l "dagster/run-id=${1}" -o json \
+    | jq -r '[.items[0].spec.template.spec.containers[0].envFrom[]? | .secretRef.name // empty] | join(",")'
+}
+expect "erasure run pod gets the purge Secret" yes "$([[ ",$(dp_run_envfrom "$run")," == *,lakehouse-purge-env,* ]] && echo yes || echo no)"
+other="$(dp_dagster_launch "${E2E_PLAIN_JOB:-migrate}")"
+dp_dagster_wait "$other" 1800 >/dev/null 2>&1 || true
+expect "a ${E2E_PLAIN_JOB:-migrate} run pod does not (envFrom: $(dp_run_envfrom "$other"))" no \
+  "$([[ ",$(dp_run_envfrom "$other")," == *,lakehouse-purge-env,* ]] && echo yes || echo no)"
+expect "no PURGE_S3_* in the environment shared by every run (lakehouse-env)" 0 \
+  "$(kubectl -n orchestration get secret lakehouse-env -o json | jq '[.data | keys[] | select(startswith("PURGE_S3"))] | length')"
+if kubectl -n orchestration get secret dagster-compute-logs-s3 >/dev/null 2>&1; then
+  n_logs="$(kubectl -n orchestration exec -i deploy/dagster-daemon -c dagster -- python -c '
+import boto3, os
+s3 = boto3.client("s3", endpoint_url="https://rustfs-svc.storage.svc:9000", verify="/etc/platform-ca/ca.crt")
+r = s3.list_objects_v2(Bucket="dagster-compute-logs", Prefix="dagster/storage/'"${run}"'")
+print(r.get("KeyCount", 0))' 2>&1 | tail -1)"
+  [[ "$n_logs" =~ ^[0-9]+$ ]] && (( n_logs > 0 )) && ok "step logs of the erasure run in s3://dagster-compute-logs (${n_logs} objects)" \
+    || bad "no compute logs of run ${run} in dagster-compute-logs: ${n_logs}"
+else
+  bad "compute logs to S3 not configured (compute_logs_s3 = false)"
+fi
+# full-refresh guard: dbt in the code-location image with LAKEHOUSE_ENV=test and an
+# unreachable Trino - the on-run-start guard must refuse before any connection
+if kubectl -n orchestration exec deploy/dagster-code-dagster-user-deployments-lakehouse -- env LAKEHOUSE_ENV=test TRINO_HOST=refused.invalid \
+     DBT_TARGET_PATH=/tmp/dbt-target DBT_LOG_PATH=/tmp/dbt-logs \
+     sh -c 'cd "$DBT_PROJECT_DIR" && dbt run --full-refresh --select clean.borgerportal.citizens' > "${tmp}/fr.out" 2>&1; then
+  bad "dbt --full-refresh ran with LAKEHOUSE_ENV=test"
+else
+  grep -q "refused outside dev" "${tmp}/fr.out" && ok "dbt --full-refresh refused with LAKEHOUSE_ENV=test (guard message)" \
+    || bad "full refresh failed for another reason: $(grep -m2 -i error "${tmp}/fr.out")"
+fi
 
 printf '\n== e2e summary (%s): %d passed, %d failed\n' "$ENV" "$PASS" "$FAIL"
 (( FAIL == 0 ))
