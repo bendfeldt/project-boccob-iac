@@ -145,21 +145,17 @@ locals {
   }
 }
 
+# Legacy cluster-wide stores (full kv/* access): only while some namespace
+# still needs them; with no legacy namespace they are removed.
 resource "kubernetes_manifest" "cluster_secret_store" {
-  for_each = local.secret_stores
+  for_each = length(var.legacy_cluster_store_namespaces) > 0 ? local.secret_stores : {}
   manifest = {
     apiVersion = "external-secrets.io/v1"
     kind       = "ClusterSecretStore"
     metadata   = { name = each.key }
     spec = {
-      # legacy, full kv/* access: only namespaces not yet migrated to their own
-      # SecretStores (modules/namespace-baseline); an empty list closes the
-      # store (a condition that matches no namespace)
-      conditions = [
-        length(var.legacy_cluster_store_namespaces) > 0
-        ? { namespaces = var.legacy_cluster_store_namespaces }
-        : { namespaces = ["-none-"] },
-      ]
+      # only namespaces not yet migrated to their own SecretStores
+      conditions = [{ namespaces = var.legacy_cluster_store_namespaces }]
       provider = {
         vault = {
           server  = local.platform.openbao_url

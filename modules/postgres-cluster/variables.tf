@@ -142,5 +142,5 @@ variable "labels" {
 variable "store_kind" {
   description = "Kind of push_store: ClusterSecretStore (legacy) or SecretStore (the namespace's own store)."
   type        = string
-  default     = "ClusterSecretStore"
+  default     = "SecretStore"
 }

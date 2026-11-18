@@ -128,14 +128,15 @@ check "certificate issued by the OpenBao PKI and chains to the platform CA" issu
 
 # ------------------------------------------------------------------------------
 step "External Secrets"
-check "ClusterSecretStores Ready" bash -c 'kubectl wait --for=condition=Ready clustersecretstore/openbao clustersecretstore/openbao-push --timeout=10s'
+check "namespaced SecretStores Ready (every namespace with secrets access)" bash -c \
+  '! kubectl get secretstores.external-secrets.io -A -o json | jq -e -r ".items[] | select(any(.status.conditions[]?; .type == \"Ready\" and .status != \"True\")) | .metadata.namespace + \"/\" + .metadata.name" | grep . && [[ \$(kubectl get secretstores.external-secrets.io -A --no-headers | wc -l) -ge 10 ]]'
 check "all ExternalSecrets synced" bash -c \
   '! kubectl get externalsecret -A -o json | jq -e -r ".items[] | select(any(.status.conditions[]?; .type == \"Ready\" and .status != \"True\")) | .metadata.namespace + \"/\" + .metadata.name" | grep .'
 check "all PushSecrets synced" bash -c \
   '! kubectl get pushsecret -A -o json | jq -e -r ".items[] | select(any(.status.conditions[]?; .type == \"Ready\" and .status != \"True\")) | .metadata.namespace + \"/\" + .metadata.name" | grep .'
 eso_roundtrip() {
   local value; value="smoke-$(random_secret 12)"
-  jq -n --arg v "$value" '{data: {value: $v}}' | bao_api -X POST --data-binary @- "${bao_url}/kv/data/platform/verify-smoke" >/dev/null
+  jq -n --arg v "$value" '{data: {value: $v}}' | bao_api -X POST --data-binary @- "${bao_url}/kv/data/database/verify-smoke" >/dev/null
   kubectl apply -f - >/dev/null <<YAML
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -144,14 +145,14 @@ metadata:
   namespace: database
 spec:
   refreshInterval: 1m0s
-  secretStoreRef: {name: openbao, kind: ClusterSecretStore}
+  secretStoreRef: {name: openbao, kind: SecretStore}
   target: {name: verify-smoke}
   dataFrom:
-    - extract: {key: platform/verify-smoke}
+    - extract: {key: database/verify-smoke}
 YAML
   kubectl -n database wait --for=condition=Ready externalsecret/verify-smoke --timeout=60s >/dev/null
   local got; got="$(kubectl -n database get secret verify-smoke -o jsonpath='{.data.value}' | base64 -d)"
-  bao_api -X DELETE "${bao_url}/kv/metadata/platform/verify-smoke" >/dev/null
+  bao_api -X DELETE "${bao_url}/kv/metadata/database/verify-smoke" >/dev/null
   [[ "$got" == "$value" ]]
 }
 if [[ "$have_token" == "1" ]]; then

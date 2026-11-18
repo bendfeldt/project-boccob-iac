@@ -133,11 +133,11 @@ variable "sse_master_key_secret" {
 }
 
 variable "secret_stores" {
-  description = "External Secrets stores used for the generated credentials: { read, push, kind }. Default = legacy ClusterSecretStores; pass module.ns_x.secret_stores for the namespace's own SecretStores."
+  description = "External Secrets stores used for the generated credentials: { read, push, kind }. Default = the namespace's own SecretStores; pass module.ns_x.secret_stores for the namespace's own SecretStores."
   type = object({
     read = string
     push = string
     kind = string
   })
-  default = { read = "openbao", push = "openbao-push", kind = "ClusterSecretStore" }
+  default = { read = "openbao", push = "openbao-push", kind = "SecretStore" }
 }

@@ -31,7 +31,7 @@ Registry: `registry.dev.lakehouse.internal:5000` (anonymous pull, authenticated 
 | What | Value |
 |---|---|
 | ClusterIssuer | `openbao-pki` |
-| ClusterSecretStore read / write | `openbao` / `openbao-push` |
+| SecretStore read / write (per namespace, `secrets_access = true`) | `openbao` / `openbao-push` (kind `SecretStore`; no ClusterSecretStores) |
 | KV v2 mount, path layout | `kv`, `kv/<namespace>/<name>` |
 | CA bundle ConfigMap (key `ca.crt`) | `platform-ca` (in every baseline namespace that sets `ca_bundle_pem`) |
 | OpenBao (in-cluster) | `https://openbao.secrets.svc:8200` |
@@ -168,10 +168,23 @@ and the namespace must be in `openbao_client_namespaces`
 (`environments/<env>/10-foundation-secrets.tfvars`; the default already lists
 identity, storage, database, catalog, query, orchestration, observability).
 
-Known limitation: the two ClusterSecretStores can read/write the whole `kv/`
-mount for any namespace labelled `boccob.io/secrets-access=true`. Tightening
-to per-namespace `SecretStore`s with per-namespace OpenBao roles is an open
-hardening item.
+Secret isolation (per namespace): `modules/namespace-baseline` creates the
+SecretStores `openbao` (read) and `openbao-push` (write) with their own
+ServiceAccounts `eso-read` / `eso-push`. OpenBao roles `eso-<ns>-read` /
+`eso-<ns>-push` (stack 11, `namespace_secret_stores`) allow:
+
+- read: `kv/<ns>/*` plus an explicit list of cross-namespace paths;
+- write: `kv/<ns>/*` only, never the `deny_write` paths (the pseudonym pepper is
+  written only by its Job).
+
+The modules' defaults use the namespace stores (`store_kind = "SecretStore"`).
+A **new namespace** needs an entry in `namespace_secret_stores`; a **new
+cross-namespace read** (e.g. a new S3 user for a consumer) needs the path in
+that entry's `reads` (or `extra_namespace_secret_reads` per environment),
+then `make deploy STACK=11-foundation-pki`. Without it the ExternalSecret
+stays NotReady with a permission error. The cluster-wide stores are gone
+(`legacy_cluster_store_namespaces = []`); `make verify` checks that a foreign
+read is refused.
 
 ## 6. Add a database
 

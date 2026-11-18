@@ -155,7 +155,6 @@ rotate these and restrict the KV paths.
   NetworkPolicy paths (`cluster_cidrs`) need a test on real hosts.
 - OpenBao OIDC login for people (Keycloak client `openbao` exists) and
   revocation of the initial root token.
-- Per-namespace SecretStores instead of cluster-wide KV access.
 - Keycloak: optimised image (read-only root filesystem), user federation.
 - Zot on the registry host for test/prod as a systemd/quadlet unit; registry
   backup; Trivy DB mirroring.

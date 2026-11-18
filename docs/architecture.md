@@ -15,7 +15,7 @@
  | 10-foundation-secrets   bootstrap CA, namespace secrets, OpenBao (sealed)      |
  |      -> scripts/openbao/init.sh (init, unseal, raft join)                      |
  | 11-foundation-pki       OpenBao: KV v2, kubernetes auth, root + issuing CA;    |
- |                         ClusterIssuer openbao-pki; ClusterSecretStores         |
+ |                         ClusterIssuer openbao-pki; per-namespace ESO roles     |
  | 12-foundation-services  database (CNPG cluster), storage (RustFS + buckets),   |
  |                         identity (Keycloak realm lakehouse), ingress hosts     |
  | 20-catalog              catalog: Polaris (+ polaris-db), catalogs, principals  |
@@ -68,7 +68,8 @@ verifies them (`ServersTransport`) against the platform CA.
 
  secret values: generated in-cluster (ESO Password generator) or by operators
      -> Kubernetes Secret -> PushSecret -> OpenBao kv/<namespace>/<name>
-     -> ExternalSecret (ClusterSecretStore openbao) -> Secret in the consuming namespace
+     -> ExternalSecret (SecretStore openbao of the consuming namespace; OpenBao role
+        eso-<ns>-read: kv/<ns>/* + granted cross-namespace paths) -> Secret
 ```
 
 - cert-manager and ESO authenticate to OpenBao with bound ServiceAccount

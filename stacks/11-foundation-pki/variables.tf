@@ -55,7 +55,7 @@ variable "extra_namespace_secret_reads" {
 }
 
 variable "legacy_cluster_store_namespaces" {
-  description = "Namespaces that may still use the cluster-wide ClusterSecretStores openbao / openbao-push (full kv/* access) until their ExternalSecrets/PushSecrets switch to the namespaced SecretStores. Empty = cluster-wide stores usable by nobody."
+  description = "Namespaces that may still use the cluster-wide ClusterSecretStores openbao / openbao-push (full kv/* access) until their ExternalSecrets/PushSecrets switch to the namespaced SecretStores. Empty (default, all namespaces migrated) = the ClusterSecretStores are not created."
   type        = list(string)
-  default     = ["catalog", "query", "orchestration"]
+  default     = []
 }

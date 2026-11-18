@@ -123,7 +123,7 @@ YAML
 check "namespaced store: observability reads a granted path (storage/s3-users/platform-logs)" bash -c \
   "$(declare -f ops_es_denied); ! ops_es_denied SecretStore openbao storage/s3-users/platform-logs"
 check "namespaced store: observability cannot read orchestration/pseudonym-pepper" ops_es_denied SecretStore openbao orchestration/pseudonym-pepper
-check "cluster-wide store refuses a migrated namespace (observability)" ops_es_denied ClusterSecretStore openbao orchestration/pseudonym-pepper
+check "no cluster-wide store grants observability the pepper (legacy ClusterSecretStore absent or refusing)" ops_es_denied ClusterSecretStore openbao orchestration/pseudonym-pepper
 check "foundation namespaces use their own SecretStores only" bash -c \
   'r=$(kubectl get externalsecret,pushsecret -A -o json | jq -r ".items[] | select(.metadata.namespace | IN(\"database\",\"storage\",\"identity\",\"observability\",\"backup\")) | select((.spec.secretStoreRef.kind // .spec.secretStoreRefs[0].kind // \"none\") == \"ClusterSecretStore\") | .metadata.namespace + \"/\" + .metadata.name"); echo "${r:-none}"; [[ -z "$r" ]]'
 
