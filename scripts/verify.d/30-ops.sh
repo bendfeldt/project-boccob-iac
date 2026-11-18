@@ -94,6 +94,40 @@ check "Kyverno exception honoured (keycloak: no read-only-rootfs failure reporte
   '! kubectl -n identity get policyreports.wgpolicyk8s.io -o json | jq -e "[.items[].results[]? | select(.policy == \"require-read-only-root-filesystem\" and .result == \"fail\")] | length > 0"'
 
 # ------------------------------------------------------------------------------
+step "Secret isolation (per-namespace stores)"
+# ops_es_denied <store kind> <store> <kv path>: an ExternalSecret in namespace
+# observability must NOT be able to read another namespace's secret
+ops_es_denied() {
+  local name
+  name="verify-smoke-isolation-$(tr '[:upper:]' '[:lower:]' <<<"${1:0:1}")"
+  kubectl apply -f - >/dev/null <<YAML
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata: {name: ${name}, namespace: observability}
+spec:
+  refreshInterval: 1m0s
+  secretStoreRef: {name: ${2}, kind: ${1}}
+  target: {name: ${name}, creationPolicy: Owner}
+  dataFrom: [{extract: {key: ${3}}}]
+YAML
+  local i st=""
+  for i in $(seq 1 15); do
+    st="$(kubectl -n observability get externalsecret "$name" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)"
+    [[ -n "$st" ]] && break
+    sleep 2
+  done
+  echo "Ready=${st:-none}: $(kubectl -n observability get externalsecret "$name" -o jsonpath='{.status.conditions[0].message}' 2>/dev/null | cut -c1-160)"
+  kubectl -n observability delete externalsecret "$name" --ignore-not-found >/dev/null 2>&1
+  ! kubectl -n observability get secret "$name" >/dev/null 2>&1 && [[ "$st" != "True" ]]
+}
+check "namespaced store: observability reads a granted path (storage/s3-users/platform-logs)" bash -c \
+  "$(declare -f ops_es_denied); ! ops_es_denied SecretStore openbao storage/s3-users/platform-logs"
+check "namespaced store: observability cannot read orchestration/pseudonym-pepper" ops_es_denied SecretStore openbao orchestration/pseudonym-pepper
+check "cluster-wide store refuses a migrated namespace (observability)" ops_es_denied ClusterSecretStore openbao orchestration/pseudonym-pepper
+check "foundation namespaces use their own SecretStores only" bash -c \
+  'r=$(kubectl get externalsecret,pushsecret -A -o json | jq -r ".items[] | select(.metadata.namespace | IN(\"database\",\"storage\",\"identity\",\"observability\",\"backup\")) | select((.spec.secretStoreRef.kind // .spec.secretStoreRefs[0].kind // \"none\") == \"ClusterSecretStore\") | .metadata.namespace + \"/\" + .metadata.name"); echo "${r:-none}"; [[ -z "$r" ]]'
+
+# ------------------------------------------------------------------------------
 step "Object storage lifecycle (erasure finality)"
 for b in lakehouse-raw lakehouse-clean lakehouse-consolidated lakehouse-curated; do
   check "bucket ${b}: noncurrent versions + expired delete markers expire (lifecycle)" bash -c \
