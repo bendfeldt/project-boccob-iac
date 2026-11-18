@@ -85,9 +85,12 @@ environments/<env>/NN-name.tfvars        (optional sizing per environment)
 - `STACK_NEEDS_OPENBAO=1` gives the stack a configured `vault` provider
   (`provider "vault" { skip_child_token = true }`): port-forward, CA and token
   are handled by `scripts/tofu.sh`.
-- Keep states small (see architecture.md, "OpenTofu state"); split
-  a stack before it grows (the data plane is split into `20-catalog`,
-  `21-query`, `22-orchestration`).
+- Keep states small (see architecture.md, "OpenTofu state"): a state Secret
+  is capped at 1 MiB and every `kubernetes_manifest` stores its full object.
+  `make verify` fails above 85 % and warns from 70 %; split a stack before
+  that (the data plane is split into `20-catalog`, `21-query`,
+  `22-orchestration`; identity was moved out of 12 into `13-identity` with
+  `tofu state mv`, see architecture.md).
 - Commit the `.terraform.lock.hcl` of the stack.
 
 ## 4. Add a mirrored image or chart
@@ -241,7 +244,7 @@ All contract buckets have versioning enabled.
 
 ## 8. Add an OIDC client
 
-In `environments/<env>/12-foundation-services.tfvars` (merged over the built-in
+In `environments/<env>/13-identity.tfvars` (merged over the built-in
 clients trino, polaris, dagster, grafana, openbao):
 
 ```hcl
@@ -254,7 +257,7 @@ oidc_clients = {
 }
 ```
 
-Redeploy stack 12. The secret is generated and stored at
+Redeploy stack 13 (`make deploy ENV=<env> STACK=13-identity`). The secret is generated and stored at
 `kv/identity/oidc-clients/<client id>` with properties `client-id`,
 `client-secret`, `issuer`. Tokens carry a `groups` claim (group names:
 `platform-admin`, `data-engineer`, `analyst`, `pii-reader`, `auditor`) and
@@ -319,8 +322,8 @@ module "ns_query" {
 A cross-namespace flow needs both ends: egress in the client namespace
 **and** ingress in the server namespace. The foundation servers are opened with
 tfvars of their stacks: `openbao_client_namespaces` (stack 10),
-`postgres_client_namespaces`, `s3_client_namespaces`,
-`keycloak_client_namespaces`, `metrics_namespaces` (stack 12).
+`postgres_client_namespaces`, `s3_client_namespaces`, `metrics_namespaces`
+(stack 12), `keycloak_client_namespaces` (stack 13).
 Use `module.ns_x.name` for everything placed in the namespace so resources are
 created after the policies. Metrics ports already opened for
 `metrics_namespaces` (default `observability`): CNPG 9187, RustFS 9000,

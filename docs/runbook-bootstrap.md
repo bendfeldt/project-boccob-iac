@@ -162,7 +162,7 @@ rotate these and restrict the KV paths.
 |---|---|
 | Upgrade a component | edit `versions.yaml` -> `make lock` -> `make airgap-mirror` (or bundle/load) -> `make deploy STACK=..` -> `make verify` |
 | OpenBao upgrade | update strategy is `OnDelete`: delete standby pods one by one (unseal each), then `bao operator step-down` and the old leader |
-| Rotate a generated secret | OpenBao is the source of truth (create-only push): `bao kv metadata delete kv/<kv_path>` and `kubectl -n <ns> delete secret <name>-seed`, then force-sync `externalsecret/<name>`; restart consumers (Keycloak clients: redeploy stack 12 so the realm Job re-imports). See docs/compliance/runbooks/key-rotation.md |
+| Rotate a generated secret | OpenBao is the source of truth (create-only push): `bao kv metadata delete kv/<kv_path>` and `kubectl -n <ns> delete secret <name>-seed`, then force-sync `externalsecret/<name>`; restart consumers (Keycloak clients: redeploy stack 13-identity so the realm Job re-imports). See docs/compliance/runbooks/key-rotation.md |
 | Certificates | renewed by cert-manager (90 d lifetime, renewal at 60 d); issuing CA 5 y, root 10 y — rotate with a new `pki_int` issuer before expiry |
 | Stuck state lock | `kubectl -n tofu-state get lease`; after confirming no run is active: `scripts/tofu.sh <env> <stack> force-unlock <id>` |
 | Tear down | `CONFIRM=<env> make destroy ENV=<env> [STACK=..]` |

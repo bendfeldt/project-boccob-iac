@@ -14,9 +14,9 @@ buckets = {
 # --- registered by the data plane (stacks 20-catalog, 21-query, 22-orchestration) ---
 s3_users = {
   # --- ops (stack 32-backup), dev only: stand-in for the off-site S3 target ---
-  # one user for both stand-in targets (a real site has one per target bucket);
-  # dev only: stack 12's state is close to the 1 MiB Secret limit (docs/architecture.md)
-  "platform-offsite" = { read_write_buckets = ["platform-backup-offsite", "platform-lake-offsite"] }
+  # one user per stand-in target bucket, as at a real site
+  "platform-offsite"      = { read_write_buckets = ["platform-backup-offsite"] }
+  "platform-offsite-lake" = { read_write_buckets = ["platform-lake-offsite"] }
   # Trino: reads and writes Iceberg data files of all layers
   "lakehouse-query" = { read_write_buckets = ["lakehouse-raw", "lakehouse-clean", "lakehouse-consolidated", "lakehouse-curated"] }
   # Dagster run pods (dlt landing, erasure, retention): rw raw, read-only on the other layers (erasure storage scan)

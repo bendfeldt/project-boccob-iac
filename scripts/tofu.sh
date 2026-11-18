@@ -144,6 +144,13 @@ case "$action" in
   init)     tofu_init "$@" ;;
   validate) tofu_init; tofu -chdir="$stack_dir" validate "$@" ;;
   plan|apply|destroy|refresh|import)
-            tofu_init; tofu -chdir="$stack_dir" "$action" -input=false "${var_files[@]}" "$@" ;;
+            tofu_init; tofu -chdir="$stack_dir" "$action" -input=false "${var_files[@]}" "$@"
+            # state Secret size (hard limit 1 MiB: beyond it an apply cannot persist its state)
+            if [[ "$action" == apply ]]; then
+              size="$(kubectl -n tofu-state get secret "tfstate-default-${stack}" -o jsonpath='{.data.tfstate}' 2>/dev/null | base64 -d | wc -c)"
+              if (( size * 100 / 1048576 >= 70 )); then
+                warn "state of ${stack} is ${size} bytes ($(( size * 100 / 1048576 ))% of the 1 MiB Secret limit): split the stack (docs/architecture.md)"
+              fi
+            fi ;;
   *)        tofu_init; tofu -chdir="$stack_dir" "$action" "$@" ;;
 esac

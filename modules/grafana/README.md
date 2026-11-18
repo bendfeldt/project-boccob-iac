@@ -12,5 +12,5 @@ trail only, `role_mapping.strict = true`: only the auditor groups can log in).
 
 Status: rendered with `helm template` from the planned values (no upstream
 images left); not deployed on the build machine (image ~480 MB, disk budget).
-Prerequisites: Keycloak clients `grafana` and `grafana-audit` (stack 12),
+Prerequisites: Keycloak clients `grafana` and `grafana-audit` (stack 13-identity),
 DNS / `DEV_INGRESS_HOSTS` entries for `grafana` and `grafana-audit`.

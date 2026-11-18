@@ -16,8 +16,10 @@
  |      -> scripts/openbao/init.sh (init, unseal, raft join)                      |
  | 11-foundation-pki       OpenBao: KV v2, kubernetes auth, root + issuing CA;    |
  |                         ClusterIssuer openbao-pki; per-namespace ESO roles     |
- | 12-foundation-services  database (CNPG cluster), storage (RustFS + buckets),   |
- |                         identity (Keycloak realm lakehouse), ingress hosts     |
+ | 12-foundation-services  database ns (+ backup credentials), storage (RustFS +  |
+ |                         buckets, S3 users), ingress hosts s3/openbao           |
+ | 13-identity             identity: Keycloak realm lakehouse, OIDC clients;      |
+ |                         keycloak-db (CNPG cluster in ns database)              |
  | 20-catalog              catalog: Polaris (+ polaris-db), catalogs, principals  |
  | 21-query                query: Trino + OPA (policy bundle from Zot)            |
  | 22-orchestration        orchestration: Dagster (+ dagster-db), oauth2-proxy    |
@@ -93,15 +95,18 @@ before it leaves the workstation. etcd snapshots therefore contain the state;
 the encryption passphrase is part of key custody (runbook).
 
 Limit to watch: a state Secret must stay below 1 MiB, and encrypted state does
-not compress. Measured on dev (2026-11-18): **`12-foundation-services` is at
-1,035,915 of 1,048,576 bytes** — an apply that adds one more S3 user (4
-`kubernetes_manifest`, ~25 kB) already failed with "data: Too long" and had to
-be recovered. The big items: S3 user credentials (~25 kB each, 9 users),
-Keycloak client credentials (~180 kB), the three namespace SecretStores
-(~90 kB each: the ESO schema is stored with every `kubernetes_manifest`).
-**Split stack 12 before the next change to it** (e.g. Keycloak + identity
-namespace into their own stack). Other stacks: 20-catalog ~290 kB,
-22-orchestration ~320 kB, 21-query ~275 kB. Keep stacks small — split a stack (e.g. `20-catalog`, `21-query`,
+not compress. On 2026-11-18 `12-foundation-services` reached 1,035,915 of
+1,048,576 bytes and an apply failed to persist its state ("data: Too long")
+after it had changed the cluster. Keycloak, the identity namespace and
+keycloak-db were therefore moved into `13-identity` **with their state**
+(`tofu state mv` between the pulled states, pushed back with
+`STATE_READ_UNENCRYPTED=1 scripts/tofu.sh <env> <stack> state push <file>`;
+plans of both stacks afterwards: 0 to add/change/destroy). Sizes after the
+split (dev): 12 = 53 %, 13 = 38 %, 22 = 30 %, 20 = 27 %, 21 = 26 % of 1 MiB.
+Big items: every `kubernetes_manifest` stores the full object incl. the CRD
+schema (an S3 user's credentials ~25 kB, a namespace SecretStore ~90 kB).
+`make verify` fails above 85 % and warns from 70 %; `scripts/tofu.sh apply`
+warns from 70 %. Keep stacks smallKeep stacks small — split a stack (e.g. `20-catalog`, `21-query`,
 `22-orchestration`) well before it reaches ~700 kB:
 `kubectl -n tofu-state get secret -o json | jq '.items[] | {n: .metadata.name, bytes: (.data.tfstate | @base64d | length)}'`.
 
@@ -119,7 +124,7 @@ done by the k3s embedded network policy controller (verified by
 | `secrets` | 10 | OpenBao |
 | `database` | 12 | all CloudNativePG clusters |
 | `storage` | 12 | RustFS |
-| `identity` | 12 | Keycloak |
+| `identity` | 13 | Keycloak |
 | `catalog`, `query`, `orchestration` | 20, 21, 22 | Polaris, Trino + OPA, Dagster (docs/data-plane.md) |
 | `observability` | 30 | Prometheus, Alertmanager, Loki, Grafana, audit archive |
 | `observability-agent` | 30 | OTel log collector DaemonSet (PSS privileged: read-only hostPath) |
