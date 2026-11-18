@@ -93,9 +93,15 @@ before it leaves the workstation. etcd snapshots therefore contain the state;
 the encryption passphrase is part of key custody (runbook).
 
 Limit to watch: a state Secret must stay below 1 MiB, and encrypted state does
-not compress. Measured on dev: `12-foundation-services` is ~395 kB (the
-`kubernetes_manifest` resources store full objects), `11-foundation-pki`
-~150 kB. Keep stacks small — split a stack (e.g. `20-catalog`, `21-query`,
+not compress. Measured on dev (2026-11-18): **`12-foundation-services` is at
+1,035,915 of 1,048,576 bytes** — an apply that adds one more S3 user (4
+`kubernetes_manifest`, ~25 kB) already failed with "data: Too long" and had to
+be recovered. The big items: S3 user credentials (~25 kB each, 9 users),
+Keycloak client credentials (~180 kB), the three namespace SecretStores
+(~90 kB each: the ESO schema is stored with every `kubernetes_manifest`).
+**Split stack 12 before the next change to it** (e.g. Keycloak + identity
+namespace into their own stack). Other stacks: 20-catalog ~290 kB,
+22-orchestration ~320 kB, 21-query ~275 kB. Keep stacks small — split a stack (e.g. `20-catalog`, `21-query`,
 `22-orchestration`) well before it reaches ~700 kB:
 `kubectl -n tofu-state get secret -o json | jq '.items[] | {n: .metadata.name, bytes: (.data.tfstate | @base64d | length)}'`.
 
