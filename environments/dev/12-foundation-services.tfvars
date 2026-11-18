@@ -1,5 +1,4 @@
-# dev sizing: single instances, small volumes
-postgres_storage_size    = "1Gi"
+# dev sizing: single instance, small volume
 rustfs_data_storage_size = "5Gi"
 
 # ops (stack 32-backup), dev only: off-site copy targets on the same RustFS.
@@ -30,24 +29,6 @@ s3_users = {
   # Dagster S3ComputeLogManager (webserver, daemon, run pods): own bucket only - never
   # platform-logs, whose credential also writes Loki's audit tenant and platform-audit
   "dagster-compute-logs" = { read_write_buckets = ["dagster-compute-logs"] }
-}
-oidc_clients = {
-  # service account that reads group memberships for the Trino file group provider
-  "trino-group-sync" = {
-    name                         = "Trino group sync"
-    standard_flow                = false
-    service_account              = true
-    service_account_client_roles = { "realm-management" = ["view-users", "query-groups"] }
-    # Keycloak >= 26.8 admin API: token needs scope kc-admin-api (audience check)
-    optional_client_scopes = ["kc-admin-api"]
-  }
-  # dev only: password grant on the trino client so that scripts/verify.sh and
-  # scripts/dev/e2e.sh can obtain user tokens without a browser
-  trino = {
-    name                 = "Trino"
-    redirect_uris        = ["https://trino.dev.lakehouse.internal/oauth2/callback", "https://trino.dev.lakehouse.internal/ui/logout/logout.html"]
-    direct_access_grants = true
-  }
 }
 
 # ops (stack 30-observability), dev only: short WORM retention of the audit archive

@@ -65,7 +65,19 @@ state_passphrase() {
   esac
 }
 pass="$(state_passphrase)"
+# STATE_READ_UNENCRYPTED=1: also READ plaintext state (e.g. `state push` of a file
+# produced by `state mv` when resources move between stacks); writes still use
+# aes_gcm (check afterwards: verify "tofu state is encrypted")
+unencrypted="" fallback="" enforced=true
+if [[ "${STATE_READ_UNENCRYPTED:-0}" == "1" ]]; then
+  enforced=false   # required by OpenTofu for an unencrypted fallback; the primary method still encrypts
+  unencrypted='method "unencrypted" "migrate" {}'
+  fallback='  fallback {
+    method = method.unencrypted.migrate
+  }'
+fi
 TF_ENCRYPTION="$(cat <<CFG
+${unencrypted}
 key_provider "pbkdf2" "main" {
   passphrase = "${pass}"
 }
@@ -74,7 +86,8 @@ method "aes_gcm" "main" {
 }
 state {
   method   = method.aes_gcm.main
-  enforced = true
+  enforced = ${enforced}
+${fallback}
 }
 plan {
   method   = method.aes_gcm.main
@@ -83,7 +96,7 @@ plan {
 CFG
 )"
 export TF_ENCRYPTION
-unset pass
+unset pass unencrypted fallback enforced
 
 # --- common variables ----------------------------------------------------------
 export TF_VAR_environment="$ENV"

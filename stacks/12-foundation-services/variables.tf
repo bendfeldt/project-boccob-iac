@@ -11,29 +11,6 @@ variable "metrics_namespaces" {
 }
 
 # --- PostgreSQL ----------------------------------------------------------------
-variable "postgres_instances" {
-  description = "Instances per PostgreSQL cluster created by this stack (null = 1, or 3 with ha=true)."
-  type        = number
-  default     = null
-}
-
-variable "postgres_storage_size" {
-  description = "PGDATA size of the Keycloak database."
-  type        = string
-  default     = "1Gi"
-}
-
-variable "postgres_resources" {
-  description = "Resources per PostgreSQL instance of the Keycloak database."
-  type = object({
-    requests = map(string)
-    limits   = map(string)
-  })
-  default = {
-    requests = { cpu = "50m", memory = "192Mi" }
-    limits   = { memory = "512Mi" }
-  }
-}
 
 variable "postgres_client_namespaces" {
   description = "Namespaces whose pods may connect to PostgreSQL clusters in the database namespace (port 5432)."
@@ -114,51 +91,12 @@ variable "s3_client_namespaces" {
   default     = ["database", "secrets", "catalog", "query", "orchestration", "observability", "backup"]
 }
 
-# --- Keycloak --------------------------------------------------------------------
-variable "keycloak_replicas" {
-  description = "Keycloak pods (null = 1, or 2 with ha=true)."
-  type        = number
-  default     = null
-}
-
-variable "keycloak_resources" {
-  description = "Keycloak container resources."
-  type = object({
-    requests = map(string)
-    limits   = map(string)
-  })
-  default = {
-    requests = { cpu = "100m", memory = "640Mi" }
-    limits   = { memory = "1280Mi" }
-  }
-}
-
-variable "oidc_clients" {
-  description = "OIDC clients of the lakehouse realm, merged over the built-in defaults (trino, polaris, dagster, grafana, openbao). See modules/keycloak for the object shape."
-  type        = any
-  default     = {}
-}
-
-variable "keycloak_client_namespaces" {
-  description = "Namespaces whose pods may reach Keycloak directly on its Service (port 8443). OIDC clients normally use the public hostname instead (allow_ingress_hosts in their namespace baseline)."
-  type        = list(string)
-  default     = []
-}
 
 # --- backup / encryption (ops work package) ---------------------------------------
 variable "rustfs_sse_enabled" {
   description = "Generate an SSE-S3 master key for RustFS (kv/storage/rustfs-sse) so clients can request server-side encryption (used for backups)."
   type        = bool
   default     = true
-}
-
-variable "postgres_backup" {
-  description = "Continuous backup (base backups + WAL, PITR) of the PostgreSQL clusters of this stack to s3://platform-backup/postgres/<cluster>. null = off."
-  type = object({
-    retention_policy = optional(string, "7d")
-    schedule         = optional(string, "0 30 1 * * *")
-  })
-  default = {}
 }
 
 variable "lakehouse_noncurrent_version_days" {
