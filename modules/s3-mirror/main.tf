@@ -1,12 +1,16 @@
 # Off-site copy: one-way `rc mirror` of buckets to a second S3 target, one
 # sub-path per source bucket. Per bucket: propagate_deletes (rc mirror
 # --remove) for data that must be erasable (lake buckets), no propagation for
-# backups (the target should have versioning + object lock so that a
-# compromised platform cannot destroy them).
+# backups. Use one instance per target bucket: backups go to a target with
+# versioning + object lock (a compromised platform cannot destroy them); lake
+# data goes to a target WITHOUT object lock whose noncurrent versions expire
+# quickly (target_guard refuses anything else), so that erasure reaches it.
 
 locals {
   labels = merge(var.labels, { "app.kubernetes.io/name" = var.name, "app.kubernetes.io/component" = "backup" })
   dst    = trim("${var.target_s3.bucket}/${var.target_s3.prefix}", "/")
+  # object keys at the target start with this (lifecycle rule prefixes are matched against it)
+  dst_key_prefix = trim(var.target_s3.prefix, "/") == "" ? "" : "${trim(var.target_s3.prefix, "/")}/"
   plain_env = {
     SSL_CERT_FILE = "/etc/platform-ca/ca.crt"
     HOME          = "/tmp"
@@ -35,6 +39,25 @@ resource "kubernetes_config_map_v1" "this" {
       export RC_HOST_src="$${SRC_SCHEME}://$${SRC_ACCESS_KEY}:$${SRC_SECRET_KEY}@$${SRC_HOST}"
       export RC_HOST_dst="$${DST_SCHEME}://$${DST_ACCESS_KEY}:$${DST_SECRET_KEY}@$${DST_HOST}"
       rc_status=0
+      %{if var.target_guard != null~}
+      # pre-flight: data that must stay erasable may not land in a target that
+      # keeps deleted versions (object lock, or versioning without a short
+      # noncurrent-version expiry)
+      t="dst/${var.target_s3.bucket}"
+      lock="$(rc --json bucket lock info "$t")" || { echo "target check failed: cannot read object lock of $t"; exit 2; }
+      if ! printf '%s' "$lock" | jq -e '[.data.items[]? | select(.object_lock_enabled == true)] | length == 0' >/dev/null; then
+        echo "REFUSED: $t has object lock - erased data would stay retrievable at the target"; exit 3
+      fi
+      ver="$(rc --json bucket version info "$t")" || { echo "target check failed: cannot read versioning of $t"; exit 2; }
+      if printf '%s' "$ver" | jq -e '.status == "Enabled"' >/dev/null; then
+        rules="$(rc --json bucket lifecycle rule export "$t")" || { echo "target check failed: cannot read lifecycle of $t"; exit 2; }
+        if ! printf '%s' "$rules" | jq -e --arg p "${local.dst_key_prefix}" --argjson max ${var.target_guard.max_noncurrent_days} \
+          '[.rules[]? | select(.status == "Enabled") | select(.noncurrentVersionExpiration.noncurrentDays != null and .noncurrentVersionExpiration.noncurrentDays <= $max) | (.prefix // .filter.prefix // "") as $rp | select($p | startswith($rp))] | length > 0' >/dev/null; then
+          echo "REFUSED: $t is versioned without a lifecycle rule expiring noncurrent versions within ${var.target_guard.max_noncurrent_days} days"; exit 3
+        fi
+      fi
+      echo "target check ok: $t (no object lock; noncurrent versions expire within ${var.target_guard.max_noncurrent_days} days or versioning off)"
+      %{endif~}
       %{for b in var.source_s3.buckets~}
       echo "== ${b.name}"
       rc mirror --summary --retry-attempts 5 %{if b.propagate_deletes}--remove %{endif}"src/${b.name}" "dst/${local.dst}/${b.name}" || rc_status=1

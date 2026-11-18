@@ -1,7 +1,8 @@
 # 32-backup: backups that are not part of a component's own definition.
 #   - OpenBao raft snapshots -> s3://platform-backup/openbao/ (CronJob)
 #   - retention: S3 lifecycle on platform-backup (snapshots + noncurrent versions)
-#   - off-site copy of platform-backup to a second S3 target (optional)
+#   - off-site copy (optional): platform-backup to a locked target bucket, the
+#     lake buckets to a separate, unlocked target bucket (erasure must reach it)
 # PostgreSQL backups (base backup + WAL, PITR) are configured on each
 # CloudNativePG cluster (modules/postgres-cluster `backup`, local.postgres_backup
 # in stack 12). k3s etcd snapshots: scripts/lib/k3s-config.sh (HA servers).
@@ -126,8 +127,12 @@ module "openbao_snapshot" {
 }
 
 # =============================================================================
-# Off-site copy (optional)
+# Off-site copy (optional): backups and lake data go to separate target buckets
 # =============================================================================
+locals {
+  offsite_lake = var.offsite == null ? null : var.offsite.lake
+}
+
 module "offsite_s3_credentials" {
   count      = var.offsite == null ? 0 : 1
   source     = "../../modules/external-secret"
@@ -143,6 +148,7 @@ module "offsite_s3_credentials" {
   labels = local.common_labels
 }
 
+# backups: platform-backup -> locked, versioned target; nothing is ever deleted there
 module "offsite_copy" {
   count     = var.offsite == null ? 0 : 1
   source    = "../../modules/s3-mirror"
@@ -153,7 +159,7 @@ module "offsite_copy" {
   source_s3 = {
     endpoint           = local.platform.s3_url
     credentials_secret = module.backup_s3_credentials.secret_name
-    buckets            = var.offsite.buckets
+    buckets            = [{ name = "platform-backup" }]
   }
   target_s3 = {
     endpoint           = var.offsite.endpoint
@@ -162,4 +168,61 @@ module "offsite_copy" {
     credentials_secret = module.offsite_s3_credentials[0].secret_name
   }
   labels = local.common_labels
+}
+
+# lake: read with platform-offsite-reader (read only on the four lake buckets;
+# the platform-backup user, which the database namespace also holds, has no lake access)
+module "offsite_reader_s3_credentials" {
+  count      = local.offsite_lake == null ? 0 : 1
+  source     = "../../modules/external-secret"
+  store      = module.ns_backup.secret_stores.read
+  store_kind = module.ns_backup.secret_stores.kind
+  name       = "platform-offsite-reader-s3"
+  namespace  = module.ns_backup.name
+  kv_path    = "storage/s3-users/platform-offsite-reader"
+  template = {
+    access_key_id     = "{{ index . \"access-key\" }}"
+    secret_access_key = "{{ index . \"secret-key\" }}"
+  }
+  labels = local.common_labels
+}
+
+module "offsite_lake_s3_credentials" {
+  count      = local.offsite_lake == null ? 0 : 1
+  source     = "../../modules/external-secret"
+  store      = module.ns_backup.secret_stores.read
+  store_kind = module.ns_backup.secret_stores.kind
+  name       = "offsite-lake-s3"
+  namespace  = module.ns_backup.name
+  kv_path    = local.offsite_lake.credentials
+  template = {
+    access_key_id     = "{{ index . \"access-key\" }}"
+    secret_access_key = "{{ index . \"secret-key\" }}"
+  }
+  labels = local.common_labels
+}
+
+# deletions propagate; the target is checked before every run (no object lock,
+# noncurrent versions expire within max_noncurrent_days): erasure reaches the
+# copy after one run + that expiry
+module "offsite_lake_copy" {
+  count     = local.offsite_lake == null ? 0 : 1
+  source    = "../../modules/s3-mirror"
+  name      = "offsite-lake-copy"
+  namespace = module.ns_backup.name
+  image     = module.versions.images["rustfs-rc"].ref
+  schedule  = local.offsite_lake.schedule
+  source_s3 = {
+    endpoint           = local.platform.s3_url
+    credentials_secret = module.offsite_reader_s3_credentials[0].secret_name
+    buckets            = [for b in local.offsite_lake.buckets : { name = b, propagate_deletes = true }]
+  }
+  target_s3 = {
+    endpoint           = var.offsite.endpoint
+    bucket             = local.offsite_lake.bucket
+    prefix             = local.offsite_lake.prefix
+    credentials_secret = module.offsite_lake_s3_credentials[0].secret_name
+  }
+  target_guard = { max_noncurrent_days = local.offsite_lake.max_noncurrent_days }
+  labels       = local.common_labels
 }

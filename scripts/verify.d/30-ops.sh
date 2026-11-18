@@ -95,15 +95,15 @@ check "Kyverno exception honoured (keycloak: no read-only-rootfs failure reporte
 
 # ------------------------------------------------------------------------------
 step "Secret isolation (per-namespace stores)"
-# ops_es_denied <store kind> <store> <kv path>: an ExternalSecret in namespace
-# observability must NOT be able to read another namespace's secret
+# ops_es_denied <store kind> <store> <kv path> [namespace]: an ExternalSecret in
+# the namespace (default observability) must NOT be able to read the path
 ops_es_denied() {
-  local name
+  local name ns="${4:-observability}"
   name="verify-smoke-isolation-$(tr '[:upper:]' '[:lower:]' <<<"${1:0:1}")"
   kubectl apply -f - >/dev/null <<YAML
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
-metadata: {name: ${name}, namespace: observability}
+metadata: {name: ${name}, namespace: ${ns}}
 spec:
   refreshInterval: 1m0s
   secretStoreRef: {name: ${2}, kind: ${1}}
@@ -112,18 +112,22 @@ spec:
 YAML
   local i st=""
   for i in $(seq 1 15); do
-    st="$(kubectl -n observability get externalsecret "$name" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)"
+    st="$(kubectl -n "$ns" get externalsecret "$name" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)"
     [[ -n "$st" ]] && break
     sleep 2
   done
-  echo "Ready=${st:-none}: $(kubectl -n observability get externalsecret "$name" -o jsonpath='{.status.conditions[0].message}' 2>/dev/null | cut -c1-160)"
-  kubectl -n observability delete externalsecret "$name" --ignore-not-found >/dev/null 2>&1
-  ! kubectl -n observability get secret "$name" >/dev/null 2>&1 && [[ "$st" != "True" ]]
+  echo "Ready=${st:-none}: $(kubectl -n "$ns" get externalsecret "$name" -o jsonpath='{.status.conditions[0].message}' 2>/dev/null | cut -c1-160)"
+  kubectl -n "$ns" delete externalsecret "$name" --ignore-not-found >/dev/null 2>&1
+  ! kubectl -n "$ns" get secret "$name" >/dev/null 2>&1 && [[ "$st" != "True" ]]
 }
 check "namespaced store: observability reads a granted path (storage/s3-users/platform-logs)" bash -c \
   "$(declare -f ops_es_denied); ! ops_es_denied SecretStore openbao storage/s3-users/platform-logs"
 check "namespaced store: observability cannot read orchestration/pseudonym-pepper" ops_es_denied SecretStore openbao orchestration/pseudonym-pepper
 check "no cluster-wide store grants observability the pepper (legacy ClusterSecretStore absent or refusing)" ops_es_denied ClusterSecretStore openbao orchestration/pseudonym-pepper
+check "namespaced store: database cannot read the lake reader credential (storage/s3-users/platform-offsite-reader)" \
+  ops_es_denied SecretStore openbao storage/s3-users/platform-offsite-reader database
+check "S3 user platform-backup (held by database + backup) has no grant on the lake buckets" bash -c \
+  'kubectl -n storage get configmap rustfs-provision -o json | jq -e ".data[\"policy-platform-backup.json\"] | fromjson | [.Statement[].Resource[] | select(startswith(\"arn:aws:s3:::lakehouse-\"))] | length == 0"'
 check "foundation namespaces use their own SecretStores only" bash -c \
   'r=$(kubectl get externalsecret,pushsecret -A -o json | jq -r ".items[] | select(.metadata.namespace | IN(\"database\",\"storage\",\"identity\",\"observability\",\"backup\")) | select((.spec.secretStoreRef.kind // .spec.secretStoreRefs[0].kind // \"none\") == \"ClusterSecretStore\") | .metadata.namespace + \"/\" + .metadata.name"); echo "${r:-none}"; [[ -z "$r" ]]'
 
@@ -154,6 +158,24 @@ ops_backup_objects() ( # subshell: a die() in the S3 helpers must not end verify
   (( age < ${VERIFY_SNAPSHOT_MAX_AGE:-7200} ))
 )
 check "backup objects in platform-backup (PostgreSQL base backups, OpenBao snapshot < 2h)" ops_backup_objects
+# off-site lake copy: separate target, checked before every run (no object lock,
+# short noncurrent expiry) so that erasure reaches the copy (audit N-2)
+ops_offsite_lake() {
+  local job
+  job="verify-offsite-lake-$(date +%s)"
+  kubectl -n backup create job "$job" --from=cronjob/offsite-lake-copy >/dev/null || return 1
+  kubectl -n backup wait --for=condition=complete "job/${job}" --timeout=240s >/dev/null 2>&1
+  local rc=$? out
+  out="$(kubectl -n backup logs "job/${job}" 2>/dev/null)"
+  grep -E '^(target check|REFUSED)' <<<"$out"
+  kubectl -n backup delete job "$job" --ignore-not-found >/dev/null 2>&1
+  [[ $rc -eq 0 ]] && grep -q '^target check ok' <<<"$out"
+}
+if kubectl -n backup get cronjob offsite-lake-copy >/dev/null 2>&1; then
+  check "off-site lake copy: target bucket passes the erasure check (no object lock, noncurrent expiry) and mirrors" ops_offsite_lake
+  check "off-site lake copy reads with platform-offsite-reader, backups copy with platform-backup" bash -c \
+    'kubectl -n backup get cronjob offsite-lake-copy -o json | jq -e "[.spec.jobTemplate.spec.template.spec.containers[0].env[] | select(.name == \"SRC_ACCESS_KEY\") | .valueFrom.secretKeyRef.name] == [\"platform-offsite-reader-s3\"]" && kubectl -n backup get configmap offsite-copy -o jsonpath="{.data.mirror\.sh}" | grep -c "rc mirror" | grep -qx 1'
+fi
 if [[ "${VERIFY_RESTORE_TEST:-1}" == "1" ]]; then
   check "restore test (PITR into a scratch cluster + OpenBao snapshot integrity)" \
     "${REPO_ROOT}/scripts/backup/restore-test.sh" "$ENV"

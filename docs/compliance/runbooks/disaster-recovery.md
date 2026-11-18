@@ -10,7 +10,7 @@ from its business impact analysis **[manual]**. What the mechanisms give:
 |---|---|---|---|
 | PostgreSQL (every CNPG cluster with `backup`) | daily base backup + continuous WAL archive (archive_timeout 5 min), SSE-S3, `s3://platform-backup/postgres/<cluster>/` | minutes | dev: 34 s for keycloak-db (PITR into a scratch cluster) **[verified]** |
 | OpenBao | raft snapshot CronJob (`openbao_snapshot_schedule`, default hourly), `s3://platform-backup/openbao/` | schedule interval | snapshot integrity checked by `make restore-test` **[verified]**; full restore **[static]** |
-| Object storage (layer buckets) | Iceberg snapshots (time travel within their expiry); off-site copy of the four lakehouse buckets + `platform-backup` (`offsite.buckets`, stack 32; lake buckets propagate deletions so erasure reaches the copy); versions expire after 1 day (`lakehouse_noncurrent_version_days`) | off-site schedule (default 6 h) | dev: 746 lake objects copied to the stand-in target in 23 s **[verified]**; restore from it **[static]** |
+| Object storage (layer buckets) | Iceberg snapshots (time travel within their expiry); off-site copy of the four lakehouse buckets to their own unlocked target bucket (`offsite.lake`, stack 32; deletions propagated so erasure reaches the copy) and of `platform-backup` to a locked target (`offsite.bucket`); noncurrent versions expire after `lakehouse_noncurrent_version_days` | off-site schedule (default 6 h) | dev: 746 lake objects copied to the stand-in target in 23 s **[verified]**; restore from it **[static]** |
 | Audit trail | Loki (`platform-logs`, versioned) + WORM archive `platform-audit` (daily) | 1 day for the archive | **[verified]** archive written and locked |
 | Cluster state (k3s datastore) | etcd snapshots on HA servers every 6 h, 28 kept (`scripts/lib/k3s-config.sh`) | 6 h | **[static]** |
 | Configuration | git (both repositories) + `versions.lock.yaml` + Zot | — | redeploy with `make deploy` |
@@ -68,8 +68,9 @@ exists); after a PITR into a new cluster, consumers take the new cluster's
 1. Recreate the buckets (`make deploy STACK=12-foundation-services`).
 2. Copy back from the off-site target, per bucket, with `rc mirror
    dst/<target bucket>/<prefix>/<bucket> src/<bucket>` (the same pinned rc image,
-   e.g. a Job derived from the `offsite-copy` CronJob with source/target swapped).
-   Lake data is as recent as the last off-site run (RPO = `offsite.schedule`).
+   e.g. a Job derived from the `offsite-lake-copy` CronJob with source/target swapped;
+   lake buckets come from `offsite.lake.bucket`, `platform-backup` from `offsite.bucket`).
+   Lake data is as recent as the last off-site run (RPO = `offsite.lake.schedule`).
 3. PostgreSQL/OpenBao restores from `platform-backup` (A, B); Polaris metadata
    (in polaris-db) and the Iceberg files must come from compatible points in
    time: restore polaris-db to the time of the off-site run.

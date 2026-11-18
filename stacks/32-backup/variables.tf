@@ -33,12 +33,20 @@ variable "noncurrent_version_retention_days" {
 # --- off-site copy ------------------------------------------------------------------
 variable "offsite" {
   description = <<-EOT
-    Second S3 target for an off-site copy of platform-backup (null = off).
-    endpoint: https URL of the target; bucket/prefix there; credentials: OpenBao
-    KV path (below kv/) with the properties access-key / secret-key, written by
-    an operator (`bao kv put kv/backup/offsite-s3 access-key=.. secret-key=..`);
-    cidrs/port: where the target lives (NetworkPolicy egress). The target CA must
-    be in the platform-ca bundle or be the platform CA.
+    Off-site copy to a second S3 target (null = off). Two separate target buckets,
+    each with its own credentials (operator-written OpenBao KV paths below kv/
+    with the properties access-key / secret-key):
+    - backups (bucket/prefix/credentials): platform-backup, never deleted at the
+      target; the target bucket should have versioning, object lock (COMPLIANCE)
+      and default encryption.
+    - lake: the four lakehouse buckets, read with the S3 user
+      platform-offsite-reader; deletions are propagated (rc mirror --remove) so
+      that erasure and retention reach the copy. Its target bucket must have NO
+      object lock and, if versioned, a lifecycle rule that expires noncurrent
+      versions within lake.max_noncurrent_days: every run checks this first and
+      refuses otherwise (audit N-2). Set lake = null to copy backups only.
+    endpoint/cidrs/namespaces/port: where the target lives (NetworkPolicy egress);
+    the target CA must be in the platform-ca bundle.
   EOT
   type = object({
     endpoint    = string
@@ -49,20 +57,20 @@ variable "offsite" {
     namespaces  = optional(list(string), [])
     port        = optional(number, 443)
     schedule    = optional(string, "45 */6 * * *")
-    # buckets copied (each below <bucket>/<prefix>/<source bucket>/);
-    # lake buckets propagate deletions so that erasure reaches the copy
-    buckets = optional(list(object({
-      name              = string
-      propagate_deletes = optional(bool, false)
-      })), [
-      { name = "platform-backup" },
-      { name = "lakehouse-raw", propagate_deletes = true },
-      { name = "lakehouse-clean", propagate_deletes = true },
-      { name = "lakehouse-consolidated", propagate_deletes = true },
-      { name = "lakehouse-curated", propagate_deletes = true },
-    ])
+    lake = object({
+      bucket              = string
+      prefix              = optional(string, "")
+      credentials         = optional(string, "backup/offsite-lake-s3")
+      schedule            = optional(string, "15 */6 * * *")
+      max_noncurrent_days = optional(number, 7)
+      buckets             = optional(list(string), ["lakehouse-raw", "lakehouse-clean", "lakehouse-consolidated", "lakehouse-curated"])
+    })
   })
   default = null
+  validation {
+    condition     = var.offsite == null ? true : (var.offsite.lake == null ? true : var.offsite.lake.bucket != var.offsite.bucket)
+    error_message = "offsite.lake.bucket must differ from offsite.bucket: backups keep object lock, the lake copy must not (erasure)."
+  }
 }
 
 variable "resources" {

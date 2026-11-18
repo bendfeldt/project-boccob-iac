@@ -49,6 +49,14 @@ variable "target_s3" {
   })
 }
 
+variable "target_guard" {
+  description = "Pre-flight check of the target bucket before every run, for data that must stay erasable (lake buckets): the run fails when the target has object lock, or has versioning without an enabled lifecycle rule (covering the target prefix) that expires noncurrent versions within max_noncurrent_days. Needs read access to the target's object lock, versioning and lifecycle configuration. null = no check (backup targets, which should be locked)."
+  type = object({
+    max_noncurrent_days = number
+  })
+  default = null
+}
+
 variable "ca_configmap" {
   description = "ConfigMap with the CA bundle (key ca.crt) trusted for both endpoints."
   type        = string

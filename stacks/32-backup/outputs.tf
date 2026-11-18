@@ -17,3 +17,8 @@ output "offsite_cronjob" {
   description = "CronJob of the off-site copy (null when off)."
   value       = var.offsite == null ? null : module.offsite_copy[0].cronjob
 }
+
+output "offsite_lake_cronjob" {
+  description = "CronJob of the off-site copy of the lake buckets (null when off)."
+  value       = local.offsite_lake == null ? null : module.offsite_lake_copy[0].cronjob
+}
