@@ -94,12 +94,12 @@ key="$(one "$subject_sql")"
 before="$(one "select count(*) from curated.keystore.dim_citizen where business_key = '${key}'")"
 log "subject: pseudonymised key ${key:0:8}..., ${before} keystore member(s)"
 reason="e2e-$(date -u +%Y%m%dT%H%M%SZ)"
-# the identifier (fake CPR) is read inside the code-location pod and passed on stdin
-cpr="$(sa "select cpr_number from clean.borgerportal.citizens where citizen_id = '${key}' limit 1" | jq -r '.[0]')"
-printf '%s\n' "$cpr" | kubectl -n orchestration exec -i deploy/dagster-code-dagster-user-deployments-lakehouse -- \
-  lakehouse-erase --submit --identifier-stdin --requested-by "dpo@kommune.example" --reason "$reason" > "${tmp}/submit.json" 2>"${tmp}/submit.err" \
+# the request names the subject by its pseudonymised key (the clean layer keeps no
+# clear CPR any more); the key goes over stdin, never on a command line
+printf '%s\n' "$key" | kubectl -n orchestration exec -i deploy/dagster-code-dagster-user-deployments-lakehouse -- \
+  python -c 'import sys; from governance.erasure.cli import main; k = sys.stdin.readline().strip(); sys.exit(main(["--submit", "--subject-key", k] + sys.argv[1:]))' \
+  --requested-by "dpo@kommune.example" --reason "$reason" > "${tmp}/submit.json" 2>"${tmp}/submit.err" \
   && ok "erasure request queued ($(jq -r .request_id "${tmp}/submit.json"))" || bad "submit: $(tail -2 "${tmp}/submit.err")"
-unset cpr
 run="$(dp_dagster_launch erasure)"
 log "run ${run}"
 if dp_dagster_wait "$run" 1800; then ok "erasure run ${run} SUCCESS"; else bad "erasure run ${run}"; fi
@@ -109,7 +109,13 @@ for check in "clean.borgerportal.citizens|citizen_id" "consolidated.party.person
 done
 expect "audit record of the erasure (completed, no identifier)" completed \
   "$(one "select status from curated.audit.erasure_log where reason like '%${reason}%'")"
-expect "erasure queue empty" 0 "$(one "select count(*) from curated.audit.erasure_requests")"
+# audit H-1: neither the solution's erasure SQL nor anything else put the key into the query audit trail
+if kubectl -n query logs deploy/trino-coordinator -c audit-log --since=1h | grep -qF "$key"; then
+  bad "subject key found in the Trino query audit trail"
+else
+  ok "subject key absent from the Trino query audit trail (last hour)"
+fi
+expect "erasure queue empty (raw.governance.erasure_requests, written via pyiceberg)" 0 "$(one "select count(*) from raw.governance.erasure_requests")"
 
 printf '\n== e2e summary (%s): %d passed, %d failed\n' "$ENV" "$PASS" "$FAIL"
 (( FAIL == 0 ))
