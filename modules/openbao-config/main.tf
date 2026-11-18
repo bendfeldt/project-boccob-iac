@@ -125,6 +125,7 @@ resource "vault_policy" "cert_manager" {
 }
 
 resource "vault_policy" "eso_read" {
+  count  = var.legacy_eso_roles ? 1 : 0
   name   = "external-secrets-read"
   policy = <<-HCL
     path "${vault_mount.kv.path}/data/*" {
@@ -137,6 +138,7 @@ resource "vault_policy" "eso_read" {
 }
 
 resource "vault_policy" "eso_push" {
+  count  = var.legacy_eso_roles ? 1 : 0
   name   = "external-secrets-push"
   policy = <<-HCL
     path "${vault_mount.kv.path}/data/*" {
@@ -218,21 +220,23 @@ resource "vault_kubernetes_auth_backend_role" "cert_manager" {
 }
 
 resource "vault_kubernetes_auth_backend_role" "eso_read" {
+  count                            = var.legacy_eso_roles ? 1 : 0
   backend                          = vault_auth_backend.kubernetes.path
   role_name                        = "external-secrets"
   bound_service_account_names      = [var.external_secrets.service_account]
   bound_service_account_namespaces = [var.external_secrets.namespace]
-  token_policies                   = [vault_policy.eso_read.name]
+  token_policies                   = [vault_policy.eso_read[0].name]
   token_ttl                        = 600
   token_max_ttl                    = 900
 }
 
 resource "vault_kubernetes_auth_backend_role" "eso_push" {
+  count                            = var.legacy_eso_roles ? 1 : 0
   backend                          = vault_auth_backend.kubernetes.path
   role_name                        = "external-secrets-push"
   bound_service_account_names      = [var.external_secrets.service_account]
   bound_service_account_namespaces = [var.external_secrets.namespace]
-  token_policies                   = [vault_policy.eso_push.name]
+  token_policies                   = [vault_policy.eso_push[0].name]
   token_ttl                        = 600
   token_max_ttl                    = 900
 }

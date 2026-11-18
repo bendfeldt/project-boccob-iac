@@ -27,7 +27,7 @@ output "roles" {
   description = "Kubernetes auth role names."
   value = {
     cert_manager = vault_kubernetes_auth_backend_role.cert_manager.role_name
-    eso_read     = vault_kubernetes_auth_backend_role.eso_read.role_name
-    eso_push     = vault_kubernetes_auth_backend_role.eso_push.role_name
+    eso_read     = var.legacy_eso_roles ? vault_kubernetes_auth_backend_role.eso_read[0].role_name : null
+    eso_push     = var.legacy_eso_roles ? vault_kubernetes_auth_backend_role.eso_push[0].role_name : null
   }
 }

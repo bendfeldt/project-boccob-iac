@@ -39,6 +39,7 @@ module "openbao_config" {
     service_account = "external-secrets"
     namespace       = local.platform.namespaces.platform
   }
+  legacy_eso_roles = length(var.legacy_cluster_store_namespaces) > 0
   namespace_stores = {
     for ns, cfg in var.namespace_secret_stores : ns => {
       reads      = concat(cfg.reads, lookup(var.extra_namespace_secret_reads, ns, []))

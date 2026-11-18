@@ -68,3 +68,9 @@ variable "namespace_stores" {
   }))
   default = {}
 }
+
+variable "legacy_eso_roles" {
+  description = "Create the legacy cluster-wide ESO roles external-secrets / external-secrets-push (kv/* read / write, bound to the ESO controller ServiceAccount). Only needed while ClusterSecretStores exist."
+  type        = bool
+  default     = false
+}
