@@ -166,6 +166,12 @@ locals {
           Action   = ["s3:GetObject", "s3:GetObjectVersion", "s3:ListBucket", "s3:ListBucketVersions", "s3:GetBucketLocation"]
           Resource = flatten([for b in user.read_only_buckets : ["arn:aws:s3:::${b}", "arn:aws:s3:::${b}/*"]])
         }],
+        # remove objects with all their versions (erasure, retention, maintenance), nothing else
+        length(user.purge_buckets) == 0 ? [] : [{
+          Effect   = "Allow"
+          Action   = ["s3:ListBucket", "s3:ListBucketVersions", "s3:GetBucketLocation", "s3:GetObject", "s3:GetObjectVersion", "s3:DeleteObject", "s3:DeleteObjectVersion"]
+          Resource = flatten([for b in user.purge_buckets : ["arn:aws:s3:::${b}", "arn:aws:s3:::${b}/*"]])
+        }],
       )
     })
   }

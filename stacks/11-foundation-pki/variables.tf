@@ -41,6 +41,7 @@ variable "namespace_secret_stores" {
         "identity/oidc-clients/dagster",
         "query/trino/service-accounts/svc-dagster",
         "storage/s3-users/lakehouse-orchestration",
+        "storage/s3-users/lakehouse-purge",
       ]
       # written only by the pepper Job (its own OpenBao role, check-and-set 0)
       deny_write = ["orchestration/pseudonym-pepper"]

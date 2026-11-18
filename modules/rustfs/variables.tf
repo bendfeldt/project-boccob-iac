@@ -113,6 +113,7 @@ variable "users" {
   type = map(object({
     read_write_buckets = optional(list(string), [])
     read_only_buckets  = optional(list(string), [])
+    purge_buckets      = optional(list(string), []) # list/get/delete objects and object versions only
   }))
   default = {}
 }

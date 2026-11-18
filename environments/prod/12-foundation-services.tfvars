@@ -29,6 +29,8 @@ s3_users = {
     read_write_buckets = ["lakehouse-raw"]
     read_only_buckets  = ["lakehouse-clean", "lakehouse-consolidated", "lakehouse-curated"]
   }
+  # Dagster erasure / retention / maintenance: remove object versions on the layer buckets
+  "lakehouse-purge" = { purge_buckets = ["lakehouse-raw", "lakehouse-clean", "lakehouse-consolidated", "lakehouse-curated"] }
 }
 oidc_clients = {
   # service account that reads group memberships for the Trino file group provider

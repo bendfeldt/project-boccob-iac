@@ -275,8 +275,11 @@ resource "vault_policy" "ns_push" {
       path "${vault_mount.kv.path}/data/${each.key}/*" {
         capabilities = ["create", "update", "read"]
       }
+      # ESO PushSecret writes custom metadata (managed-by) with every new
+      # secret: without create/update on metadata no new path can be pushed.
+      # No delete: removing a secret stays an operator action.
       path "${vault_mount.kv.path}/metadata/${each.key}/*" {
-        capabilities = ["read", "list"]
+        capabilities = ["create", "update", "read", "list"]
       }
     HCL
     ],
