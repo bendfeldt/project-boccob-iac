@@ -77,3 +77,13 @@ variable "labels" {
   type        = map(string)
   default     = {}
 }
+
+variable "secret_stores" {
+  description = "External Secrets stores for this module's secrets: { read, push, kind }. Pass module.ns_<x>.secret_stores (the namespace's own SecretStores, kv/<ns>/* + granted reads, stack 11 namespace_secret_stores); the default is the legacy cluster-wide stores."
+  type = object({
+    read = string
+    push = string
+    kind = string
+  })
+  default = { read = "openbao", push = "openbao-push", kind = "ClusterSecretStore" }
+}

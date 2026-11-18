@@ -70,6 +70,8 @@ module "ns_catalog" {
 
 module "polaris_db" {
   source        = "../../modules/postgres-cluster"
+  push_store    = "openbao-push"
+  store_kind    = "SecretStore" # namespace database (stack 12)
   name          = "polaris-db"
   namespace     = local.ns.database
   image         = module.versions.images["postgresql"].ref
@@ -83,9 +85,10 @@ module "polaris_db" {
 }
 
 module "polaris" {
-  source    = "../../modules/polaris"
-  namespace = module.ns_catalog.name
-  chart     = module.versions.charts["polaris"]
+  source        = "../../modules/polaris"
+  secret_stores = module.ns_catalog.secret_stores
+  namespace     = module.ns_catalog.name
+  chart         = module.versions.charts["polaris"]
   images = {
     polaris    = module.versions.images["polaris"]
     admin_tool = module.versions.images["polaris-admin-tool"]

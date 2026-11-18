@@ -127,56 +127,70 @@ locals {
 
 # --- secrets --------------------------------------------------------------------------
 module "shared_secret" {
-  source    = "../generated-secret"
-  name      = "${local.name}-shared-secret"
-  namespace = var.namespace
-  kv_path   = "${var.kv_prefix}/shared-secret"
-  keys      = ["shared-secret"]
-  length    = 64
-  labels    = var.labels
+  source     = "../generated-secret"
+  read_store = var.secret_stores.read
+  push_store = var.secret_stores.push
+  store_kind = var.secret_stores.kind
+  name       = "${local.name}-shared-secret"
+  namespace  = var.namespace
+  kv_path    = "${var.kv_prefix}/shared-secret"
+  keys       = ["shared-secret"]
+  length     = 64
+  labels     = var.labels
 }
 
 module "polaris_credentials" {
-  source    = "../external-secret"
-  name      = "${local.name}-polaris"
-  namespace = var.namespace
-  kv_path   = var.polaris.credentials_kv_path
-  labels    = var.labels
+  source     = "../external-secret"
+  store      = var.secret_stores.read
+  store_kind = var.secret_stores.kind
+  name       = "${local.name}-polaris"
+  namespace  = var.namespace
+  kv_path    = var.polaris.credentials_kv_path
+  labels     = var.labels
 }
 
 module "s3_credentials" {
-  source    = "../external-secret"
-  name      = "${local.name}-s3"
-  namespace = var.namespace
-  kv_path   = var.s3.credentials_kv_path
-  labels    = var.labels
+  source     = "../external-secret"
+  store      = var.secret_stores.read
+  store_kind = var.secret_stores.kind
+  name       = "${local.name}-s3"
+  namespace  = var.namespace
+  kv_path    = var.s3.credentials_kv_path
+  labels     = var.labels
 }
 
 module "oidc_credentials" {
-  source    = "../external-secret"
-  name      = "${local.name}-oidc"
-  namespace = var.namespace
-  kv_path   = var.oidc.client_secret_kv_path
-  labels    = var.labels
+  source     = "../external-secret"
+  store      = var.secret_stores.read
+  store_kind = var.secret_stores.kind
+  name       = "${local.name}-oidc"
+  namespace  = var.namespace
+  kv_path    = var.oidc.client_secret_kv_path
+  labels     = var.labels
 }
 
 module "group_sync_credentials" {
-  source    = "../external-secret"
-  name      = "${local.name}-group-sync"
-  namespace = var.namespace
-  kv_path   = var.group_sync.client_secret_kv_path
-  labels    = var.labels
+  source     = "../external-secret"
+  store      = var.secret_stores.read
+  store_kind = var.secret_stores.kind
+  name       = "${local.name}-group-sync"
+  namespace  = var.namespace
+  kv_path    = var.group_sync.client_secret_kv_path
+  labels     = var.labels
 }
 
 module "service_account_passwords" {
-  for_each  = var.service_accounts
-  source    = "../generated-secret"
-  name      = "${local.name}-sa-${each.key}"
-  namespace = var.namespace
-  kv_path   = "${local.sa_kv_prefix}/${each.key}"
-  keys      = ["password"]
-  literals  = { username = each.key }
-  labels    = var.labels
+  for_each   = var.service_accounts
+  source     = "../generated-secret"
+  read_store = var.secret_stores.read
+  push_store = var.secret_stores.push
+  store_kind = var.secret_stores.kind
+  name       = "${local.name}-sa-${each.key}"
+  namespace  = var.namespace
+  kv_path    = "${local.sa_kv_prefix}/${each.key}"
+  keys       = ["password"]
+  literals   = { username = each.key }
+  labels     = var.labels
 }
 
 # bcrypt password file, rendered by External Secrets from the values in OpenBao
@@ -192,7 +206,7 @@ resource "kubernetes_manifest" "password_file" {
     }
     spec = {
       refreshInterval = "1h0m0s"
-      secretStoreRef  = { name = "openbao", kind = "ClusterSecretStore" }
+      secretStoreRef  = { name = var.secret_stores.read, kind = var.secret_stores.kind }
       target = {
         name           = "${local.name}-password-file"
         creationPolicy = "Owner"

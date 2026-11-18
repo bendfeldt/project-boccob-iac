@@ -49,21 +49,26 @@ locals {
 
 # --- secrets -------------------------------------------------------------------
 module "root_credentials" {
-  source    = "../generated-secret"
-  name      = local.root_secret_name
-  namespace = var.namespace
-  kv_path   = "${var.kv_prefix}/root"
-  keys      = ["client-secret"]
-  literals  = { "client-id" = "root", realm = var.realm }
-  labels    = var.labels
+  source     = "../generated-secret"
+  read_store = var.secret_stores.read
+  push_store = var.secret_stores.push
+  store_kind = var.secret_stores.kind
+  name       = local.root_secret_name
+  namespace  = var.namespace
+  kv_path    = "${var.kv_prefix}/root"
+  keys       = ["client-secret"]
+  literals   = { "client-id" = "root", realm = var.realm }
+  labels     = var.labels
 }
 
 # credentials file for `polaris-admin-tool bootstrap -f` (keeps the secret off argv)
 module "bootstrap_credentials" {
-  source    = "../external-secret"
-  name      = local.boot_secret_name
-  namespace = var.namespace
-  kv_path   = module.root_credentials.kv_path
+  source     = "../external-secret"
+  store      = var.secret_stores.read
+  store_kind = var.secret_stores.kind
+  name       = local.boot_secret_name
+  namespace  = var.namespace
+  kv_path    = module.root_credentials.kv_path
   template = {
     "credentials.yaml" = "{{ .realm }}:\n  client-id: {{ index . \"client-id\" }}\n  client-secret: {{ index . \"client-secret\" }}\n"
   }
@@ -72,20 +77,25 @@ module "bootstrap_credentials" {
 
 # signing key of Polaris' own token endpoint; shared by all replicas
 module "token_broker_key" {
-  source    = "../generated-secret"
-  name      = local.token_secret_name
-  namespace = var.namespace
-  kv_path   = "${var.kv_prefix}/token-broker"
-  keys      = ["symmetric.key"]
-  length    = 64
-  labels    = var.labels
+  source     = "../generated-secret"
+  read_store = var.secret_stores.read
+  push_store = var.secret_stores.push
+  store_kind = var.secret_stores.kind
+  name       = local.token_secret_name
+  namespace  = var.namespace
+  kv_path    = "${var.kv_prefix}/token-broker"
+  keys       = ["symmetric.key"]
+  length     = 64
+  labels     = var.labels
 }
 
 module "db_credentials" {
-  source    = "../external-secret"
-  name      = local.db_secret_name
-  namespace = var.namespace
-  kv_path   = var.database.kv_path
+  source     = "../external-secret"
+  store      = var.secret_stores.read
+  store_kind = var.secret_stores.kind
+  name       = local.db_secret_name
+  namespace  = var.namespace
+  kv_path    = var.database.kv_path
   template = {
     username = "{{ .username }}"
     password = "{{ .password }}"
@@ -96,21 +106,25 @@ module "db_credentials" {
 }
 
 module "s3_credentials" {
-  source    = "../external-secret"
-  name      = local.s3_secret_name
-  namespace = var.namespace
-  kv_path   = var.s3.credentials_kv_path
-  labels    = var.labels
+  source     = "../external-secret"
+  store      = var.secret_stores.read
+  store_kind = var.secret_stores.kind
+  name       = local.s3_secret_name
+  namespace  = var.namespace
+  kv_path    = var.s3.credentials_kv_path
+  labels     = var.labels
 }
 
 module "oidc_credentials" {
-  count     = var.oidc == null ? 0 : 1
-  source    = "../external-secret"
-  name      = local.oidc_secret_name
-  namespace = var.namespace
-  kv_path   = var.oidc.client_secret_kv_path
-  template  = { clientSecret = "{{ index . \"client-secret\" }}" }
-  labels    = var.labels
+  count      = var.oidc == null ? 0 : 1
+  source     = "../external-secret"
+  store      = var.secret_stores.read
+  store_kind = var.secret_stores.kind
+  name       = local.oidc_secret_name
+  namespace  = var.namespace
+  kv_path    = var.oidc.client_secret_kv_path
+  template   = { clientSecret = "{{ index . \"client-secret\" }}" }
+  labels     = var.labels
 }
 
 # --- TLS -------------------------------------------------------------------------

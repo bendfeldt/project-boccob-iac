@@ -9,21 +9,26 @@ locals {
 }
 
 module "cookie_secret" {
-  source    = "../generated-secret"
-  name      = "${var.name}-cookie"
-  namespace = var.namespace
-  kv_path   = "${var.kv_prefix}/cookie-secret"
-  keys      = ["cookie-secret"]
-  length    = 32 # AES-256 key
-  labels    = var.labels
+  source     = "../generated-secret"
+  read_store = var.secret_stores.read
+  push_store = var.secret_stores.push
+  store_kind = var.secret_stores.kind
+  name       = "${var.name}-cookie"
+  namespace  = var.namespace
+  kv_path    = "${var.kv_prefix}/cookie-secret"
+  keys       = ["cookie-secret"]
+  length     = 32 # AES-256 key
+  labels     = var.labels
 }
 
 module "client_secret" {
-  source    = "../external-secret"
-  name      = "${var.name}-oidc"
-  namespace = var.namespace
-  kv_path   = var.oidc.client_secret_kv_path
-  labels    = var.labels
+  source     = "../external-secret"
+  store      = var.secret_stores.read
+  store_kind = var.secret_stores.kind
+  name       = "${var.name}-oidc"
+  namespace  = var.namespace
+  kv_path    = var.oidc.client_secret_kv_path
+  labels     = var.labels
 }
 
 module "tls" {

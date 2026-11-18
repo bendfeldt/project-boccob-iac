@@ -59,12 +59,14 @@ locals {
 
 # --- secrets ---------------------------------------------------------------------------
 module "db_credentials" {
-  source    = "../external-secret"
-  name      = local.pg_secret
-  namespace = var.namespace
-  kv_path   = var.database.kv_path
-  template  = { "postgresql-password" = "{{ .password }}" }
-  labels    = var.labels
+  source     = "../external-secret"
+  store      = var.secret_stores.read
+  store_kind = var.secret_stores.kind
+  name       = local.pg_secret
+  namespace  = var.namespace
+  kv_path    = var.database.kv_path
+  template   = { "postgresql-password" = "{{ .password }}" }
+  labels     = var.labels
 }
 
 # pepper: created once in OpenBao by a Job (never by OpenTofu, never overwritten)
@@ -213,7 +215,7 @@ resource "kubernetes_manifest" "solution_env" {
     }
     spec = {
       refreshInterval = "5m0s"
-      secretStoreRef  = { name = "openbao", kind = "ClusterSecretStore" }
+      secretStoreRef  = { name = var.secret_stores.read, kind = var.secret_stores.kind }
       target          = { name = local.env_secret, creationPolicy = "Owner", deletionPolicy = "Retain" }
       data = [
         for env_name, ref in merge(var.solution_secrets, { PSEUDONYM_PEPPER = { kv_path = var.pepper_kv_path, property = "pepper" } }) : {

@@ -63,10 +63,11 @@ module "opa" {
 }
 
 module "trino" {
-  source      = "../../modules/trino"
-  namespace   = module.ns_query.name
-  chart       = module.versions.charts["trino"]
-  environment = replace(var.environment, "-", "_")
+  source        = "../../modules/trino"
+  secret_stores = module.ns_query.secret_stores
+  namespace     = module.ns_query.name
+  chart         = module.versions.charts["trino"]
+  environment   = replace(var.environment, "-", "_")
   images = {
     trino        = module.versions.images["trino"]
     python       = module.versions.images["python"]

@@ -62,6 +62,8 @@ module "ns_orchestration" {
 
 module "dagster_db" {
   source        = "../../modules/postgres-cluster"
+  push_store    = "openbao-push"
+  store_kind    = "SecretStore" # namespace database (stack 12)
   name          = "dagster-db"
   namespace     = local.ns.database
   image         = module.versions.images["postgresql"].ref
@@ -75,8 +77,9 @@ module "dagster_db" {
 }
 
 module "dagster" {
-  source    = "../../modules/dagster"
-  namespace = module.ns_orchestration.name
+  source        = "../../modules/dagster"
+  secret_stores = module.ns_orchestration.secret_stores
+  namespace     = module.ns_orchestration.name
   charts = {
     dagster          = module.versions.charts["dagster"]
     user_deployments = module.versions.charts["dagster-user-deployments"]
@@ -127,6 +130,7 @@ module "dagster" {
 
 module "dagster_auth" {
   source         = "../../modules/oauth2-proxy"
+  secret_stores  = module.ns_orchestration.secret_stores
   name           = "dagster-auth"
   namespace      = module.ns_orchestration.name
   image          = module.versions.images["oauth2-proxy"].ref
