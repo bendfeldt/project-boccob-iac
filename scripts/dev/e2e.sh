@@ -171,15 +171,17 @@ print(r.get("KeyCount", 0))' 2>&1 | tail -1)"
 else
   bad "compute logs to S3 not configured (compute_logs_s3 = false)"
 fi
-# full-refresh guard: dbt in the code-location image with LAKEHOUSE_ENV=test and an
-# unreachable Trino - the on-run-start guard must refuse before any connection
-if kubectl -n orchestration exec deploy/dagster-code-dagster-user-deployments-lakehouse -- env LAKEHOUSE_ENV=test TRINO_HOST=refused.invalid \
+# full-refresh guard: dbt in the code-location pod with LAKEHOUSE_ENV=test. dbt
+# connects before on-run-start (relation cache), so this needs the real Trino; the
+# guard aborts in on-run-start before any model runs, and should_full_refresh()
+# is the backstop inside the materialization (dev data is synthetic either way)
+if kubectl -n orchestration exec deploy/dagster-code-dagster-user-deployments-lakehouse -- env LAKEHOUSE_ENV=test \
      DBT_TARGET_PATH=/tmp/dbt-target DBT_LOG_PATH=/tmp/dbt-logs \
      sh -c 'cd "$DBT_PROJECT_DIR" && dbt run --full-refresh --select clean.borgerportal.citizens' > "${tmp}/fr.out" 2>&1; then
   bad "dbt --full-refresh ran with LAKEHOUSE_ENV=test"
 else
   grep -q "refused outside dev" "${tmp}/fr.out" && ok "dbt --full-refresh refused with LAKEHOUSE_ENV=test (guard message)" \
-    || bad "full refresh failed for another reason: $(grep -m2 -i error "${tmp}/fr.out")"
+    || bad "full refresh failed for another reason: $(sed 's/\x1b\[[0-9;]*m//g' "${tmp}/fr.out" | grep -A2 -m1 'ERROR')"
 fi
 
 printf '\n== e2e summary (%s): %d passed, %d failed\n' "$ENV" "$PASS" "$FAIL"
