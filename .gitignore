@@ -31,3 +31,4 @@ openbao-init*.json
 .vscode/
 *.swp
 .DS_Store
+__pycache__/
