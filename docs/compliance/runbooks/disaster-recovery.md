@@ -20,11 +20,14 @@ Retention:
 - OpenBao snapshots: `openbao_snapshot_retention_days`; deleted versions in
   `platform-backup`: `noncurrent_version_retention_days` (S3 lifecycle on
   `platform-backup` only, applied by the snapshot job).
-- Lakehouse buckets: versioned, but noncurrent versions expire after
-  `lakehouse_noncurrent_version_days` (stack 12, default 1 day) so that erasure
-  and retention deletes become final. Object versions are therefore **not** a
-  recovery mechanism for lake data beyond that window: use Iceberg snapshots
-  (within their expiry) and the off-site copy.
+- Lakehouse buckets: versioned; noncurrent versions expire after
+  `lakehouse_noncurrent_version_days` (stack 12, default 7 days) so that
+  retention deletes become final. Within that window an accidental delete (e.g.
+  `DROP TABLE` with purge, a faulty job) can be undone from the object versions
+  (`rc undo` / copy the version back, then re-register the table metadata in
+  Polaris); beyond it use Iceberg snapshots (within their expiry) and the
+  off-site copy. Erasure is not delayed by the window: the erasure job deletes
+  the versions of the objects it touched explicitly.
 
 ## Regular test
 

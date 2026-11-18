@@ -139,3 +139,34 @@ variable "secret_stores" {
   })
   default = { read = "openbao", push = "openbao-push", kind = "SecretStore" }
 }
+
+variable "job_secrets" {
+  description = <<-EOT
+    Secret environment for selected jobs only (e.g. the purge credential for
+    erasure / retention / maintenance). name => { env = ENV_NAME => { kv_path,
+    property }, jobs = Dagster job names }. Each entry becomes Secret
+    `<code location>-<name>-env` (External Secrets), which is NOT given to the
+    code server or to other runs: a job attaches it through its tag
+    `dagster-k8s/config` = {"container_config": {"env_from": [{"secret_ref":
+    {"name": "<secret>"}}]}}; the Secret name is in the environment variable
+    <NAME>_ENV_SECRET (e.g. PURGE_ENV_SECRET). ValidatingAdmissionPolicies
+    admit a Job or Pod in the namespace that references the Secret only when
+    it carries the label dagster/job of a listed job and was created by the
+    run launcher (Job: ServiceAccount `run_launcher_service_account`; Pod: the
+    Job controller).
+  EOT
+  type = map(object({
+    env = map(object({
+      kv_path  = string
+      property = string
+    }))
+    jobs = list(string)
+  }))
+  default = {}
+}
+
+variable "run_launcher_service_account" {
+  description = "ServiceAccount that creates the run Jobs (the queued run coordinator launches every run from the daemon; the chart's ServiceAccount `dagster`)."
+  type        = string
+  default     = "dagster"
+}

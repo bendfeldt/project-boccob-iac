@@ -36,7 +36,10 @@ locals {
     REQUESTS_CA_BUNDLE  = local.ca_path
     AWS_CA_BUNDLE       = local.ca_path
   }
-  env_list = [for k, v in merge(local.tls_env, var.solution_env) : { name = k, value = v }]
+  # job-scoped secrets (not in the code server, not in other runs): see var.job_secrets
+  job_secret_names = { for name, _ in var.job_secrets : name => "${var.code_location_name}-${name}-env" }
+  job_secret_env   = { for name, secret in local.job_secret_names : "${upper(replace(name, "-", "_"))}_ENV_SECRET" => secret }
+  env_list         = [for k, v in merge(local.tls_env, local.job_secret_env, var.solution_env) : { name = k, value = v }]
 
   code_location = {
     name               = var.code_location_name
@@ -238,6 +241,123 @@ resource "kubernetes_manifest" "solution_env" {
     update = "3m"
   }
   depends_on = [kubernetes_job_v1.pepper]
+}
+
+# job-scoped secrets: one Secret per entry, attached only by the listed jobs
+resource "kubernetes_manifest" "job_secret" {
+  for_each = var.job_secrets
+  manifest = {
+    apiVersion = "external-secrets.io/v1"
+    kind       = "ExternalSecret"
+    metadata = {
+      name      = local.job_secret_names[each.key]
+      namespace = var.namespace
+      labels    = var.labels
+    }
+    spec = {
+      refreshInterval = "5m0s"
+      secretStoreRef  = { name = var.secret_stores.read, kind = var.secret_stores.kind }
+      target          = { name = local.job_secret_names[each.key], creationPolicy = "Owner", deletionPolicy = "Retain" }
+      data = [for env_name, ref in each.value.env : {
+        secretKey = env_name
+        remoteRef = { key = ref.kv_path, property = ref.property }
+      }]
+    }
+  }
+  wait {
+    condition {
+      type   = "Ready"
+      status = "True"
+    }
+  }
+  timeouts {
+    create = "3m"
+    update = "3m"
+  }
+}
+
+# Admission guard (built-in ValidatingAdmissionPolicy, always Deny, independent
+# of Kyverno's mode): a Job or Pod in the namespace that references a job-scoped
+# Secret (envFrom, env valueFrom, secret or projected volume) must carry the label
+# dagster/job of a listed job, and must come from the run launcher (Job) or the
+# Job controller (Pod). Run pods hold a ServiceAccount that may create Jobs and
+# Pods, so a compromised ingestion run cannot mount the Secret itself.
+locals {
+  spec_refs = <<-CEL
+    variables.ctrs.exists(c,
+      c.?envFrom.orValue([]).exists(e, e.?secretRef.?name.orValue('') == variables.secret) ||
+      c.?env.orValue([]).exists(e, e.?valueFrom.?secretKeyRef.?name.orValue('') == variables.secret)) ||
+    variables.ps.?volumes.orValue([]).exists(v,
+      v.?secret.?secretName.orValue('') == variables.secret ||
+      v.?projected.?sources.orValue([]).exists(s, s.?secret.?name.orValue('') == variables.secret))
+  CEL
+  guard_kinds = {
+    job = {
+      resource_rules = [{ apiGroups = ["batch"], apiVersions = ["v1"], operations = ["CREATE", "UPDATE"], resources = ["jobs"] }]
+      podspec        = "object.spec.template.spec"
+      labels         = "object.spec.template.metadata.?labels.orValue({})"
+      creator        = "system:serviceaccount:${var.namespace}:${var.run_launcher_service_account}"
+    }
+    pod = {
+      resource_rules = [{ apiGroups = [""], apiVersions = ["v1"], operations = ["CREATE", "UPDATE"], resources = ["pods", "pods/ephemeralcontainers"] }]
+      podspec        = "object.spec"
+      labels         = "object.metadata.?labels.orValue({})"
+      creator        = "system:serviceaccount:kube-system:job-controller"
+    }
+  }
+  job_secret_guards = merge([for name, secret in var.job_secrets : {
+    for kind, k in local.guard_kinds : "${name}-${kind}" => merge(k, {
+      secret = local.job_secret_names[name]
+      jobs   = secret.jobs
+      policy = "${var.namespace}-${local.job_secret_names[name]}-${kind}"
+    })
+  }]...)
+}
+
+resource "kubernetes_manifest" "job_secret_guard" {
+  for_each = local.job_secret_guards
+  manifest = {
+    apiVersion = "admissionregistration.k8s.io/v1"
+    kind       = "ValidatingAdmissionPolicy"
+    metadata   = { name = each.value.policy, labels = var.labels }
+    spec = {
+      failurePolicy    = "Fail"
+      matchConstraints = { resourceRules = each.value.resource_rules }
+      variables = [
+        { name = "secret", expression = "'${each.value.secret}'" },
+        { name = "ps", expression = each.value.podspec },
+        { name = "ctrs", expression = "variables.ps.containers + variables.ps.?initContainers.orValue([]) + variables.ps.?ephemeralContainers.orValue([])" },
+        { name = "refs", expression = local.spec_refs },
+        { name = "job", expression = "${each.value.labels}[?'dagster/job'].orValue('')" },
+      ]
+      validations = [
+        {
+          expression = "!variables.refs || variables.job in ${jsonencode(each.value.jobs)}"
+          message    = "Secret ${each.value.secret} may only be used by the Dagster jobs ${join(", ", each.value.jobs)} (label dagster/job)"
+        },
+        {
+          expression = "!variables.refs || request.userInfo.username == '${each.value.creator}'"
+          message    = "Secret ${each.value.secret} may only be referenced by objects created by ${each.value.creator}"
+        },
+      ]
+    }
+  }
+}
+
+resource "kubernetes_manifest" "job_secret_guard_binding" {
+  for_each = local.job_secret_guards
+  manifest = {
+    apiVersion = "admissionregistration.k8s.io/v1"
+    kind       = "ValidatingAdmissionPolicyBinding"
+    metadata   = { name = each.value.policy, labels = var.labels }
+    spec = {
+      policyName        = kubernetes_manifest.job_secret_guard[each.key].manifest.metadata.name
+      validationActions = ["Deny"]
+      matchResources = {
+        namespaceSelector = { matchLabels = { "kubernetes.io/metadata.name" = var.namespace } }
+      }
+    }
+  }
 }
 
 # --- Dagster ---------------------------------------------------------------------------

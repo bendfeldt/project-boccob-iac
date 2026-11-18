@@ -52,7 +52,7 @@ if kubectl get namespace catalog query orchestration >/dev/null 2>&1; then
     # a pod of the query namespace that is not the Trino coordinator must not reach OPA
     kubectl -n query run verify-smoke-opa --restart=Never --quiet --rm -i --pod-running-timeout=120s \
       --image="$(image_zot_ref busybox)" \
-      --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":65534,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"verify-smoke-opa","image":"'"$(image_zot_ref busybox)"'","command":["sh","-c","if nc -w 4 -z opa.query.svc.cluster.local 8181; then echo CONNECTED; else echo BLOCKED; fi"],"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"resources":{"limits":{"memory":"32Mi"}}}]}}' \
+      --overrides='{"spec":{"securityContext":{"runAsNonRoot":true,"runAsUser":65534,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"verify-smoke-opa","image":"'"$dp_busybox"'","command":["sh","-c","if nc -w 4 -z opa.query.svc.cluster.local 8181; then echo CONNECTED; else echo BLOCKED; fi"],"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"resources":{"limits":{"memory":"32Mi"}}}]}}' \
       2>/dev/null | grep -q '^BLOCKED'
   }
   check "NetworkPolicy: only the Trino coordinator can query OPA" opa_isolated
@@ -67,8 +67,37 @@ if kubectl get namespace catalog query orchestration >/dev/null 2>&1; then
     "$(declare -f dp_dagster_graphql); echo '{\"query\":\"{ instance { concurrencyLimit(concurrencyKey: \\\"lakehouse_writer\\\") { slotCount } } }\"}' | dp_dagster_graphql | jq -e '.data.instance.concurrencyLimit.slotCount == 1'"
   check "pseudonym pepper present in the code location environment (value not shown)" bash -c \
     "kubectl -n orchestration get secret lakehouse-env -o jsonpath='{.data.PSEUDONYM_PEPPER}' | base64 -d | wc -c | awk '{exit !(\$1 >= 32)}'"
-  check "purge S3 key delivered to the code location (PURGE_S3_*)" bash -c \
-    "kubectl -n orchestration get secret lakehouse-env -o json | jq -e '.data | has(\"PURGE_S3_ACCESS_KEY_ID\") and has(\"PURGE_S3_SECRET_ACCESS_KEY\")'"
+  # purge credential (s3:DeleteObjectVersion): only in lakehouse-purge-env, attached
+  # only by the purge jobs; admission-guarded (audit N-3)
+  check "purge S3 key only in lakehouse-purge-env, not in lakehouse-env (code server, ordinary runs)" bash -c \
+    "kubectl -n orchestration get secret lakehouse-purge-env -o json | jq -e '.data | has(\"PURGE_S3_ACCESS_KEY_ID\") and has(\"PURGE_S3_SECRET_ACCESS_KEY\")' >/dev/null && kubectl -n orchestration get secret lakehouse-env -o json | jq -e '[.data | keys[] | select(startswith(\"PURGE_S3\"))] | length == 0'"
+  # dp_purge_admit <kind Job|Pod> <dagster/job label> <user>: server-side dry run of
+  # an object that attaches lakehouse-purge-env; prints allowed / denied
+  dp_purge_admit() {
+    local kind="$1" job="$2" as="$3" spec
+    spec='{"restartPolicy":"Never","securityContext":{"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"c","image":"'"$dp_busybox"'","command":["true"],"envFrom":[{"secretRef":{"name":"lakehouse-purge-env"}}],"securityContext":{"allowPrivilegeEscalation":false,"readOnlyRootFilesystem":true,"runAsNonRoot":true,"capabilities":{"drop":["ALL"]}},"resources":{"requests":{"cpu":"5m","memory":"16Mi"},"limits":{"memory":"32Mi"}}}]}'
+    local meta='{"name":"verify-purge-guard","namespace":"orchestration","labels":{"dagster/job":"'"$job"'"}}'
+    local obj
+    if [[ "$kind" == Job ]]; then
+      obj='{"apiVersion":"batch/v1","kind":"Job","metadata":'"$meta"',"spec":{"template":{"metadata":{"labels":{"dagster/job":"'"$job"'"}},"spec":'"$spec"'}}}'
+    else
+      obj='{"apiVersion":"v1","kind":"Pod","metadata":'"$meta"',"spec":'"$spec"'}'
+    fi
+    if kubectl create --dry-run=server --as="$as" -f - <<<"$obj" >/dev/null 2>"${tmp}/purge-guard.err"; then echo allowed
+    elif grep -q "ValidatingAdmissionPolicy 'orchestration-lakehouse-purge-env" "${tmp}/purge-guard.err"; then echo denied
+    else echo "error: $(head -c 200 "${tmp}/purge-guard.err")"; fi
+  }
+  dp_daemon_sa="system:serviceaccount:orchestration:dagster"
+  dp_run_sa="system:serviceaccount:orchestration:dagster-code-dagster-user-deployments-user-deployments"
+  dp_busybox="$(image_zot_ref busybox)"
+  dp_purge_guard_allows_erasure() { [[ "$(dp_purge_admit Job erasure "$dp_daemon_sa")" == allowed ]]; }
+  dp_purge_guard_denies_other_job() { [[ "$(dp_purge_admit Job transform "$dp_daemon_sa")" == denied ]]; }
+  dp_purge_guard_denies_run_sa() {
+    [[ "$(dp_purge_admit Job erasure "$dp_run_sa")" == denied && "$(dp_purge_admit Pod erasure "$dp_run_sa")" == denied ]]
+  }
+  check "purge guard: the run launcher may start an erasure Job with lakehouse-purge-env" dp_purge_guard_allows_erasure
+  check "purge guard: the run launcher may NOT attach lakehouse-purge-env to another job (transform)" dp_purge_guard_denies_other_job
+  check "purge guard: a run pod's ServiceAccount may NOT create a Job or Pod with lakehouse-purge-env" dp_purge_guard_denies_run_sa
   # supply chain: the artefacts the cluster actually runs carry the platform signature
   dp_solution_refs() {
     kubectl -n orchestration get deploy dagster-code-dagster-user-deployments-lakehouse -o jsonpath='{.spec.template.spec.containers[0].image}'

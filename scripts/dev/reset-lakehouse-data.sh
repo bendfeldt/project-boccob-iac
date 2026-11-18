@@ -4,7 +4,8 @@
 #   1. drop every view, table and schema of the four Trino/Polaris catalogs
 #      (as svc-dagster; Iceberg drop with purge removes the data files)
 #   2. delete every object version and delete marker left in the four
-#      lakehouse buckets (S3 user lakehouse-purge, inside the code-location pod)
+#      lakehouse buckets (S3 user lakehouse-purge from Secret lakehouse-purge-env,
+#      handed to a python process in the code-location pod on stdin)
 # Keys of the keystore are lost: never run this outside dev.
 #
 #   CONFIRM=dev scripts/dev/reset-lakehouse-data.sh dev
@@ -35,12 +36,15 @@ for catalog in raw clean consolidated curated; do
 done
 
 step "delete all object versions in the lakehouse buckets"
-kubectl -n orchestration exec -i deploy/dagster-code-dagster-user-deployments-lakehouse -- python -I - <<'PY'
-import os
+# the purge credential is not in the code-location pod (audit N-3): read it from
+# Secret lakehouse-purge-env and hand it over on stdin (never on a command line)
+purge_py='
+import json, os, sys
 import s3fs
 from fsspec.asyn import sync
 
-fs = s3fs.S3FileSystem(key=os.environ["PURGE_S3_ACCESS_KEY_ID"], secret=os.environ["PURGE_S3_SECRET_ACCESS_KEY"],
+cred = json.loads(sys.stdin.readline())
+fs = s3fs.S3FileSystem(key=cred["PURGE_S3_ACCESS_KEY_ID"], secret=cred["PURGE_S3_SECRET_ACCESS_KEY"],
                        client_kwargs={"endpoint_url": os.environ["S3_ENDPOINT_URL"], "region_name": os.environ.get("S3_REGION", "us-east-1")})
 for bucket in ("lakehouse-raw", "lakehouse-clean", "lakehouse-consolidated", "lakehouse-curated"):
     removed = 0
@@ -52,5 +56,8 @@ for bucket in ("lakehouse-raw", "lakehouse-clean", "lakehouse-consolidated", "la
         sync(fs.loop, fs._call_s3, "delete_objects", Bucket=bucket, Delete={"Objects": objs, "Quiet": True})
         removed += len(objs)
     print(f"{bucket}: {removed} object versions / delete markers removed")
-PY
+'
+kubectl -n orchestration get secret lakehouse-purge-env -o json \
+  | jq -c '.data | map_values(@base64d)' \
+  | kubectl -n orchestration exec -i deploy/dagster-code-dagster-user-deployments-lakehouse -- python -I -c "$purge_py"
 log "lakehouse data of ${ENV} reset"

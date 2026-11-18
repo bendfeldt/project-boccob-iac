@@ -120,13 +120,23 @@ module "dagster" {
     ERASURE_VERIFY_STORAGE = tostring(var.erasure_verify_storage)
   }, var.solution_env)
   solution_secrets = {
-    S3_ACCESS_KEY_ID           = { kv_path = "storage/s3-users/${var.s3_user}", property = "access-key" }
-    S3_SECRET_ACCESS_KEY       = { kv_path = "storage/s3-users/${var.s3_user}", property = "secret-key" }
-    PURGE_S3_ACCESS_KEY_ID     = { kv_path = "storage/s3-users/${var.purge_s3_user}", property = "access-key" }
-    PURGE_S3_SECRET_ACCESS_KEY = { kv_path = "storage/s3-users/${var.purge_s3_user}", property = "secret-key" }
-    POLARIS_CLIENT_ID          = { kv_path = "catalog/polaris/principals/${var.polaris_principal}", property = "client-id" }
-    POLARIS_CLIENT_SECRET      = { kv_path = "catalog/polaris/principals/${var.polaris_principal}", property = "client-secret" }
-    TRINO_PASSWORD             = { kv_path = "query/trino/service-accounts/${var.trino_service_account}", property = "password" }
+    S3_ACCESS_KEY_ID      = { kv_path = "storage/s3-users/${var.s3_user}", property = "access-key" }
+    S3_SECRET_ACCESS_KEY  = { kv_path = "storage/s3-users/${var.s3_user}", property = "secret-key" }
+    POLARIS_CLIENT_ID     = { kv_path = "catalog/polaris/principals/${var.polaris_principal}", property = "client-id" }
+    POLARIS_CLIENT_SECRET = { kv_path = "catalog/polaris/principals/${var.polaris_principal}", property = "client-secret" }
+    TRINO_PASSWORD        = { kv_path = "query/trino/service-accounts/${var.trino_service_account}", property = "password" }
+  }
+  # the purge credential (s3:DeleteObjectVersion on the lake buckets) is not in
+  # lakehouse-env: Secret lakehouse-purge-env (PURGE_ENV_SECRET), attached only by
+  # the purge_jobs through their dagster-k8s/config tag; admission-guarded (audit N-3)
+  job_secrets = {
+    purge = {
+      env = {
+        PURGE_S3_ACCESS_KEY_ID     = { kv_path = "storage/s3-users/${var.purge_s3_user}", property = "access-key" }
+        PURGE_S3_SECRET_ACCESS_KEY = { kv_path = "storage/s3-users/${var.purge_s3_user}", property = "secret-key" }
+      }
+      jobs = var.purge_jobs
+    }
   }
   openbao             = { url = local.platform.openbao_url, kv_mount = local.platform.kv_mount }
   max_concurrent_runs = var.max_concurrent_runs

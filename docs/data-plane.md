@@ -123,7 +123,9 @@ same-namespace allow, so other pods there cannot query OPA [verified by `make ve
   (`TRINO_CA_BUNDLE`, `LAKEHOUSE_CA_BUNDLE`, `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`,
   `AWS_CA_BUNDLE`) point at the mounted `platform-ca`. Secrets
   (`S3_*`, `POLARIS_CLIENT_*`, `TRINO_PASSWORD`, `PSEUDONYM_PEPPER`) come from
-  OpenBao through one ExternalSecret. `DBT_TARGET=password`, `TRINO_USER=svc-dagster`,
+  OpenBao through one ExternalSecret (`lakehouse-env`; the purge credential
+  `PURGE_S3_*` is not in it, see "Purge credential and deletion safety window").
+  `DBT_TARGET=password`, `TRINO_USER=svc-dagster`,
   `TRINO_HOST=trino.<base_domain>`, `TRINO_PORT=443` (through Traefik like every
   client: `X-Forwarded-For` in the audit trail can only be set by Traefik; direct
   access to 8443 is closed unless `trino_client_namespaces` lists a namespace).
@@ -201,6 +203,70 @@ Trino's own query history (`system.runtime.queries`, in memory, visible to
 (`query.max-history`); the solution should stop putting keys into SQL (audit
 H-1, solution part).
 
+## Purge credential and deletion safety window
+
+The S3 user `lakehouse-purge` may delete object **versions** on the four lake
+buckets: whoever holds it can destroy lake data beyond recovery. Since audit
+N-3 it is handed only to the runs that need it:
+
+- Secret `lakehouse-purge-env` (`PURGE_S3_ACCESS_KEY_ID`,
+  `PURGE_S3_SECRET_ACCESS_KEY`; `modules/dagster` `job_secrets`, stack 22
+  `purge_jobs` = `erasure`, `retention`, `iceberg_maintenance`). It is neither
+  in `lakehouse-env` nor in the code server's container context, so ingestion,
+  dbt and every other run start without it.
+- A purge job attaches it with the Dagster K8sRunLauncher's per-job Kubernetes
+  config (pinned dagster-k8s 0.29.30: tag `dagster-k8s/config`,
+  `container_config.env_from`, merged DEEP with the code location's container
+  context, lists appended). The Secret name is in `PURGE_ENV_SECRET`.
+  [verified on dev: an `erasure` run launched with the tag got
+  `envFrom: [user-env ConfigMap, lakehouse-env, lakehouse-purge-env]` and
+  succeeded]
+- Two built-in ValidatingAdmissionPolicies (always Deny, independent of the
+  Kyverno mode; `orchestration-lakehouse-purge-env-job|pod`) admit a Job or Pod
+  in `orchestration` that references the Secret (envFrom, env, secret or
+  projected volume) only when its label `dagster/job` is one of `purge_jobs`
+  **and** it comes from the run launcher (Job: ServiceAccount `dagster`, which
+  the queued run coordinator uses for every launch) or the Job controller
+  (Pod). Run pods' own ServiceAccount may create Jobs and Pods (chart RBAC), so
+  without the creator rule a compromised ingestion run could mount the Secret.
+  `make verify` checks all three cases with server-side dry runs.
+- Residual: anyone allowed into the Dagster UI (`platform-admin`,
+  `data-engineer`) can launch a purge job, including with extra run tags; that
+  is the intended authority over erasure/retention/maintenance.
+
+What the solution must add (not in this repository): on the jobs `erasure`,
+`retention` and `iceberg_maintenance` (`orchestration/jobs.py`)
+
+```python
+PURGE_TAGS = {"dagster-k8s/config": {"container_config": {"env_from": [
+    {"secret_ref": {"name": os.environ.get("PURGE_ENV_SECRET", "lakehouse-purge-env")}}]}}}
+
+@dg.job(..., tags={"lakehouse/kind": "erasure", **PURGE_TAGS})
+```
+
+(Dagster serialises a dict tag value to JSON; the default multiprocess executor
+runs every op inside the run pod, so no step-level config is needed). Until that
+release is deployed these jobs run without `PURGE_S3_*`:
+`S3Settings.for_purge()` then falls back to the ordinary credential and the
+version deletes fail loudly (AccessDenied) instead of being skipped. A renamed
+or additional purge job must be added to `purge_jobs`.
+
+Delayed-deletion window: `lakehouse_noncurrent_version_days` (stack 12) is 7
+days by default (was 1). Trade-off:
+
+| | 1 day | 7 days (default) |
+|---|---|---|
+| erasure | no difference: the erasure deletes the versions of the objects it touched explicitly | same |
+| retention / maintenance deletes (ordinary deletes) | final after 1 day | recoverable for 7 days, then final (state it in the retention policy) |
+| accident (`DROP TABLE` with purge, faulty job, leaked non-purge credential) | 1 day to notice and undo | 7 days to notice and undo |
+
+For the window to hold, the solution's maintenance and retention must not
+purge **all** noncurrent versions: they should delete only versions older than
+the window (`purge_noncurrent(..., older_than=...)`) or leave them to the
+lifecycle; only the erasure purges the versions of its own objects at once.
+The off-site lake copy keeps its own short expiry
+(`offsite.lake.max_noncurrent_days`, stack 32).
+
 ## Erasure verification
 
 `ERASURE_VERIFY_STORAGE=true` makes every erasure request read and decode
@@ -255,7 +321,7 @@ fixes) now describes the platform as deployed. Checked point by point:
 | `TRINO_HOST=trino.<base_domain>`, `TRINO_PORT=443` (through Traefik) | stack 22 `solution_env` | aligned |
 | groups `platform-admin`, `data-engineer`, `analyst`, `pii-reader`, `auditor`, `lakehouse-service`; service-account groups from static file entries, OPA `principals` overlay empty | Keycloak groups synced (five), `lakehouse-service` static only (`trino_service_accounts`; the group sync ignores static-only groups even if a Keycloak group of that name exists) | aligned |
 | `svc-dagster` in `data-engineer`, `pii-reader`, `lakehouse-service`; no person in `lakehouse-service` | stack 21 default | aligned |
-| `PURGE_S3_ACCESS_KEY_ID` / `PURGE_S3_SECRET_ACCESS_KEY`: ListBucket, ListBucketVersions, GetObject, GetObjectVersion, DeleteObject, DeleteObjectVersion on the four lakehouse buckets | S3 user `lakehouse-purge` (`purge_buckets` in `modules/rustfs`: exactly those actions + GetBucketLocation), delivered through `lakehouse-env` to code location and run pods; PutObject is refused [verified on dev] | aligned |
+| `PURGE_S3_ACCESS_KEY_ID` / `PURGE_S3_SECRET_ACCESS_KEY`: ListBucket, ListBucketVersions, GetObject, GetObjectVersion, DeleteObject, DeleteObjectVersion on the four lakehouse buckets | S3 user `lakehouse-purge` (`purge_buckets` in `modules/rustfs`: exactly those actions + GetBucketLocation; PutObject is refused [verified on dev]) in Secret `lakehouse-purge-env` (name in `PURGE_ENV_SECRET`), attached only by `erasure`, `retention`, `iceberg_maintenance` through their `dagster-k8s/config` tag (audit N-3) | **changed: the solution must add the tag** (see "Purge credential and deletion safety window") |
 | `ERASURE_VERIFY_STORAGE` | variable `erasure_verify_storage`: dev `true`, test/prod `false` (whole-lake scan per request is O(lake), audit N-1); see "Erasure verification" | **changed: the solution contract must drop "recommended in test/prod"** |
 | no object lock on the lakehouse buckets; lifecycle as second line of defence | buckets versioned, no object lock; lifecycle expires noncurrent versions (ops package) | aligned |
 | query text in the audit archive: no keys/CPR from the tooling; ad-hoc literals redacted by the platform | audit sink redaction (H-1) | aligned |

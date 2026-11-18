@@ -35,6 +35,12 @@ variable "purge_s3_user" {
   default     = "lakehouse-purge"
 }
 
+variable "purge_jobs" {
+  description = "Dagster jobs that may attach the purge credential (Secret lakehouse-purge-env, PURGE_S3_*) through their tag dagster-k8s/config; every other run, and the code server, runs without it."
+  type        = list(string)
+  default     = ["erasure", "retention", "iceberg_maintenance"]
+}
+
 variable "polaris_principal" {
   description = "Polaris principal of the ingestion (index) stage (stack 20)."
   type        = string
