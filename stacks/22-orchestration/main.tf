@@ -119,6 +119,9 @@ module "dagster" {
     ERASURE_VERIFY_STORAGE = var.erasure_verify_storage
     # dbt --full-refresh of incremental models is refused unless dev (solution docs/releases.md)
     LAKEHOUSE_ENV = var.environment
+    # delayed-deletion window: maintenance/retention purge only older noncurrent
+    # versions; same value as the bucket lifecycle (common variable)
+    NONCURRENT_VERSION_GRACE_DAYS = tostring(var.lakehouse_noncurrent_version_days)
   }, var.solution_env)
   solution_secrets = {
     S3_ACCESS_KEY_ID      = { kv_path = "storage/s3-users/${var.s3_user}", property = "access-key" }

@@ -98,13 +98,3 @@ variable "rustfs_sse_enabled" {
   type        = bool
   default     = true
 }
-
-variable "lakehouse_noncurrent_version_days" {
-  description = "Days after which noncurrent (deleted or overwritten) object versions in the four lakehouse buckets are removed by the RustFS lifecycle scanner; expired delete markers are removed too. This is the delayed-deletion safety window: an accidental DROP TABLE ... purge, a faulty job or a compromised credential without DeleteObjectVersion can be undone within it. It does not delay erasure: the erasure job deletes the object versions of the objects it touched explicitly (purge credential); it bounds how long data removed by ordinary deletes (retention, Iceberg maintenance) stays recoverable. Minimum 1 (S3 lifecycle granularity is days). Default 7 (docs/data-plane.md, \"Purge credential and deletion safety window\")."
-  type        = number
-  default     = 7
-  validation {
-    condition     = var.lakehouse_noncurrent_version_days >= 1
-    error_message = "lakehouse_noncurrent_version_days must be at least 1."
-  }
-}
