@@ -140,7 +140,8 @@ check "every CloudNativePG cluster archives WAL (ContinuousArchiving=True)" bash
   'kubectl -n database get clusters.postgresql.cnpg.io -o json | jq -e "[.items[] | select(.spec.backup.barmanObjectStore != null)] as \$b | (\$b | length) > 0 and all(\$b[]; any(.status.conditions[]?; .type == \"ContinuousArchiving\" and .status == \"True\"))"'
 check "CloudNativePG clusters without backup configuration (should be none)" bash -c \
   'r=$(kubectl -n database get clusters.postgresql.cnpg.io -o json | jq -r ".items[] | select(.spec.backup.barmanObjectStore == null) | .metadata.name"); echo "without backup: ${r:-none}"; [[ -z "$r" ]]'
-ops_backup_objects() {
+ops_backup_objects() ( # subshell: a die() in the S3 helpers must not end verify.sh
+  trap s3_session_stop EXIT
   mkdir -p "${tmp}/s3"
   s3_session "${tmp}/s3"
   local pg snap age
@@ -151,7 +152,7 @@ ops_backup_objects() {
   age=$(( $(date -u +%s) - $(date -u -d "$(sed -E 's#.*raft-([0-9]{8})T([0-9]{2})([0-9]{2})([0-9]{2})Z\.snap#\1 \2:\3:\4#' <<<"$snap")" +%s) ))
   echo "snapshot age ${age}s"
   (( age < ${VERIFY_SNAPSHOT_MAX_AGE:-7200} ))
-}
+)
 check "backup objects in platform-backup (PostgreSQL base backups, OpenBao snapshot < 2h)" ops_backup_objects
 if [[ "${VERIFY_RESTORE_TEST:-1}" == "1" ]]; then
   check "restore test (PITR into a scratch cluster + OpenBao snapshot integrity)" \

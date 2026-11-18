@@ -55,8 +55,10 @@ icurl() { # icurl <host> <path> [curl args]
 step "cluster"
 check "kube-apiserver ready" kubectl get --raw /readyz
 check "all nodes Ready" bash -c '! kubectl get nodes --no-headers | grep -v " Ready "'
-check "no pod in a failed/pending state" bash -c \
-  '! kubectl get pods -A --no-headers --field-selector=status.phase!=Running,status.phase!=Succeeded | grep .'
+# failed attempts of a Job that later completed (retry after a restart) are not a problem
+check "no pod in a failed/pending state (except retried attempts of completed Jobs)" bash -c \
+  'done_jobs=$(kubectl get jobs -A -o json | jq -c "[.items[] | select(any(.status.conditions[]?; .type == \"Complete\" and .status == \"True\")) | .metadata.namespace + \"/\" + .metadata.name]");
+   ! kubectl get pods -A -o json --field-selector=status.phase!=Running,status.phase!=Succeeded | jq -r --argjson done "$done_jobs" ".items[] | (.metadata.namespace + \"/\" + ([(.metadata.ownerReferences // [])[] | select(.kind == \"Job\") | .name][0] // \"-\")) as \$j | select(\$done | index(\$j) | not) | .metadata.namespace + \"/\" + .metadata.name + \" \" + .status.phase" | grep .'
 check "all containers of running pods are ready" bash -c \
   '! kubectl get pods -A --field-selector=status.phase=Running -o json | jq -e -r ".items[] | select(any(.status.containerStatuses[]?; .ready == false)) | .metadata.namespace + \"/\" + .metadata.name" | grep .'
 if [[ "$CLUSTER_MODE" == "podman" ]]; then
@@ -129,7 +131,7 @@ check "certificate issued by the OpenBao PKI and chains to the platform CA" issu
 # ------------------------------------------------------------------------------
 step "External Secrets"
 check "namespaced SecretStores Ready (every namespace with secrets access)" bash -c \
-  '! kubectl get secretstores.external-secrets.io -A -o json | jq -e -r ".items[] | select(any(.status.conditions[]?; .type == \"Ready\" and .status != \"True\")) | .metadata.namespace + \"/\" + .metadata.name" | grep . && [[ \$(kubectl get secretstores.external-secrets.io -A --no-headers | wc -l) -ge 10 ]]'
+  '! kubectl get secretstores.external-secrets.io -A -o json | jq -e -r ".items[] | select(any(.status.conditions[]?; .type == \"Ready\" and .status != \"True\")) | .metadata.namespace + \"/\" + .metadata.name" | grep . && [[ $(kubectl get secretstores.external-secrets.io -A --no-headers | wc -l) -ge 10 ]]'
 check "all ExternalSecrets synced" bash -c \
   '! kubectl get externalsecret -A -o json | jq -e -r ".items[] | select(any(.status.conditions[]?; .type == \"Ready\" and .status != \"True\")) | .metadata.namespace + \"/\" + .metadata.name" | grep .'
 check "all PushSecrets synced" bash -c \
