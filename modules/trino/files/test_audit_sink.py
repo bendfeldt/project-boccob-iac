@@ -27,6 +27,21 @@ class Redaction(unittest.TestCase):
         self.assertNotIn(KEY, out)
         self.assertNotIn("311299-0001", out)
 
+    def test_full_event_mode_redacts_every_field(self):
+        event = {
+            "metadata": {"query": f"select 1 where k = '{KEY}'", "preparedQuery": f"select ? -- {KEY}", "plan": "x 010190-1234"},
+            "failureInfo": {"failureMessage": f"line 1: '{KEY}' not found", "failuresJson": "[\"0101901234\"]"},
+            "context": {"user": "svc-dagster", "groups": ["data-engineer"]},
+            "ioMetadata": {"inputs": [{"columns": [{"column": "citizen_id"}]}]},
+            "createTime": 1,
+        }
+        out = json.dumps(audit_sink.redact_all(event))
+        self.assertNotIn(KEY, out)
+        self.assertNotIn("1234", out)
+        self.assertIn("svc-dagster", out)
+        self.assertIn("citizen_id", out)
+        self.assertIn('"createTime": 1', out)
+
     def test_ordinary_sql_untouched(self):
         for q in (
             "select count(*) from curated.borgerservice.fact_payment where amount > 1000000",

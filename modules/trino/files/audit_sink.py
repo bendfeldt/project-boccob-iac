@@ -9,7 +9,9 @@ Redaction (GDPR: the audit archive is WORM and can never be erased): string
 literals that look like a pseudonymised subject key (64 hex characters) or a
 CPR number (DDMMYY-NNNN / DDMMYYNNNN) are replaced in the query text before
 the record is written, so neither an erasure nor an ad-hoc lookup of a person
-puts the identifier into the archive. The query shape stays auditable.
+puts the identifier into the archive. The query shape stays auditable. With
+AUDIT_FULL_EVENTS=true every string field of the event is redacted the same way
+(preparedQuery, failureInfo messages, plans, ...; audit N-10).
 Python standard library only.
 """
 
@@ -35,6 +37,18 @@ def redact(text):
     for pattern in _PATTERNS:
         text = pattern.sub(REDACTED, text)
     return text
+
+
+def redact_all(value):
+    """Redact every string anywhere in a structure (full-event mode: the query, the
+    prepared query, failure messages, plans and any other field can echo literals)."""
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, list):
+        return [redact_all(v) for v in value]
+    if isinstance(value, dict):
+        return {k: redact_all(v) for k, v in value.items()}
+    return value
 
 
 def subset(event):
@@ -79,9 +93,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             event = json.loads(raw)
             if FULL:
-                out = event
-                if "metadata" in out and "query" in out["metadata"]:
-                    out["metadata"]["query"] = redact(out["metadata"]["query"])
+                out = redact_all(event)
             else:
                 out = subset(event)
             sys.stdout.write(json.dumps(out, separators=(",", ":")) + "\n")
