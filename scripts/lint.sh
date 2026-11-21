@@ -34,6 +34,26 @@ for d in "${REPO_ROOT}"/stacks/[0-9]*/; do
   fi
 done
 
+step "HA profile: RustFS PodDisruptionBudget (audit L6)"
+# the module enables the chart's PDB whenever RustFS runs distributed (HA); the
+# chart renders it only in distributed mode, so dev (single pod) has none
+if grep -Eq 'pdb[[:space:]]*=[[:space:]]*\{[[:space:]]*create[[:space:]]*=[[:space:]]*var\.distributed' "${REPO_ROOT}/modules/rustfs/main.tf"; then
+  rustfs_chart="${BOCCOB_CACHE_DIR}/charts/rustfs-$(yq -r '.charts.rustfs.version' "$VERSIONS_FILE").tgz"
+  if [[ -f "$rustfs_chart" ]] && command -v helm >/dev/null; then
+    if helm template lint "$rustfs_chart" -n storage --set secret.existingSecret=lint \
+         --set mode.distributed.enabled=true --set mode.standalone.enabled=false \
+         --set pdb.create=true --set pdb.maxUnavailable=1 2>/dev/null | grep -q '^kind: PodDisruptionBudget'; then
+      log "RustFS chart renders a PodDisruptionBudget in distributed mode"
+    else
+      err "RustFS chart does not render a PDB in distributed mode"; rc=1
+    fi
+  else
+    warn "RustFS chart not in ${BOCCOB_CACHE_DIR}/charts: only the module setting was checked"
+  fi
+else
+  err "modules/rustfs: pdb.create must follow var.distributed (HA profile)"; rc=1
+fi
+
 step "lock file"
 want="$(yq -c '{images: (.images | map_values({source, tag})), charts: (.charts | map_values({repo, name, version}))}' "$VERSIONS_FILE")"
 have="$(yq -c '{images: (.images | map_values({source, tag})), charts: (.charts | map_values({repo, name, version}))}' "$LOCK_FILE")"
