@@ -55,10 +55,36 @@ icurl() { # icurl <host> <path> [curl args]
 step "cluster"
 check "kube-apiserver ready" kubectl get --raw /readyz
 check "all nodes Ready" bash -c '! kubectl get nodes --no-headers | grep -v " Ready "'
-# failed attempts of a Job that later completed (retry after a restart) are not a problem
-check "no pod in a failed/pending state (except retried attempts of completed Jobs)" bash -c \
-  'done_jobs=$(kubectl get jobs -A -o json | jq -c "[.items[] | select(any(.status.conditions[]?; .type == \"Complete\" and .status == \"True\")) | .metadata.namespace + \"/\" + .metadata.name]");
-   ! kubectl get pods -A -o json --field-selector=status.phase!=Running,status.phase!=Succeeded | jq -r --argjson done "$done_jobs" ".items[] | (.metadata.namespace + \"/\" + ([(.metadata.ownerReferences // [])[] | select(.kind == \"Job\") | .name][0] // \"-\")) as \$j | select(\$done | index(\$j) | not) | .metadata.namespace + \"/\" + .metadata.name + \" \" + .status.phase" | grep .'
+# Not a problem (listed as warnings): failed attempts of a Job that later
+# completed; pods EVICTED for node pressure (their controller already replaced
+# them; audit R3-6); failed runs of a CronJob whose most recent run completed.
+failed_pods() {
+  local done_jobs cron_ok
+  done_jobs="$(kubectl get jobs -A -o json | jq -c '[.items[] | select(any(.status.conditions[]?; .type == "Complete" and .status == "True")) | .metadata.namespace + "/" + .metadata.name]')"
+  # CronJobs whose newest Job completed: older failed runs are history, not state
+  cron_ok="$(kubectl get jobs -A -o json | jq -c '
+    [.items[] | select(.metadata.ownerReferences[]?.kind == "CronJob")
+     | {cj: (.metadata.namespace + "/" + (.metadata.ownerReferences[] | select(.kind == "CronJob") | .name)),
+        t: .metadata.creationTimestamp,
+        ok: any(.status.conditions[]?; .type == "Complete" and .status == "True")}]
+    | group_by(.cj) | map(max_by(.t)) | map(select(.ok) | .cj)')"
+  kubectl get pods -A -o json --field-selector=status.phase!=Running,status.phase!=Succeeded | jq -r \
+    --argjson donejobs "$done_jobs" --argjson cronok "$cron_ok" '.items[]
+    | (.metadata.namespace + "/" + ([(.metadata.ownerReferences // [])[] | select(.kind == "Job") | .name][0] // "-")) as $j
+    | (.metadata.namespace + "/" + ($j | split("/")[1] | sub("-[0-9]+$"; ""))) as $cj
+    | if ($donejobs | index($j)) then empty
+      elif .status.reason == "Evicted" then "WARN evicted " + .metadata.namespace + "/" + .metadata.name
+      elif ($cronok | index($cj)) then "WARN old CronJob run " + .metadata.namespace + "/" + .metadata.name
+      else .metadata.namespace + "/" + .metadata.name + " " + .status.phase end'
+}
+failed_pods_check() {
+  local out
+  out="$(failed_pods)"
+  [[ -n "$out" ]] && echo "$out"
+  grep -q '^WARN' <<<"$out" && warn "$(grep -c '^WARN' <<<"$out") evicted pod(s) / old failed CronJob runs left (kubectl delete pod --field-selector=status.phase=Failed -A to clean up)"
+  ! grep -qv '^WARN' <<<"$out"
+}
+check "no pod in a failed/pending state (evicted pods and old CronJob runs are warnings)" failed_pods_check
 check "all containers of running pods are ready" bash -c \
   '! kubectl get pods -A --field-selector=status.phase=Running -o json | jq -e -r ".items[] | select(any(.status.containerStatuses[]?; .ready == false)) | .metadata.namespace + \"/\" + .metadata.name" | grep .'
 if [[ "$CLUSTER_MODE" == "podman" ]]; then
