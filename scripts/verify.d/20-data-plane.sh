@@ -98,6 +98,37 @@ if kubectl get namespace catalog query orchestration >/dev/null 2>&1; then
   check "purge guard: the run launcher may start an erasure Job with lakehouse-purge-env" dp_purge_guard_allows_erasure
   check "purge guard: the run launcher may NOT attach lakehouse-purge-env to another job (transform)" dp_purge_guard_denies_other_job
   check "purge guard: a run pod's ServiceAccount may NOT create a Job or Pod with lakehouse-purge-env" dp_purge_guard_denies_run_sa
+  # run-tag injection (audit R3-1): a Dagster UI user forges a dagster-k8s/config tag
+  # on a non-purge job; the launcher's allowlist or the admission policy must stop
+  # it before any Job exists (the run fails, no Job with its run id)
+  dp_forged_run() { # dp_forged_run <dagster-k8s/config JSON> -> "refused" or details
+    local tags run status jobs
+    tags="$(jq -cn --arg v "$1" '[{key: "dagster-k8s/config", value: $v}]')"
+    run="$(dp_dagster_launch migrate "" "$tags")" || { echo "launch failed"; return 1; }
+    dp_dagster_wait "$run" 300 >/dev/null 2>&1 || true
+    status="$(dp_dagster_status "$run")"
+    jobs="$(kubectl -n orchestration get job -l "dagster/run-id=${run}" --no-headers 2>/dev/null | wc -l)"
+    echo "run ${run}: ${status}, ${jobs} Job(s): $(dp_dagster_failure "$run" | grep -oE 'violated the allowed list: [a-z_.]+|DagsterK8sUnrecoverableAPIError' | head -1)"
+    [[ "$status" == FAILURE && "$jobs" == 0 ]]
+  }
+  purge_from='{"secret_ref": {"name": "lakehouse-purge-env"}}'
+  check "tag injection: command override + purge Secret on a non-purge job is refused" \
+    dp_forged_run '{"container_config": {"command": ["sh", "-c", "env"], "env_from": ['"$purge_from"']}}'
+  check "tag injection: purge Secret on a non-purge job is refused (admission: dagster/job)" \
+    dp_forged_run '{"container_config": {"env_from": ['"$purge_from"']}}'
+  check "tag injection: forged dagster/job label is refused" \
+    dp_forged_run '{"pod_template_spec_metadata": {"labels": {"dagster/job": "erasure"}}, "container_config": {"env_from": ['"$purge_from"']}}'
+  # the run-job policy itself: the launcher's identity cannot create a Job with a custom command
+  dp_run_job_admit() { # dp_run_job_admit <command JSON or null> -> allowed|denied
+    local cmd="$1" img
+    img="$(kubectl -n orchestration get deploy dagster-code-dagster-user-deployments-lakehouse -o jsonpath='{.spec.template.spec.containers[0].image}')"
+    local obj='{"apiVersion":"batch/v1","kind":"Job","metadata":{"name":"verify-run-guard","namespace":"orchestration","labels":{"dagster/job":"migrate"}},"spec":{"template":{"metadata":{"labels":{"dagster/job":"migrate"}},"spec":{"restartPolicy":"Never","securityContext":{"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"dagster","image":"'"$img"'","command":'"$cmd"',"args":["dagster","api","execute_run","{}"],"env":[{"name":"DAGSTER_RUN_JOB_NAME","value":"migrate"}],"securityContext":{"allowPrivilegeEscalation":false,"readOnlyRootFilesystem":true,"runAsNonRoot":true,"capabilities":{"drop":["ALL"]}},"resources":{"requests":{"cpu":"5m","memory":"16Mi"},"limits":{"memory":"32Mi"}}}]}}}}'
+    if kubectl create --dry-run=server --as="$dp_daemon_sa" -f - <<<"$obj" >/dev/null 2>"${tmp}/run-guard.err"; then echo allowed
+    elif grep -q "orchestration-dagster-run-jobs" "${tmp}/run-guard.err"; then echo denied
+    else echo "error: $(head -c 200 "${tmp}/run-guard.err")"; fi
+  }
+  dp_run_guard() { [[ "$(dp_run_job_admit null)" == allowed && "$(dp_run_job_admit '["sh","-c","env"]')" == denied ]]; }
+  check "run-job policy: the launcher may create a standard run Job, not one with a custom command" dp_run_guard
   # supply chain: the artefacts the cluster actually runs carry the platform signature
   dp_solution_refs() {
     kubectl -n orchestration get deploy dagster-code-dagster-user-deployments-lakehouse -o jsonpath='{.spec.template.spec.containers[0].image}'
