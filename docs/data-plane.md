@@ -28,11 +28,15 @@ stack measured on dev: 20-catalog ~180 kB.
 ## Solution artefacts (the only interface to the solution repository)
 
 ```
-cd ../project-boccob
-export REGISTRY=registry.dev.lakehouse.internal:5000 REGISTRY_USERNAME=mirror
-export REGISTRY_PASSWORD="$(cat ~/.boccob/dev/registry/push-password)"   # never on the command line in prod
-make image image-push bundle bundle-push       # -> dist/image/image.ref, dist/opa/bundle.ref
+make release-publish ENV=dev            # SOLUTION_DIR=../project-boccob (default), SBOM=0, SKIP_BUILD=1
+make solution-bundle ENV=test BUNDLE=<dir> REFS="<image ref> <bundle ref>"   # air gap: export
+make solution-load   ENV=prod BUNDLE=<dir>                                   # air gap: import + verify
 ```
+
+`release-publish` wraps the solution's publish targets (its docs/releases.md,
+"Publishing": `REGISTRY`, `REGISTRY_HOST`, `REGISTRY_CA_FILE`,
+`REGISTRY_USERNAME`/`REGISTRY_PASSWORD`, `VERSION`) and signs the results; no
+host trust store is modified (patching runbook, "Solution release").
 
 Put the two digest references into `environments/<env>/22-orchestration.tfvars`
 (`dagster_code_location_image`) and `environments/<env>/21-query.tfvars`

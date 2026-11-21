@@ -18,7 +18,7 @@ help: ## Show this help
 	@echo; echo "  Variables: ENV=dev|test|prod  STACK=<stacks/NN-*>  GROUPS=cluster,foundation,...  BUNDLE=<dir>"
 
 # --- versions / air-gap ---------------------------------------------------------
-.PHONY: lock tools airgap-mirror airgap-bundle airgap-load airgap-check providers-mirror node-bundle
+.PHONY: lock tools airgap-mirror airgap-bundle airgap-load airgap-check providers-mirror node-bundle solution-bundle solution-load release-publish
 lock: ## Resolve versions.yaml -> versions.lock.yaml (needs internet)
 	$(S)/lock-update.sh
 tools: ## Install pinned cosign/trivy/syft into ~/.cache/boccob/bin
@@ -31,6 +31,12 @@ airgap-load: ## Air-gapped: push a bundle (BUNDLE=<dir>) into Zot
 	MIRROR_GROUPS=$(GROUPS) $(S)/airgap/mirror.sh load $(ENV) $(BUNDLE)
 airgap-check: ## Verify Zot holds every locked image (by digest) and chart
 	MIRROR_GROUPS=$(GROUPS) $(S)/airgap/mirror.sh check $(ENV)
+solution-bundle: ## Connected: export solution artefacts + signatures by digest (BUNDLE=<dir> REFS="<image@sha256:..> <bundle@sha256:..>")
+	$(S)/airgap/solution.sh bundle $(ENV) $(BUNDLE) $(REFS)
+solution-load: ## Air-gapped: load a solution bundle (BUNDLE=<dir>) into Zot and verify digests + signatures
+	$(S)/airgap/solution.sh load $(ENV) $(BUNDLE)
+release-publish: ## Build, push and sign a solution release into Zot (SOLUTION_DIR=.. VERSION=.. SBOM=0 SKIP_BUILD=1)
+	$(S)/release/publish.sh $(ENV)
 providers-mirror: ## Mirror OpenTofu providers for offline `tofu init`
 	$(S)/airgap/providers-mirror.sh $(BUNDLE)
 node-bundle: ## Build the k3s node bundle for test/prod hosts

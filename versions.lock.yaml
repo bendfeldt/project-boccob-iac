@@ -423,3 +423,10 @@ binaries:
     groups:
       - tools
     sha256: bf52519eb57f675d47c07d43213cb6dff6449f3d6d1147ff6701ed91f44eef0c
+  oras:
+    url: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_linux_amd64.tar.gz
+    file: oras.tar.gz
+    extract: oras
+    groups:
+      - tools
+    sha256: 66fb0ad7206f3f6fa77ed5b552049d364ccf4b50b1684554f731f76302b52ca0

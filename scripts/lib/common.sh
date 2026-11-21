@@ -119,7 +119,7 @@ lock_keys() {
     | ($ex | split(",") | map(select(length > 0))) as $x
     | .[$kind] | to_entries[]
     | select(($g | length) == 0 or ((.value.groups // []) | any(. as $y | $g | index($y))))
-    | select(($x | length) == 0 or ((.value.groups // []) | length == 0) or ((.value.groups // []) | all(. as $y | $x | index($y))) | not)
+    | select(($x | length) == 0 or ((.value.groups // []) | length == 0) or (((.value.groups // []) | all(. as $y | $x | index($y))) | not))
     | .key'
 }
 # image_zot_repo <key>      -> <registry>/<source>

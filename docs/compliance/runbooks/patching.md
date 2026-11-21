@@ -30,6 +30,29 @@ The solution's release procedure is `project-boccob/docs/releases.md`; a
 release may carry schema migrations that rewrite lake data (not reversible
 without a backup). On the platform side, per environment (test first):
 
+0. **Publish** (connected build host that reaches the environment's Zot):
+   `make release-publish ENV=<env>` with `SOLUTION_DIR=<checkout of the solution
+   repository at the release commit>` (default `../project-boccob`). It runs the
+   solution's `make image image-push bundle bundle-push` with `REGISTRY` /
+   `REGISTRY_HOST` = the Zot of `<env>`, `REGISTRY_CA_FILE` = its CA
+   (`~/.boccob/<env>/pki/registry-ca.crt`; passed per call, nothing in `/etc`),
+   the push credentials (`REGISTRY_PASSWORD`, default the env's push-password
+   file), `NO_PROXY` for the internal names and, when `HTTPS_PROXY` is set, the
+   proxy and its CA for the image build (`BUILD_PROXY`, `BUILD_CA_BUNDLE`,
+   `BUILD_NETWORK=host`). Then it signs and verifies both artefacts with the
+   environment's transit key and prints the two references for the tfvars.
+   `SBOM=0` skips the build-time SBOM/scan on a disk-constrained host,
+   `SKIP_BUILD=1` re-pushes what was built (same digests).
+   **Air-gapped environment** (no route from the build host): publish to the
+   connected environment (test), then
+   `make solution-bundle ENV=test BUNDLE=<dir> REFS="<image ref> <bundle ref>"`
+   (image + OPA bundle by digest with their referrers - the cosign signature
+   bundles - as OCI layouts, `artefacts.json`, `SHA256SUMS`), carry `<dir>`
+   across, and `make solution-load ENV=prod BUNDLE=<dir>`: checksums, copy into
+   the prod Zot under the same repository path with unchanged digests, then the
+   signature check with the prod key. An environment with its own signing key
+   re-signs after its review (`make sign ENV=prod REFS=...`), otherwise
+   `solution-load` fails the signature check by design.
 1. **Lake backup before the deployment**: `make backup ENV=<env> WHAT=lake` —
    base backup of `polaris-db` (the Iceberg table pointers) and a run of the
    off-site lake copy (`offsite-lake-copy`), both at the same point in time;

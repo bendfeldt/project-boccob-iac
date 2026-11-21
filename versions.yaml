@@ -311,3 +311,9 @@ binaries:
     file: syft.tar.gz
     extract: syft
     groups: [tools]
+  oras:
+    # OCI artefacts with referrers (OPA bundle, cosign signature bundles): solution air-gap path
+    url: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_linux_amd64.tar.gz
+    file: oras.tar.gz
+    extract: oras
+    groups: [tools]

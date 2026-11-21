@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the pinned supply-chain tools (cosign, trivy, syft) from
+# Install the pinned supply-chain tools (cosign, trivy, syft, oras) from
 # versions.lock.yaml into ${BOCCOB_CACHE_DIR}/bin (checksum verified).
 #   BUNDLE_DIR=<airgap bundle>  take the files from the bundle instead of the internet
 # shellcheck source=lib/common.sh
