@@ -122,9 +122,17 @@ kv/pki/pki_int/transit, the kubernetes auth method and its roles, ACL policies
 except its own, PKI, transit key lifecycle; **no** secret values, transit
 signing, raft snapshots, seal, audit devices or token creation; verified on
 dev: kv read, raft snapshot, token create and rewriting its own policy are
-refused). Inherent limit: an identity that manages policies and auth roles can
-grant access indirectly, so the policy contains accidents and a leaked deploy
-token's blast radius, not a malicious operator (four-eyes review of the code).
+refused; no delete of mounts, CA keys/issuers/root or transit keys).
+**The deploy token is privileged** (audit R3-5): it can write ACL policies and
+kubernetes-auth roles, so with access to any ServiceAccount it can grant itself
+`kv/*`. Treat it like an admin token: four-eyes review of every change to the
+OpenBao stacks (11, 20, 21, 22, 30, 31, 32) and of their `make plan` output
+before `make deploy`; its requests are in the OpenBao audit trail.
+Destructive changes are refused twice: `prevent_destroy` on the kv, pki,
+pki_int and transit mounts, the kubernetes auth method, the root CA and the
+cosign key, and `scripts/deploy.sh` refuses any plan that deletes or replaces a
+`vault_*` resource, a CloudNativePG cluster, the RustFS release or a PVC unless
+`ALLOW_DESTROY=<env>` (after a backup and review; audit R3-3).
 
 - dev: `scripts/tofu.sh` uses the root token of the init file only to (re)write
   that policy and mint a 1 h, non-renewable `tofu-deployer` token, hands that

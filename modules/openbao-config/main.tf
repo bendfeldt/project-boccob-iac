@@ -9,6 +9,12 @@ resource "vault_mount" "kv" {
   type        = "kv"
   options     = { version = "2" }
   description = "Platform secrets (KV v2). Layout: ${var.kv_mount}/<namespace>/<name>"
+
+  # irreplaceable (all KV secrets incl. the pepper / the CA keys / the cosign key):
+  # a change that forces replacement must fail instead of wiping it (audit R3-3)
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # --- Kubernetes auth ---------------------------------------------------------------
@@ -16,6 +22,12 @@ resource "vault_auth_backend" "kubernetes" {
   type        = "kubernetes"
   path        = "kubernetes"
   description = "Workload identity: Kubernetes ServiceAccount tokens"
+
+  # irreplaceable (all KV secrets incl. the pepper / the CA keys / the cosign key):
+  # a change that forces replacement must fail instead of wiping it (audit R3-3)
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "vault_kubernetes_auth_backend_config" "this" {
@@ -32,6 +44,12 @@ resource "vault_mount" "pki_root" {
   description               = "Internal root CA"
   default_lease_ttl_seconds = var.pki_root_ttl_hours * 3600
   max_lease_ttl_seconds     = var.pki_root_ttl_hours * 3600
+
+  # irreplaceable (all KV secrets incl. the pepper / the CA keys / the cosign key):
+  # a change that forces replacement must fail instead of wiping it (audit R3-3)
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "vault_pki_secret_backend_root_cert" "root" {
@@ -44,6 +62,11 @@ resource "vault_pki_secret_backend_root_cert" "root" {
   key_type     = "ec"
   key_bits     = 384
   issuer_name  = "root"
+
+  # the root key never leaves OpenBao: replacing it re-issues the whole PKI (audit R3-3)
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "vault_pki_secret_backend_config_urls" "root" {
@@ -58,6 +81,12 @@ resource "vault_mount" "pki_int" {
   description               = "Internal issuing CA (cert-manager ClusterIssuer)"
   default_lease_ttl_seconds = var.pki_max_leaf_ttl_hours * 3600
   max_lease_ttl_seconds     = var.pki_intermediate_ttl_hours * 3600
+
+  # irreplaceable (all KV secrets incl. the pepper / the CA keys / the cosign key):
+  # a change that forces replacement must fail instead of wiping it (audit R3-3)
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "vault_pki_secret_backend_intermediate_cert_request" "int" {

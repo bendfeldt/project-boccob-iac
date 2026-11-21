@@ -4,6 +4,8 @@
 #   scripts/deploy.sh <env>            all stacks (stacks/NN-*), lowest number first
 #   scripts/deploy.sh <env> <stack>    one stack
 #   PLAN_ONLY=1 scripts/deploy.sh ...  plan instead of apply
+#   ALLOW_DESTROY=<env>                 accept a plan that deletes/replaces OpenBao
+#                                       (vault_*), CNPG clusters, RustFS, PVCs
 #
 # Per-stack settings live in stacks/<stack>/stack.env:
 #   STACK_NEEDS_OPENBAO=1      tofu needs an authenticated OpenBao connection
@@ -12,7 +14,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 load_env "${1:-${ENV:-}}"
 only="${2:-${STACK:-}}"
-require_cmd tofu kubectl
+require_cmd tofu kubectl jq
 
 kubectl get --raw /readyz >/dev/null 2>&1 || die "cluster not reachable with ${KUBECONFIG} (make cluster-up ENV=${ENV})"
 
@@ -32,6 +34,29 @@ if [[ "$ENV" == "prod" || "${REQUIRE_POLICY_ENFORCE:-0}" == "1" ]] && ! policy_e
     die "environments/${ENV}/31-policy.tfvars must set policy_mode and signature_mode to \"Enforce\" (or POLICY_AUDIT_ACK=${ENV} for a documented, temporary exception)"
   fi
 fi
+
+# destroy_guard <stack> <plan file>: a saved plan that deletes or replaces an
+# irreplaceable resource is refused unless ALLOW_DESTROY=<env>:
+#   vault_* (OpenBao mounts, auth, policies, roles, PKI, transit keys),
+#   CloudNativePG clusters, the RustFS release, PersistentVolumeClaims.
+# (Buckets are never deleted by OpenTofu: the RustFS provisioning Job only creates.)
+destroy_guard() {
+  local stack="$1" plan="$2" hits
+  hits="$("${REPO_ROOT}/scripts/tofu.sh" "$ENV" "$stack" show -json "$plan" | jq -r '
+    [.resource_changes[]? | select(.change.actions | index("delete"))
+     | select((.type | startswith("vault_"))
+              or (.type == "kubernetes_manifest" and ((.change.before.manifest.kind // "") == "Cluster")
+                  and ((.change.before.manifest.apiVersion // "") | startswith("postgresql.cnpg.io")))
+              or (.type == "helm_release" and (.address | test("module\\.rustfs\\.")))
+              or (.type | startswith("kubernetes_persistent_volume_claim")))
+     | "\(.address) (\(.change.actions | join("+")))"] | .[]')" || die "cannot read plan ${plan}"
+  [[ -z "$hits" ]] && return 0
+  if [[ "${ALLOW_DESTROY:-}" == "$ENV" ]]; then
+    warn "plan of ${stack} deletes/replaces irreplaceable resources (ALLOW_DESTROY=${ENV}):"$'\n'"${hits}"
+  else
+    die "plan of ${stack} would delete or replace irreplaceable resources:"$'\n'"${hits}"$'\n'"review it (make plan ENV=${ENV} STACK=${stack}); set ALLOW_DESTROY=${ENV} only after a backup and four-eyes review"
+  fi
+}
 
 stacks=()
 if [[ -n "$only" ]]; then
@@ -56,7 +81,14 @@ for stack in "${stacks[@]}"; do
   fi
 
   step "apply ${stack} (${ENV})"
-  "${REPO_ROOT}/scripts/tofu.sh" "$ENV" "$stack" apply -auto-approve
+  # plan to a file, refuse destructive changes of irreplaceable resources, then
+  # apply exactly that plan (audit R3-3)
+  plan_file="${STATE_DIR}/tofu/${stack}.tfplan"
+  mkdir -p "$(dirname "$plan_file")"; rm -f "$plan_file"
+  "${REPO_ROOT}/scripts/tofu.sh" "$ENV" "$stack" plan -out="$plan_file"
+  destroy_guard "$stack" "$plan_file"
+  "${REPO_ROOT}/scripts/tofu.sh" "$ENV" "$stack" apply "$plan_file"
+  rm -f "$plan_file"
 
   if [[ -n "$STACK_POST_APPLY" ]]; then
     step "post-apply ${stack}: ${STACK_POST_APPLY}"

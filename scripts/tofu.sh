@@ -144,6 +144,8 @@ case "$action" in
   init)     tofu_init "$@" ;;
   validate) tofu_init; tofu -chdir="$stack_dir" validate "$@" ;;
   plan|apply|destroy|refresh|import)
+            # a saved plan carries its variables: no -var-file then
+            if [[ "$action" == apply && "${1:-}" == *.tfplan ]]; then var_files=(); fi
             tofu_init; tofu -chdir="$stack_dir" "$action" -input=false "${var_files[@]}" "$@"
             # state Secret size (hard limit 1 MiB: beyond it an apply cannot persist its state)
             if [[ "$action" == apply ]]; then

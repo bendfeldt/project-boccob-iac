@@ -70,6 +70,12 @@ resource "vault_mount" "transit" {
   path        = "transit"
   type        = "transit"
   description = "Signing keys (cosign) — keys are created non-exportable"
+
+  # irreplaceable (all KV secrets incl. the pepper / the CA keys / the cosign key):
+  # a change that forces replacement must fail instead of wiping it (audit R3-3)
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "vault_transit_secret_backend_key" "cosign" {
@@ -78,6 +84,12 @@ resource "vault_transit_secret_backend_key" "cosign" {
   type             = "ecdsa-p256"
   exportable       = false
   deletion_allowed = false
+
+  # irreplaceable (all KV secrets incl. the pepper / the CA keys / the cosign key):
+  # a change that forces replacement must fail instead of wiping it (audit R3-3)
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # Release engineers / the publishing job get this policy: sign and read the
