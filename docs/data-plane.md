@@ -242,9 +242,27 @@ N-3 it is handed only to the runs that need it:
   (Pod). Run pods' own ServiceAccount may create Jobs and Pods (chart RBAC), so
   without the creator rule a compromised ingestion run could mount the Secret.
   `make verify` checks all three cases with server-side dry runs.
-- Residual: anyone allowed into the Dagster UI (`platform-admin`,
-  `data-engineer`) can launch a purge job, including with extra run tags; that
-  is the intended authority over erasure/retention/maintenance.
+- Run-tag injection (audit R3-1): the K8sRunLauncher runs with
+  `only_allow_user_defined_k8s_config_fields` (configured through the chart's
+  CustomRunLauncher; the chart has no value for it): a run may only use the
+  fields the code location's container context needs (container env, env_from,
+  volume_mounts, resources, image_pull_policy; pod volumes, service account,
+  token automount, security context; template annotations; namespace) - no
+  command, args, image, labels or init containers - and only the contract's env
+  var names. The code location therefore carries no labels (run labels come
+  from the launcher), so `dagster/job` cannot be forged. A second
+  ValidatingAdmissionPolicy (`orchestration-dagster-run-jobs`) admits a Job from
+  the launcher only with one container, no command, args
+  `dagster api execute_run|resume_run`, the deployed code location image,
+  `dagster/job` == `DAGSTER_RUN_JOB_NAME` and only the contract's Secrets.
+  `make verify` launches three forged runs (command + purge Secret, purge
+  Secret on `migrate`, forged label) and expects each to fail without a Job.
+  Note: the allowlist cannot be `{container_config: {env_from: true}}` alone -
+  dagster-k8s validates the code location's container context together with
+  the tags, so every field the context sets must be allowed.
+- Residual: anyone allowed into the Dagster UI can launch the purge jobs
+  themselves; test/prod restrict `dagster_ui_groups` to `platform-admin` and
+  the access review treats UI access as privileged.
 
 Solution side (`orchestration/jobs.py`, solution commit 4d79fed): with
 `PURGE_CREDENTIALS_SECRET` set, the jobs `erasure`, `retention` and
