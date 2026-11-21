@@ -3,7 +3,7 @@
 ## Layers and stacks
 
 ```
- versions.yaml -> make lock -> versions.lock.yaml  (image digests, chart + binary sha256)
+ versions.yaml -> make lock -> versions.lock.yaml  (image digests per arch, chart + binary sha256)
         |
         v
  Zot registry (images + charts as OCI)  <- make airgap-mirror | airgap-bundle -> airgap-load
@@ -44,6 +44,8 @@ Stacks never read each other's state; they share **well-known names**
 | Install | `scripts/cluster/dev-up.sh` | node bundle + `scripts/cluster/host-install.sh` (air-gap: binary + images tarball) |
 | Registry | Zot Podman container on the same podman network | Zot on a registry host (same config), reachable as `registry.<env>.lakehouse.internal:5000` |
 | Config | one renderer for all: `scripts/lib/k3s-config.sh` | same |
+| Architecture | the machine's (`uname -m`), or the podman machine's on macOS: amd64 or arm64 | `CLUSTER_ARCH` in `env.sh` (default amd64); one per cluster |
+| Container host | Linux: podman as root on the machine; macOS: a rootful `podman machine` VM (`CLUSTER_RUNTIME=podman-machine`) | the nodes |
 
 Hardening (k3s CIS guide): secrets encryption at rest, `protect-kernel-defaults`,
 API audit policy + JSON audit log (`/var/log/kubernetes/audit/audit.log` on

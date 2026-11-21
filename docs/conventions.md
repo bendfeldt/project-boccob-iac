@@ -97,9 +97,12 @@ environments/<env>/NN-name.tfvars        (optional sizing per environment)
 
 1. Add the entry to `versions.yaml` (`images:` with `source`, `tag`, `groups`;
    `charts:` with `repo` (https or oci), `name`, `version`, `groups`).
-2. `make lock` (resolves the linux/amd64 digest / chart sha256 into `versions.lock.yaml`).
+2. `make lock` (resolves one manifest digest per platform, linux/amd64 and linux/arm64, plus
+   the index digest / chart sha256 into `versions.lock.yaml`; a platform the image does not
+   publish is listed under `missing_platforms`, see [versions.md](versions.md)).
 3. `make airgap-mirror ENV=dev GROUPS=<group>` and `make airgap-check ENV=dev`.
-4. Reference it: `module.versions.images["<key>"].ref` (or `.repository` /
+4. Reference it (the digest of the cluster's architecture, `var.cluster_arch`, is selected for you):
+   `module.versions.images["<key>"].ref` (or `.repository` /
    `.tag_digest` / `.registry` + `.repository_path` for charts),
    `module.versions.charts["<key>"]`.
 

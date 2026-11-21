@@ -1,21 +1,25 @@
 # Getting started: run the Boccob lakehouse yourself
 
 This guide is for a developer who is new to the project. By the end you will have the whole
-platform running, with the demo data loaded through all four layers. You can run it in two places:
+platform running, with the demo data loaded through all four layers. You can run it in three places:
 
-- **Part A**: on your own machine, as containers.
+- **Part A**: on your own Linux machine (x64 or arm64), as containers.
 - **Part B**: on a Linux virtual machine (VM) that you host yourself, for example on your laptop,
   a workstation or a lab server.
+- **Part C**: on a Mac with Apple Silicon (M1 to M4), inside a rootful `podman machine`.
 
-Both parts install the same thing: a single-node Kubernetes cluster (k3s) running inside a Podman
+All parts install the same thing: a single-node Kubernetes cluster (k3s) running inside a Podman
 container, plus a private image registry (Zot). That is the `dev` environment. The `test` and `prod`
 environments install k3s directly on several servers instead; they are covered in
 [runbook-bootstrap.md](runbook-bootstrap.md) and are not needed to get started.
 
-> **What has been tested.** The steps in Part A were run end to end on Ubuntu 24.04 on x86_64 (amd64), as
-> `root`, with 4 CPU cores and 15 GB RAM. The result was `make verify ENV=dev` passing all checks and
-> `scripts/dev/e2e.sh dev` passing 39/39. macOS, Windows/WSL2 and the "k3s directly on the VM" variant
-> (Part B, option 2) have **not** been tested. Where this guide describes them, it says so.
+> **What has been tested.** The steps in Part A were run end to end on Ubuntu 24.04 on x64 (x86_64,
+> amd64), as `root`, with 4 CPU cores and 15 GB RAM. The result was `make verify ENV=dev` passing all
+> checks and `scripts/dev/e2e.sh dev` passing 39/39. **Not tested:** Part C (macOS / podman machine;
+> its code paths were only exercised with stand-ins for `podman` and `uname` on Linux), any arm64
+> cluster (the arm64 image digests and binary checksums are resolved and verified against upstream,
+> but nothing has run on arm64 yet), Windows/WSL2 and the "k3s directly on the VM" variant (Part B,
+> option 2). Where this guide describes them, it says so.
 
 ---
 
@@ -45,13 +49,18 @@ are up and running.
 
 | | Minimum (tested) | Comfortable |
 |---|---|---|
-| CPU | 4 cores, x86_64 / amd64 | 8 cores |
-| RAM | 16 GB | 24 GB+ |
-| Free disk | 40 GB (tight: you will have to prune images) | 80 GB+ |
+| CPU | 4 cores, x64 (x86_64/amd64) or arm64 (aarch64) | 8 cores |
+| RAM | 16 GB (Mac: 24 GB, the VM takes 16) | 24 GB+ (Mac: 32 GB) |
+| Free disk | 40 GB (tight: you will have to prune images) | 80 GB+ (Mac: 100 GB+) |
 
-> **amd64 only.** Every image and binary is pinned to `linux/amd64` (see `versions.lock.yaml`). On an
-> Apple Silicon Mac (M1–M4) or another ARM machine, the cluster would have to run under x86
-> emulation, which is far too slow. Use Part B with an x86 VM on another machine instead.
+> **Two architectures.** `versions.lock.yaml` pins every image twice, once per platform
+> (`linux/amd64` and `linux/arm64`), and every downloaded binary per platform. The cluster uses
+> the digests of its own architecture, which the scripts detect (`uname -m` on Linux, the podman
+> machine on macOS). Other architectures (32-bit x86, 32-bit ARM, ppc64le, ...) are refused with a
+> clear message. Details: [versions.md](versions.md).
+>
+> `make doctor ENV=dev` checks this machine (architecture, tools, podman, resources, ports) and
+> changes nothing. Run it whenever something does not work.
 
 ### Network
 
@@ -65,9 +74,9 @@ that, the cluster itself never talks to the internet. If you are behind a compan
 - `get.helm.sh`, `registry.opentofu.org`, `pypi.org` / `files.pythonhosted.org`
 - the Helm chart repositories in `versions.yaml` (e.g. `*.github.io` chart sites, `charts.jetstack.io`)
 
-### Root
+### Root (Linux)
 
-The dev scripts need **root**. They run rootful Podman with a privileged k3s container, publish ports
+On Linux the dev scripts need **root**. They run rootful Podman with a privileged k3s container, publish ports
 80 and 443, set kernel parameters with `sysctl`, and add a block to `/etc/hosts`. Rootless Podman is
 not supported. Run every command in this guide in a root shell:
 
@@ -77,6 +86,10 @@ sudo -i
 
 All local state then goes to `/root/.boccob/dev/` and `/root/.cache/boccob/`.
 
+On macOS (Part C) you run everything as **your own user**: the rootful part is the podman machine.
+The few changes to the Mac itself (`/etc/hosts`, trusting the dev CA) ask for your password with
+`sudo`, and only when you opt in.
+
 ---
 
 ## Part A: run it locally
@@ -85,14 +98,10 @@ All local state then goes to `/root/.boccob/dev/` and `/root/.cache/boccob/`.
 
 | Your machine | What to do |
 |---|---|
-| **Linux (Ubuntu 24.04 recommended)** | Continue with A.2 directly on your machine. |
+| **Linux (Ubuntu 24.04 recommended), x64 or arm64** | Continue with A.2 directly on your machine. arm64 is untested. |
 | **Windows 10/11** | *Untested.* Install WSL2 with Ubuntu 24.04 (`wsl --install -d Ubuntu-24.04`), give WSL at least 16 GB RAM in `%UserProfile%\.wslconfig` (`[wsl2]` → `memory=16GB`, `processors=4`), then follow A.2 inside the Ubuntu shell. If WSL gives you trouble, use a Hyper-V VM and follow **Part B** instead. |
-| **macOS (Intel)** | Create an Ubuntu 24.04 VM (e.g. with UTM or Multipass, 4+ CPU, 16+ GB RAM, 80 GB disk) and follow **Part B**. The scripts edit Linux kernel settings and `/etc/hosts`, so they cannot run on macOS itself. |
-| **macOS (Apple Silicon)** | Not practical locally (amd64 only, see above). Use **Part B** with an x86 VM on another machine. |
-
-> **Why not `podman machine` on macOS/Windows?** It runs Fedora CoreOS, which is immutable and hard to
-> install OpenTofu, Helm and the other tools on. The scripts also expect to run on the same Linux host
-> as Podman. A normal Ubuntu VM is simpler and is exactly Part B.
+| **macOS (Apple Silicon)** | Follow **Part C** (podman machine). *Untested on real hardware.* Alternative: an arm64 Ubuntu VM (UTM, Multipass) and **Part B**. |
+| **macOS (Intel)** | Create an Ubuntu 24.04 x64 VM (e.g. with UTM or Multipass, 4+ CPU, 16+ GB RAM, 80 GB disk) and follow **Part B**. Part C may work but is not supported (the pinned tool downloads exist for Apple Silicon only). |
 
 ### A.2 Install the prerequisites (Ubuntu 24.04)
 
@@ -100,17 +109,18 @@ All local state then goes to `/root/.boccob/dev/` and `/root/.cache/boccob/`.
 sudo -i
 apt-get update
 apt-get install -y podman skopeo jq yq make git curl openssl shellcheck python3 ca-certificates
+ARCH="$(dpkg --print-architecture)"    # amd64 (x64) or arm64
 
 # OpenTofu 1.10.6
-curl -fsSLo /tmp/tofu.tgz https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_linux_amd64.tar.gz
+curl -fsSLo /tmp/tofu.tgz "https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_linux_${ARCH}.tar.gz"
 tar -xzf /tmp/tofu.tgz -C /tmp tofu && install /tmp/tofu /usr/local/bin/
 
 # Helm 3.18.6
-curl -fsSLo /tmp/helm.tgz https://get.helm.sh/helm-v3.18.6-linux-amd64.tar.gz
-tar -xzf /tmp/helm.tgz -C /tmp && install /tmp/linux-amd64/helm /usr/local/bin/
+curl -fsSLo /tmp/helm.tgz "https://get.helm.sh/helm-v3.18.6-linux-${ARCH}.tar.gz"
+tar -xzf /tmp/helm.tgz -C /tmp && install "/tmp/linux-${ARCH}/helm" /usr/local/bin/
 
 # kubectl (1.33+ works; the cluster runs 1.35)
-curl -fsSLo /tmp/kubectl https://dl.k8s.io/release/v1.35.0/bin/linux/amd64/kubectl
+curl -fsSLo /tmp/kubectl "https://dl.k8s.io/release/v1.35.0/bin/linux/${ARCH}/kubectl"
 install /tmp/kubectl /usr/local/bin/
 
 # uv (Python tooling for the solution repo); it fetches Python 3.13 itself
@@ -143,11 +153,13 @@ git -C project-boccob-iac checkout claude/determined-lovelace-ugiz1b
 ```
 
 Install the pinned supply-chain tools (cosign, trivy, syft, oras). They are checksum-verified and
-installed into `~/.cache/boccob/bin`; the scripts add that directory to `PATH` themselves.
+installed into `~/.cache/boccob/bin` in the build for this machine (linux/amd64, linux/arm64 or
+darwin/arm64); the scripts add that directory to `PATH` themselves.
 
 ```bash
 cd ~/src/project-boccob-iac
 make tools
+make doctor ENV=dev  # prerequisites, architecture, ports, disk: fix every FAIL before you go on
 make help          # every target with a one-line description
 ```
 
@@ -276,7 +288,7 @@ Try it: as `anna-analyst` you can only query the `curated` catalog, and personal
 
 Use any hypervisor: Proxmox, VMware, Hyper-V, VirtualBox, KVM/libvirt, UTM or Multipass.
 
-- Ubuntu Server 24.04 LTS, **x86_64**
+- Ubuntu Server 24.04 LTS, **x64 (x86_64/amd64)** (arm64 should work the same way but is untested)
 - 4+ vCPU (8 is better), 16+ GB RAM (24 GB is better), 80 GB disk
 - A network address you can reach from your laptop, with SSH enabled (port 22 open)
 
@@ -350,6 +362,94 @@ path. For learning and day-to-day development, use Option 1.
 
 ---
 
+## Part C: macOS on Apple Silicon (podman machine)
+
+> **Untested on real hardware.** This part was written and its code paths exercised on Linux with
+> stand-ins for `podman` and `uname`; nobody has run it on a Mac yet. Expect to debug it, and please
+> report what you find. Everything below runs as **your user**, not root.
+
+How it fits together: a **rootful podman machine** (a small Fedora CoreOS VM managed by podman)
+runs the two containers, Zot and the k3s node, natively as `linux/arm64`. Everything else (make,
+tofu, helm, kubectl, skopeo, cosign, oras, jq, yq) runs on macOS and talks to the VM through the
+podman remote connection. Ports 443, 80, 6443 and 5000 are published inside the VM and forwarded
+to `127.0.0.1` on the Mac by podman (gvproxy), so no SSH tunnel is needed.
+
+What the scripts do differently (`CLUSTER_RUNTIME=podman-machine`, automatic on macOS):
+
+| On Linux (Part A) | On macOS (Part C) |
+|---|---|
+| `sysctl` on the host | inside the VM (`podman machine ssh`), persisted in `/etc/sysctl.d/90-boccob-k3s.conf` there |
+| config files bind-mounted from `~/.boccob/dev/` | copied into the VM (`/var/lib/boccob/dev/`, root-owned, SELinux-relabelled) and mounted from there |
+| `/etc/hosts` block added (root) | opt-in, with `sudo` (`DEV_MANAGE_ETC_HOSTS=1`); the VM always gets its own entry for the registry |
+| registry CA via `SSL_CERT_FILE` | macOS Go programs ignore `SSL_CERT_FILE`: the CA must be trusted in the System keychain (`make macos-trust`) |
+| node image `linux/amd64` | node image `linux/arm64` (the VM's architecture) |
+
+### C.1 Install the tools (Homebrew)
+
+```bash
+brew install bash make podman opentofu helm kubernetes-cli jq python-yq skopeo openssl@3 git uv
+# use the new bash, GNU make and OpenSSL 3 first in PATH (put this into ~/.zprofile)
+export PATH="$(brew --prefix)/opt/make/libexec/gnubin:$(brew --prefix)/opt/openssl@3/bin:$(brew --prefix)/bin:$PATH"
+bash --version | head -1     # must be 5.x: macOS' own /bin/bash 3.2 is refused by the scripts
+make --version | head -1     # GNU Make 4.x: macOS' make 3.81 cannot run the Makefile
+yq --version                 # "yq 3.x": the Python yq (jq wrapper)
+```
+
+- **yq**: the scripts use jq syntax, so they need the **Python** yq. Homebrew's `yq` formula is the Go
+  "mikefarah" yq, which does not work here: install `python-yq` (or `pipx install yq`) and make sure
+  `brew uninstall yq` if you had it. `make doctor` tells you which one you have.
+- **cosign, trivy, syft, oras**: `make tools` installs the pinned, checksum-verified darwin/arm64
+  builds into `~/.cache/boccob/bin` (Homebrew versions also work but are not pinned).
+- Clone the two repositories next to each other as in A.3, then `make tools` and, in the solution
+  repo, `make setup tools`.
+
+### C.2 Create the podman machine
+
+```bash
+cd ~/src/project-boccob-iac
+make machine-init                     # rootful; defaults: MACHINE_CPUS=6 MACHINE_MEMORY=16384 (MiB) MACHINE_DISK=100 (GB)
+make doctor ENV=dev                   # must end with "doctor: OK"
+```
+
+`make machine-init` runs `podman machine init --rootful --cpus .. --memory .. --disk-size ..` (or
+`podman machine set` on an existing machine, which it stops first; the disk can only grow), starts
+it and makes the rootful connection the default. **Rootful is required**: the k3s node is a
+privileged container that binds ports 80/443 and needs netfilter and cgroup access. To convert an
+existing machine by hand: `podman machine stop; podman machine set --rootful; podman machine start`.
+Leave at least 4 GB of RAM for macOS (the script checks it). Another name than the default machine:
+`PODMAN_MACHINE=<name>`.
+
+### C.3 Start the cluster
+
+```bash
+DEV_MANAGE_ETC_HOSTS=1 DEV_TRUST_CA=1 make cluster-up ENV=dev   # asks for your sudo password (/etc/hosts, keychain)
+make airgap-mirror ENV=dev           # the linux/arm64 images only (MIRROR_ARCHES defaults to the cluster's arch)
+export KUBECONFIG=~/.boccob/dev/kubeconfig
+kubectl get nodes -o wide            # one node, Ready, arm64
+```
+
+- Without `DEV_MANAGE_ETC_HOSTS=1` the scripts do not touch `/etc/hosts`; `make cluster-up` then
+  stops with the exact block to add yourself (`scripts/cluster/etc-hosts.sh dev print`).
+- Without `DEV_TRUST_CA=1` it stops and asks you to run `make macos-trust ENV=dev` (adds the registry
+  CA to the System keychain with `sudo security add-trusted-cert`). Run `make macos-trust ENV=dev`
+  **again after stack `11-foundation-pki`** is deployed: it then also trusts the platform CA, which
+  Safari and Chrome need for the web UIs (Firefox: import `~/.boccob/dev/pki/trust-bundle.crt` in
+  its own settings). `ACTION=check` shows the state, `ACTION=remove` takes them out again.
+- **Ports 80/443 (unverified).** macOS lets ordinary programs bind ports below 1024 only on all
+  interfaces, which may stop podman's forwarder from opening `127.0.0.1:443`. `make cluster-up` warns
+  when nothing answers there. Then use `DEV_PUBLISH_ADDR=0.0.0.0 make cluster-up ENV=dev`: this
+  publishes all four dev ports on every interface of the Mac, so turn on the macOS firewall
+  (System Settings → Network → Firewall) or use it only on a trusted network.
+
+Then deploy as in **A.5** and open the UIs as in **A.6** (same URLs, on your Mac). `make release-publish
+ENV=dev` builds the solution image inside the VM for `linux/arm64`; to build both architectures use
+`PLATFORMS=linux/amd64,linux/arm64` (the amd64 half runs emulated and is slow).
+
+Everyday commands are those of **A.7**. In addition: after the Mac restarts, `podman machine start`
+before `make cluster-up ENV=dev`; to free the RAM, `make cluster-down ENV=dev` and `podman machine stop`.
+
+---
+
 ## 2. Troubleshooting
 
 | Symptom | Cause and fix |
@@ -364,6 +464,11 @@ path. For learning and day-to-day development, use Option 1.
 | `ImagePullBackOff` on the Dagster code location or OPA | The tfvars reference a solution digest that is not in your Zot. Repeat A.5 step 2. |
 | dbt refuses `--full-refresh` | On purpose outside `LAKEHOUSE_ENV=dev` (it would lose history and break keys). On dev it is allowed. |
 | Port 443 or 80 already in use | Stop the other web server. Moving the dev ports (`DEV_HTTPS_PORT`) breaks the Keycloak login redirects. |
+| `... is not supported. Supported: x64 (x86_64/amd64) and arm64 (aarch64)` | The machine (or the podman machine) has another CPU architecture: 32-bit x86/ARM, ppc64le, ... are not supported. |
+| `image X: no linux/arm64 digest` | The lock has no build of that image for your architecture: see [versions.md](versions.md) ("missing_platforms"). |
+| macOS: `x509: certificate signed by unknown authority` from skopeo/helm/tofu | The dev CA is not in the System keychain: `make macos-trust ENV=dev`. |
+| macOS: `bash ... is too old` / Makefile errors about `.SHELLFLAGS` | Homebrew's bash and GNU make must come first in `PATH` (C.1). |
+| macOS: `the podman machine is rootless` | `podman machine stop; podman machine set --rootful; podman machine start` (or `make machine-init`). |
 
 Useful commands:
 
@@ -382,6 +487,7 @@ df -h /                                         # disk
 | You want to… | Read |
 |---|---|
 | Understand the platform design | [architecture.md](architecture.md), [data-plane.md](data-plane.md) |
+| Pin or upgrade a version; architectures | [versions.md](versions.md) |
 | Add a module, stack, secret, bucket, OIDC client or firewall rule | [conventions.md](conventions.md) |
 | Add a data source | `project-boccob/docs/adding-a-source.md` |
 | Understand the layers, keystore and SCD2 | `project-boccob/docs/data-layers.md`, `project-boccob/docs/keystore.md` |

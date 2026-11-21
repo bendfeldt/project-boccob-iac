@@ -59,6 +59,17 @@ if command -v yq >/dev/null 2>&1; then
   elif yq -c . <<<'a: 1' >/dev/null 2>&1; then ok "yq is the Python jq wrapper ($(yq --version 2>&1 | head -1))"
   else bad "yq does not accept jq syntax (needs the Python yq)"; fi
 fi
+if command -v make >/dev/null 2>&1; then
+  # the Makefile needs GNU make >= 3.82 (.SHELLFLAGS); macOS ships 3.81
+  v="$(make --version 2>/dev/null | sed -nE '1s/^GNU Make ([0-9.]+).*/\1/p')"
+  if [[ -n "$v" ]] && version_ge "$v" 3.82; then ok "GNU make ${v}"
+  else bad "make ${v:-?}: GNU make >= 3.82 needed (macOS: brew install make; PATH=\"\$(brew --prefix)/opt/make/libexec/gnubin:\$PATH\")"; fi
+fi
+if command -v openssl >/dev/null 2>&1; then
+  v="$(openssl version 2>/dev/null)"
+  if [[ "$v" == OpenSSL\ 3* ]]; then ok "${v}"
+  else soft "${v}: OpenSSL 3 is the tested one (macOS LibreSSL: brew install openssl@3 and put it first in PATH)"; fi
+fi
 if command -v tofu >/dev/null 2>&1; then
   v="$(tofu version 2>/dev/null | head -1 | sed -E 's/.*v([0-9.]+).*/\1/')"
   if version_ge "$v" 1.10.0; then ok "OpenTofu ${v}"; else bad "OpenTofu ${v} < 1.10.0"; fi
@@ -135,8 +146,8 @@ if [[ "$CLUSTER_MODE" == "podman" ]]; then
     gr="$(podman info --format '{{.Store.GraphRoot}}' 2>/dev/null || echo /var/lib/containers)"
     free_gb=$(( $(df -Pk "$gr" 2>/dev/null | awk 'NR==2 {print $4}') / 1024 / 1024 ))
     if (( free_gb >= 40 )); then ok "free disk (${gr}): ${free_gb} GB"
-    elif (( free_gb >= 5 )); then soft "free disk (${gr}): ${free_gb} GB (40 GB recommended for a fresh mirror; prune images)"
-    else bad "free disk (${gr}): ${free_gb} GB: below 5 GB the node gets DiskPressure"; fi
+    elif (( free_gb >= 2 )); then soft "free disk (${gr}): ${free_gb} GB (40 GB recommended for a fresh mirror; prune images)"
+    else bad "free disk (${gr}): ${free_gb} GB: the dev node evicts pods below 1 GiB (DiskPressure)"; fi
   fi
 
   section "ports (${DEV_PUBLISH_ADDR:-127.0.0.1})"

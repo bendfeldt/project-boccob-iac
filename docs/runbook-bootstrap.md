@@ -50,6 +50,13 @@ make node-bundle ENV=prod                                               # [verif
 Transfer `boccob-bundle.tar` (+ `.sha256`), the provider mirror, the node
 bundle and a checkout of this repository at the same commit.
 
+Architecture: the bundle and the node bundle contain the images and k3s binaries
+of `CLUSTER_ARCH` (`environments/<env>/env.sh`, default amd64 = x64/x86_64; arm64
+for aarch64 servers). All nodes of a cluster must have that architecture
+(`host-install.sh` refuses others). `MIRROR_ARCHES=amd64,arm64` puts both into one
+bundle (images under `images/<arch>/`; the cluster's own architecture gets the plain
+tags in Zot). See [versions.md](versions.md). arm64 nodes have not been tested.
+
 Air-gapped side:
 
 1. Registry host: start Zot exactly like `scripts/cluster/registry-up.sh` does
