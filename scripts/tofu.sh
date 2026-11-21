@@ -107,6 +107,8 @@ unset pass unencrypted fallback enforced
 export TF_VAR_environment="$ENV"
 export TF_VAR_base_domain="$BASE_DOMAIN"
 export TF_VAR_registry_host="$REGISTRY_HOST"
+ensure_cluster_arch
+export TF_VAR_cluster_arch="$CLUSTER_ARCH"
 export TF_VAR_kubeconfig_path="$KUBECONFIG"
 # CA of the Zot registry, for workloads that pull OCI artefacts themselves (OPA bundle)
 if [[ -f "${REGISTRY_CA_FILE}" ]]; then

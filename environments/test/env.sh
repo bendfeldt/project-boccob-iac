@@ -17,6 +17,10 @@ export K3S_SSH_USER="${K3S_SSH_USER:-root}"
 # encrypt pod traffic between nodes (WireGuard): covers the in-namespace
 # plaintext hops of the data plane (docs/data-plane.md, "TLS exceptions").
 # Hosts need the wireguard kernel module and UDP 51820 open between nodes.
+# CPU architecture of ALL nodes (mixed clusters are not supported): amd64 (x64,
+# x86_64) or arm64 (aarch64). Selects the image digests that are mirrored and
+# deployed and the k3s binaries of the node bundle.
+export CLUSTER_ARCH="${CLUSTER_ARCH:-amd64}"
 export K3S_FLANNEL_BACKEND="${K3S_FLANNEL_BACKEND:-wireguard-native}"
 
 # OpenBao init: Shamir 5/3, shares PGP-encrypted to the key custodians

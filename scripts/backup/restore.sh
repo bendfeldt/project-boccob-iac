@@ -18,7 +18,7 @@ source "${REPO_ROOT}/scripts/lib/openbao.sh"
 source "${REPO_ROOT}/scripts/backup/lib.sh"
 load_env "${1:-${ENV:-}}"
 what="${2:-}"
-require_cmd kubectl jq curl tar sha256sum
+require_cmd kubectl jq curl tar
 tmp="$(mktemp -d)"
 trap 's3_session_stop; openbao_port_forward_stop; rm -rf "$tmp"' EXIT
 

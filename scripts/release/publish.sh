@@ -68,7 +68,7 @@ targets=(image-push bundle bundle-push)
 [[ "${SKIP_BUILD:-0}" == "1" ]] || targets=(image "${targets[@]}")
 path="$PATH"
 # the solution's build runs syft/trivy whenever they are on PATH (ours are)
-[[ "${SBOM:-1}" == "0" ]] && path="$(tr ':' '\n' <<<"$PATH" | grep -vxF "${BOCCOB_CACHE_DIR}/bin" | paste -sd:)"
+[[ "${SBOM:-1}" == "0" ]] && path="$(tr ':' '\n' <<<"$PATH" | grep -vxF "${BOCCOB_CACHE_DIR}/bin" | paste -sd: -)"
 step "solution ${SOLUTION_DIR} ($(git -C "$SOLUTION_DIR" rev-parse --short HEAD)): make ${targets[*]} -> ${REGISTRY}"
 PATH="$path" make -C "$SOLUTION_DIR" "${targets[@]}"
 

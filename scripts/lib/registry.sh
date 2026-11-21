@@ -10,7 +10,7 @@ registry_push_password_file() { printf '%s' "${STATE_DIR}/registry/push-password
 registry_login() {
   local pwfile; pwfile="$(registry_push_password_file)"
   [[ -f "$pwfile" ]] || die "registry push password missing (${pwfile}); run cluster-up / registry-up first, or place it there"
-  local auth; auth="$(printf '%s:%s' "$REGISTRY_PUSH_USER" "$(cat "$pwfile")" | base64 -w0)"
+  local auth; auth="$(printf '%s:%s' "$REGISTRY_PUSH_USER" "$(cat "$pwfile")" | b64_nowrap)"
   jq -n --arg h "$REGISTRY_HOST" --arg a "$auth" '{auths: {($h): {auth: $a}}}' | write_secret_file "$REGISTRY_AUTH_FILE"
   export REGISTRY_AUTH_FILE
 }

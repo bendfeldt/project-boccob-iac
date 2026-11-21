@@ -22,7 +22,9 @@ for key in "${keys[@]}"; do
   case "$mode" in
     keyless)
       src="$(lock_q '.images[$k].source' --arg k "$key")"
-      digest="$(lock_q '.images[$k].index_digest // .images[$k].digest' --arg k "$key")"
+      # upstream signatures are made over the index (multi-arch) digest
+      digest="$(lock_q '.images[$k].index_digest // ""' --arg k "$key")"
+      [[ -n "$digest" ]] || digest="$(image_digest "$key")"
       if cosign verify "${src}@${digest}" \
            --certificate-identity-regexp "$(jq -r '.identity_regexp' <<<"$entry")" \
            --certificate-oidc-issuer "$(jq -r '.oidc_issuer' <<<"$entry")" >/dev/null 2>"${TMPDIR:-/tmp}/cosign.err"; then

@@ -252,8 +252,8 @@ kc_token() {
 check "OIDC client 'polaris' obtains a token with its generated secret" kc_token
 kc_oidc_secret_in_bao() {
   local a b
-  a="$(bao_api "${bao_url}/kv/data/identity/oidc-clients/trino" | jq -j '.data.data["client-secret"]' | sha256sum)"
-  b="$(kubectl -n identity get secret oidc-client-trino -o jsonpath='{.data.client-secret}' | base64 -d | sha256sum)"
+  a="$(bao_api "${bao_url}/kv/data/identity/oidc-clients/trino" | jq -j '.data.data["client-secret"]' | sha256_stream)"
+  b="$(kubectl -n identity get secret oidc-client-trino -o jsonpath='{.data.client-secret}' | base64 -d | sha256_stream)"
   [[ "$a" == "$b" ]]
 }
 if [[ "$have_token" == "1" ]]; then

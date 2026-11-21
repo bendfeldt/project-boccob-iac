@@ -5,6 +5,13 @@
 
 set -euo pipefail
 
+# bash >= 4 (associative arrays, mapfile, ${var,,}). macOS ships bash 3.2:
+# `brew install bash` and put /opt/homebrew/bin first in PATH (docs/getting-started.md).
+if (( BASH_VERSINFO[0] < 4 )); then
+  echo "bash ${BASH_VERSION} is too old: bash >= 4 is required (macOS: brew install bash; /opt/homebrew/bin first in PATH)" >&2
+  exit 1
+fi
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export REPO_ROOT
 LOCK_FILE="${LOCK_FILE:-${REPO_ROOT}/versions.lock.yaml}"
@@ -34,6 +41,9 @@ require_cmd() {
   done
 }
 
+# shellcheck source=platform.sh
+source "${REPO_ROOT}/scripts/lib/platform.sh"
+
 # --- environment ---------------------------------------------------------------
 # load_env <env>: validates the name, sources environments/<env>/env.sh and
 # derives the per-environment state paths.
@@ -45,6 +55,9 @@ load_env() {
   [[ -f "$f" ]] || die "unknown environment '${env}' (${f} missing)"
   ENV="$env"
   export ENV
+  # decided before env.sh, which may depend on it
+  CLUSTER_RUNTIME="$(cluster_runtime)"
+  export CLUSTER_RUNTIME
   # shellcheck source=/dev/null
   source "$f"
   : "${CLUSTER_NAME:?env.sh must set CLUSTER_NAME}"
@@ -73,12 +86,47 @@ load_env() {
   export no_proxy="${NO_PROXY}"
 
   setup_trust_bundle
+  # architecture of the cluster nodes: selects the per-arch image digests and
+  # binaries of versions.lock.yaml. Best effort here (a stopped podman machine
+  # must not break e.g. `make doctor`); image_digest fails clearly later.
+  ensure_cluster_arch soft
 }
 
-# Go tools (helm, tofu, skopeo, cosign, trivy) honour SSL_CERT_FILE. Build one
+# ensure_cluster_arch [soft]: sets and exports CLUSTER_ARCH (amd64|arm64)
+#   CLUSTER_ARCH set     -> validated (test/prod: environments/<env>/env.sh)
+#   podman, native       -> this machine's architecture
+#   podman-machine       -> the VM's architecture (podman info), not the Mac's
+ensure_cluster_arch() {
+  local soft="${1:-}" raw=""
+  if [[ -n "${CLUSTER_ARCH:-}" ]]; then
+    CLUSTER_ARCH="$(arch_or_die "$CLUSTER_ARCH" "CLUSTER_ARCH")"
+  elif [[ "${CLUSTER_MODE:-}" == "podman" && "$(cluster_runtime)" == "podman-machine" ]]; then
+    if ! raw="$(podman info --format '{{.Host.Arch}}' 2>/dev/null)" || [[ -z "$raw" ]]; then
+      [[ "$soft" == "soft" ]] && return 0
+      die "cannot reach the podman machine to read its architecture (podman machine start; or set CLUSTER_ARCH)"
+    fi
+    CLUSTER_ARCH="$(arch_or_die "$raw" "podman machine")"
+  elif [[ "${CLUSTER_MODE:-}" == "podman" ]]; then
+    CLUSTER_ARCH="$(host_arch)"
+  else
+    [[ "$soft" == "soft" ]] && return 0
+    die "CLUSTER_ARCH is not set for ENV=${ENV:-?} (environments/<env>/env.sh: amd64 or arm64)"
+  fi
+  export CLUSTER_ARCH
+}
+# Go tools (helm, tofu, skopeo, cosign, trivy) honour SSL_CERT_FILE on Linux. Build one
 # bundle = system/proxy CAs + bootstrap registry CA (+ platform CA once it exists).
+# macOS: Go programs verify against the macOS keychain and ignore SSL_CERT_FILE, so
+# the CAs must be trusted in the System keychain (scripts/cluster/macos-trust.sh);
+# curl and python still use this bundle.
 setup_trust_bundle() {
-  local base="${BOCCOB_BASE_CA_BUNDLE:-${SSL_CERT_FILE:-/etc/ssl/certs/ca-certificates.crt}}"
+  local base="${BOCCOB_BASE_CA_BUNDLE:-${SSL_CERT_FILE:-}}" f
+  if [[ -z "$base" ]]; then
+    # Debian/Ubuntu, Fedora/RHEL, macOS (LibreSSL bundle of the system roots)
+    for f in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/cert.pem; do
+      [[ -f "$f" ]] && { base="$f"; break; }
+    done
+  fi
   local out="${STATE_DIR}/pki/trust-bundle.crt"
   # do not stack our own bundle onto itself
   [[ "$base" == "$out" ]] && base="/etc/ssl/certs/ca-certificates.crt"
@@ -122,20 +170,53 @@ lock_keys() {
     | select(($x | length) == 0 or ((.value.groups // []) | length == 0) or (((.value.groups // []) | all(. as $y | $x | index($y))) | not))
     | .key'
 }
+# image_digest <key> [arch] -> manifest digest of the linux/<arch> image (default: CLUSTER_ARCH)
+image_digest() {
+  local key="$1" arch="${2:-}" d
+  if [[ -z "$arch" ]]; then ensure_cluster_arch; arch="$CLUSTER_ARCH"; fi
+  d="$(lock_q '.images[$k].digests[$a] // ""' --arg k "$key" --arg a "$arch")"
+  [[ "$d" == sha256:* ]] || die "image ${key}: no linux/${arch} digest in ${LOCK_FILE} (run make lock; docs/versions.md lists images without that platform)"
+  printf '%s' "$d"
+}
+# image_zot_tag <key> [arch] -> tag in Zot: the locked tag for the cluster's own
+# architecture; <tag>-<arch> for an additional architecture (MIRROR_ARCHES)
+image_zot_tag() {
+  local key="$1" arch="${2:-}" tag
+  [[ -n "$arch" ]] || { ensure_cluster_arch; arch="$CLUSTER_ARCH"; }
+  tag="$(lock_q '.images[$k].tag' --arg k "$key")"
+  if [[ "$arch" == "${CLUSTER_ARCH:-}" ]]; then printf '%s' "$tag"; else printf '%s-%s' "$tag" "$arch"; fi
+}
 # image_zot_repo <key>      -> <registry>/<source>
 image_zot_repo() { printf '%s/%s' "${REGISTRY_HOST}" "$(lock_q '.images[$k].source' --arg k "$1")"; }
-# image_zot_ref <key>       -> <registry>/<source>:<tag>@<digest>
+# image_zot_ref <key> [arch]       -> <registry>/<source>:<tag>@<digest>
 image_zot_ref() {
-  lock_q '"\($r)/\(.images[$k].source):\(.images[$k].tag)@\(.images[$k].digest)"' --arg k "$1" --arg r "${REGISTRY_HOST}"
+  printf '%s:%s@%s' "$(image_zot_repo "$1")" "$(lock_q '.images[$k].tag' --arg k "$1")" "$(image_digest "$1" "${2:-}")"
 }
-# image_zot_digest_ref <key> -> <registry>/<source>@<digest>  (for tools that reject tag+digest)
-image_zot_digest_ref() {
-  lock_q '"\($r)/\(.images[$k].source)@\(.images[$k].digest)"' --arg k "$1" --arg r "${REGISTRY_HOST}"
-}
-# image_upstream_ref <key>  -> <source>@<digest>
-image_upstream_ref() { lock_q '"\(.images[$k].source)@\(.images[$k].digest)"' --arg k "$1"; }
+# image_zot_digest_ref <key> [arch] -> <registry>/<source>@<digest>  (for tools that reject tag+digest)
+image_zot_digest_ref() { printf '%s@%s' "$(image_zot_repo "$1")" "$(image_digest "$1" "${2:-}")"; }
+# image_upstream_ref <key> [arch]  -> <source>@<digest>
+image_upstream_ref() { printf '%s@%s' "$(lock_q '.images[$k].source' --arg k "$1")" "$(image_digest "$1" "${2:-}")"; }
 
-sha256_of() { sha256sum "$1" | awk '{print $1}'; }
+# --- binaries (per platform) ----------------------------------------------------
+# binary_platform <key> [platform] -> the platform entry to use for a binary:
+#   [platform] or, by group: "cluster" binaries -> linux/<CLUSTER_ARCH>,
+#   tools -> this machine (<os>/<arch>); "any" for platform-independent files
+binary_platform() {
+  local key="$1" want="${2:-}" have
+  have="$(lock_q '.binaries[$k].platforms | keys | join(" ")' --arg k "$key")"
+  if [[ " $have " == *" any "* ]]; then printf 'any'; return 0; fi
+  if [[ -z "$want" ]]; then
+    if lock_q '(.binaries[$k].groups // []) | index("cluster") != null' --arg k "$key" | grep -q true; then
+      ensure_cluster_arch; want="linux/${CLUSTER_ARCH}"
+    else
+      want="$(host_platform)"
+    fi
+  fi
+  [[ " $have " == *" ${want} "* ]] || die "binary ${key}: no ${want} build in ${LOCK_FILE} (available: ${have})"
+  printf '%s' "$want"
+}
+# binary_field <key> <platform> <url|file|sha256>
+binary_field() { lock_q '.binaries[$k].platforms[$p][$f]' --arg k "$1" --arg p "$2" --arg f "$3"; }
 
 # fetch_verified <url> <dest> <sha256|""> : cached download with checksum check
 fetch_verified() {
@@ -175,7 +256,7 @@ podman_container_alive() {
   podman container exists "$name" || return 1
   if [[ "$(podman inspect -f '{{.State.Running}}' "$name")" == "true" ]]; then
     pid="$(podman inspect -f '{{.State.Pid}}' "$name")"
-    [[ -d "/proc/${pid}" ]] && return 0
+    container_host_exec "test -d /proc/${pid}" && return 0
     warn "container ${name} is stale (host restarted?); removing it, data volumes are kept"
     podman rm -f "$name" >/dev/null 2>&1 || true
     return 1

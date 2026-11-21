@@ -12,3 +12,13 @@ output "k3s_version" {
   description = "Pinned k3s version."
   value       = local.lock.k3s.version
 }
+
+output "arch" {
+  description = "CPU architecture the image digests were selected for."
+  value       = var.arch
+}
+
+output "missing_images" {
+  description = "Image keys without a build for var.arch (not in `images`; a module that references one fails at plan time)."
+  value       = local.missing
+}

@@ -24,6 +24,12 @@ variable "registry_host" {
   type        = string
 }
 
+variable "cluster_arch" {
+  description = "CPU architecture of the cluster nodes (amd64 = x64/x86_64, arm64 = aarch64). Set by scripts/tofu.sh from CLUSTER_ARCH; selects the image digests."
+  type        = string
+  default     = "amd64"
+}
+
 variable "kubeconfig_path" {
   description = "Path of the kubeconfig for the target cluster."
   type        = string
@@ -65,6 +71,7 @@ provider "helm" {
 module "versions" {
   source        = "../../modules/versions"
   registry_host = var.registry_host
+  arch          = var.cluster_arch
 }
 
 locals {

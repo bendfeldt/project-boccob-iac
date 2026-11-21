@@ -24,7 +24,7 @@ source "${REPO_ROOT}/scripts/lib/registry.sh"
 
 cmd="${1:-}"; shift || true
 load_env "${1:-${ENV:-}}"; shift || true
-require_cmd oras jq sha256sum
+require_cmd oras jq
 dir="${1:?usage: solution.sh bundle|load <env> <dir> [refs...]}"; shift || true
 
 case "$cmd" in
@@ -47,14 +47,14 @@ case "$cmd" in
       entries="$(jq -c --arg r "$repo" --arg d "$digest" --arg t "$tag" --arg p "oci/${n}" '. + [{repository: $r, digest: $d, tag: $t, layout: $p}]' <<<"$entries")"
     done
     jq . <<<"$entries" > "${dir}/artefacts.json"
-    ( cd "$dir" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum ) > "${dir}/SHA256SUMS"
+    ( cd "$dir" && sha256_manifest ) > "${dir}/SHA256SUMS"
     log "solution bundle ready: ${dir} ($(du -sh "$dir" | awk '{print $1}'), ${n} artefact(s))"
     ;;
 
   load)
     [[ -f "${dir}/SHA256SUMS" && -f "${dir}/artefacts.json" ]] || die "not a solution bundle: ${dir}"
     step "verify bundle checksums"
-    ( cd "$dir" && sha256sum --quiet -c SHA256SUMS ) || die "bundle checksum verification failed"
+    ( cd "$dir" && sha256_check SHA256SUMS ) || die "bundle checksum verification failed"
     registry_login
     refs=()
     while read -r e; do

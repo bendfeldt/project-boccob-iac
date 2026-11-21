@@ -113,7 +113,7 @@ openbao_snapshot_check() {
   for f in meta.json state.bin SHA256SUMS; do
     [[ -s "${dir}/x/${f}" ]] || { err "snapshot ${key}: ${f} missing"; return 1; }
   done
-  ( cd "${dir}/x" && sha256sum -c --quiet SHA256SUMS ) || { err "snapshot ${key}: internal checksums differ"; return 1; }
+  ( cd "${dir}/x" && sha256_check SHA256SUMS ) || { err "snapshot ${key}: internal checksums differ"; return 1; }
   jq -e '.Index > 0' "${dir}/x/meta.json" >/dev/null || { err "snapshot ${key}: meta.json without raft index"; return 1; }
-  log "snapshot ${key}: $(stat -c %s "${dir}/snap") bytes, raft index $(jq -r .Index "${dir}/x/meta.json"), checksums OK"
+  log "snapshot ${key}: $(file_size "${dir}/snap") bytes, raft index $(jq -r .Index "${dir}/x/meta.json"), checksums OK"
 }

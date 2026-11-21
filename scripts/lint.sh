@@ -58,7 +58,23 @@ step "lock file"
 want="$(yq -c '{images: (.images | map_values({source, tag})), charts: (.charts | map_values({repo, name, version}))}' "$VERSIONS_FILE")"
 have="$(yq -c '{images: (.images | map_values({source, tag})), charts: (.charts | map_values({repo, name, version}))}' "$LOCK_FILE")"
 [[ "$want" == "$have" ]] || { err "versions.lock.yaml is out of date (run: make lock)"; rc=1; }
-if yq -r '.images[] | .digest' "$LOCK_FILE" | grep -qv '^sha256:[0-9a-f]\{64\}$'; then err "lock file has images without digest"; rc=1; fi
+[[ "$(yq -c '.platforms' "$VERSIONS_FILE")" == "$(yq -c '.platforms' "$LOCK_FILE")" ]] \
+  || { err "versions.lock.yaml platforms differ from versions.yaml (run: make lock)"; rc=1; }
+# every image: a valid digest per locked platform, or the platform listed as missing
+bad="$(yq -r '(.platforms | map(sub("^linux/"; ""))) as $a | .images | to_entries[]
+  | .key as $k | .value as $v | $a[]
+  | select(((($v.digests // {})[.] // "") | test("^sha256:[0-9a-f]{64}$")) | not)
+  | select((($v.missing_platforms // []) | index(.)) == null) | "\($k)/\(.)"' "$LOCK_FILE")"
+[[ -z "$bad" ]] || { err "lock file has images without a per-platform digest: ${bad//$'\n'/ }"; rc=1; }
+gaps="$(yq -r '.images | to_entries[] | select(.value.missing_platforms) | "\(.key): \(.value.missing_platforms | join(","))"' "$LOCK_FILE")"
+[[ -z "$gaps" ]] || warn "images without a build for some platform (docs/versions.md): ${gaps//$'\n'/; }"
+bad="$(yq -r '.binaries | to_entries[] | .key as $k | .value.platforms | to_entries[]
+  | select((.value.sha256 // "") | test("^[0-9a-f]{64}$") | not) | "\($k)/\(.key)"' "$LOCK_FILE")"
+[[ -z "$bad" ]] || { err "lock file has binaries without sha256: ${bad//$'\n'/ }"; rc=1; }
+for p in linux/amd64 linux/arm64; do
+  miss="$(yq -r --arg p "$p" '.binaries | to_entries[] | select((.value.groups | index("cluster")) and (.value.platforms | has($p) or has("any") | not)) | .key' "$LOCK_FILE")"
+  [[ -z "$miss" ]] || { err "cluster binaries without ${p}: ${miss//$'\n'/ }"; rc=1; }
+done
 
 [[ $rc -eq 0 ]] && log "lint OK"
 exit $rc

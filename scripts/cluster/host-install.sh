@@ -35,6 +35,16 @@ done
 [[ "$role" == "server" || "$role" == "agent" ]] || { echo "role must be server or agent" >&2; exit 2; }
 if [[ "$cluster_init" == "false" && -z "$join_url" ]]; then echo "need --cluster-init or --join <url>" >&2; exit 2; fi
 if [[ "$(stat -fc %T /sys/fs/cgroup)" != "cgroup2fs" ]]; then echo "cgroup v2 is required on test/prod hosts" >&2; exit 1; fi
+# the bundle carries binaries and images for one architecture (node-bundle.sh, CLUSTER_ARCH)
+case "$(uname -m)" in
+  x86_64|amd64) node_arch=amd64 ;;
+  aarch64|arm64) node_arch=arm64 ;;
+  *) echo "unsupported node architecture $(uname -m): x64 (x86_64/amd64) or arm64 (aarch64) only" >&2; exit 1 ;;
+esac
+bundle_arch="${K3S_ARCH:-amd64}"   # bundles built before K3S_ARCH existed were amd64
+if [[ "$node_arch" != "$bundle_arch" ]]; then
+  echo "this node is ${node_arch} but the bundle is for ${bundle_arch}: build it with CLUSTER_ARCH=${node_arch}" >&2; exit 1
+fi
 
 echo "==> verify bundle"
 ( cd "$HERE" && sha256sum --quiet -c SHA256SUMS )
@@ -46,7 +56,7 @@ sysctl -q -p /etc/sysctl.d/90-kubelet.conf
 echo "==> binaries and images"
 install -m 0755 "${HERE}/k3s" /usr/local/bin/k3s
 install -d -m 0755 /var/lib/rancher/k3s/agent/images
-install -m 0644 "${HERE}/k3s-airgap-images-amd64.tar.zst" /var/lib/rancher/k3s/agent/images/
+install -m 0644 "${HERE}/k3s-airgap-images-${bundle_arch}.tar.zst" /var/lib/rancher/k3s/agent/images/
 
 echo "==> configuration"
 install -d -m 0700 /etc/rancher/k3s "${K3S_HARDENING_DIR}"

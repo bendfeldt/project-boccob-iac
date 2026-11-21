@@ -18,7 +18,10 @@
 #   charts: oci://<registry>/charts/<name>:<version>
 #   solution artefacts (pushed by the solution repo): <registry>/boccob/<name>
 
-platform: linux/amd64
+# Cluster platforms resolved by `make lock`: every image gets one manifest digest per
+# platform (plus the upstream index digest). A cluster uses the digests of its own
+# architecture (CLUSTER_ARCH: amd64 = x64/x86_64, arm64 = aarch64/Apple Silicon).
+platforms: [linux/amd64, linux/arm64]
 
 k3s:
   version: v1.35.10+k3s1
@@ -281,39 +284,86 @@ charts:
     version: 14.4.2
     groups: [observability-ui]
 
-# Files downloaded verbatim (air-gap bundle + operator workstation tools).
-# `sha256` is filled in by `make lock` on first resolution and verified on
-# every later download.
+# Files downloaded verbatim (air-gap bundle + operator workstation tools), one entry
+# per platform. `make lock` takes the sha256 from the upstream checksum file
+# (`checksums`) or, where upstream publishes none, from the download itself.
+#   cluster binaries: linux/amd64 + linux/arm64 (the node's architecture)
+#   tools:            linux/amd64 + linux/arm64 + darwin/arm64 (the operator's machine)
+#   `any`:            platform-independent file
 binaries:
   k3s:
-    url: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/k3s
-    file: k3s
     groups: [cluster]
+    platforms:
+      linux/amd64:
+        url: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/k3s
+        checksums: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/sha256sum-amd64.txt
+      linux/arm64:
+        url: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/k3s-arm64
+        checksums: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/sha256sum-arm64.txt
   k3s-airgap-images:
-    url: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/k3s-airgap-images-amd64.tar.zst
-    file: k3s-airgap-images-amd64.tar.zst
     groups: [cluster]
+    platforms:
+      linux/amd64:
+        url: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/k3s-airgap-images-amd64.tar.zst
+        checksums: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/sha256sum-amd64.txt
+      linux/arm64:
+        url: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/k3s-airgap-images-arm64.tar.zst
+        checksums: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/sha256sum-arm64.txt
   k3s-install:
-    url: https://raw.githubusercontent.com/k3s-io/k3s/v1.35.10%2Bk3s1/install.sh
-    file: k3s-install.sh
     groups: [cluster]
+    platforms:
+      any:
+        url: https://raw.githubusercontent.com/k3s-io/k3s/v1.35.10%2Bk3s1/install.sh
+        file: k3s-install.sh
   cosign:
-    url: https://github.com/sigstore/cosign/releases/download/v3.1.4/cosign-linux-amd64
-    file: cosign
     groups: [tools]
+    platforms:
+      linux/amd64:
+        url: https://github.com/sigstore/cosign/releases/download/v3.1.4/cosign-linux-amd64
+        checksums: https://github.com/sigstore/cosign/releases/download/v3.1.4/cosign_checksums.txt
+      linux/arm64:
+        url: https://github.com/sigstore/cosign/releases/download/v3.1.4/cosign-linux-arm64
+        checksums: https://github.com/sigstore/cosign/releases/download/v3.1.4/cosign_checksums.txt
+      darwin/arm64:
+        url: https://github.com/sigstore/cosign/releases/download/v3.1.4/cosign-darwin-arm64
+        checksums: https://github.com/sigstore/cosign/releases/download/v3.1.4/cosign_checksums.txt
   trivy:
-    url: https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_Linux-64bit.tar.gz
-    file: trivy.tar.gz
+    groups: [tools]
     extract: trivy
-    groups: [tools]
+    platforms:
+      linux/amd64:
+        url: https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_Linux-64bit.tar.gz
+        checksums: https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_checksums.txt
+      linux/arm64:
+        url: https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_Linux-ARM64.tar.gz
+        checksums: https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_checksums.txt
+      darwin/arm64:
+        url: https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_macOS-ARM64.tar.gz
+        checksums: https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_checksums.txt
   syft:
-    url: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_linux_amd64.tar.gz
-    file: syft.tar.gz
-    extract: syft
     groups: [tools]
+    extract: syft
+    platforms:
+      linux/amd64:
+        url: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_linux_amd64.tar.gz
+        checksums: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_checksums.txt
+      linux/arm64:
+        url: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_linux_arm64.tar.gz
+        checksums: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_checksums.txt
+      darwin/arm64:
+        url: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_darwin_arm64.tar.gz
+        checksums: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_checksums.txt
   oras:
     # OCI artefacts with referrers (OPA bundle, cosign signature bundles): solution air-gap path
-    url: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_linux_amd64.tar.gz
-    file: oras.tar.gz
-    extract: oras
     groups: [tools]
+    extract: oras
+    platforms:
+      linux/amd64:
+        url: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_linux_amd64.tar.gz
+        checksums: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_checksums.txt
+      linux/arm64:
+        url: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_linux_arm64.tar.gz
+        checksums: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_checksums.txt
+      darwin/arm64:
+        url: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_darwin_arm64.tar.gz
+        checksums: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_checksums.txt

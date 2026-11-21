@@ -55,7 +55,7 @@ connect() {
   wait_for 300 "API of ${pod}" api_get sys/seal-status
 }
 
-b64_file() { base64 -w0 < "$1"; }
+b64_file() { b64_nowrap < "$1"; }
 
 do_init() {
   step "initialise OpenBao (shares=${shares}, threshold=${threshold})"

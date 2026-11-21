@@ -19,7 +19,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 source "${REPO_ROOT}/scripts/backup/lib.sh"
 load_env "${1:-${ENV:-}}"
 cluster="${2:-${CLUSTER:-keycloak-db}}"
-require_cmd kubectl jq curl tar sha256sum
+require_cmd kubectl jq curl tar
 ts="$(date -u +%Y%m%d%H%M%S)"
 scratch="restore-test-${ts}"
 tmp="$(mktemp -d)"
