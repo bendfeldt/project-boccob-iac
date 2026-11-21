@@ -75,7 +75,8 @@ if kubectl get namespace catalog query orchestration >/dev/null 2>&1; then
   # an object that attaches lakehouse-purge-env; prints allowed / denied
   dp_purge_admit() {
     local kind="$1" job="$2" as="$3" spec
-    spec='{"restartPolicy":"Never","securityContext":{"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"c","image":"'"$dp_busybox"'","command":["true"],"envFrom":[{"secretRef":{"name":"lakehouse-purge-env"}}],"securityContext":{"allowPrivilegeEscalation":false,"readOnlyRootFilesystem":true,"runAsNonRoot":true,"capabilities":{"drop":["ALL"]}},"resources":{"requests":{"cpu":"5m","memory":"16Mi"},"limits":{"memory":"32Mi"}}}]}'
+    # shaped like a launcher run Job (the run-job policy admits nothing else)
+    spec='{"restartPolicy":"Never","securityContext":{"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"dagster","image":"'"$dp_code_image"'","args":["dagster","api","execute_run","{}"],"env":[{"name":"DAGSTER_RUN_JOB_NAME","value":"'"$job"'"}],"envFrom":[{"secretRef":{"name":"lakehouse-purge-env"}}],"securityContext":{"allowPrivilegeEscalation":false,"readOnlyRootFilesystem":true,"runAsNonRoot":true,"capabilities":{"drop":["ALL"]}},"resources":{"requests":{"cpu":"5m","memory":"16Mi"},"limits":{"memory":"32Mi"}}}]}'
     local meta='{"name":"verify-purge-guard","namespace":"orchestration","labels":{"dagster/job":"'"$job"'"}}'
     local obj
     if [[ "$kind" == Job ]]; then
@@ -89,7 +90,7 @@ if kubectl get namespace catalog query orchestration >/dev/null 2>&1; then
   }
   dp_daemon_sa="system:serviceaccount:orchestration:dagster"
   dp_run_sa="system:serviceaccount:orchestration:dagster-code-dagster-user-deployments-user-deployments"
-  dp_busybox="$(image_zot_ref busybox)"
+  dp_code_image="$(kubectl -n orchestration get deploy dagster-code-dagster-user-deployments-lakehouse -o jsonpath='{.spec.template.spec.containers[0].image}')"
   dp_purge_guard_allows_erasure() { [[ "$(dp_purge_admit Job erasure "$dp_daemon_sa")" == allowed ]]; }
   dp_purge_guard_denies_other_job() { [[ "$(dp_purge_admit Job transform "$dp_daemon_sa")" == denied ]]; }
   dp_purge_guard_denies_run_sa() {
