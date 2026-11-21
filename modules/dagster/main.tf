@@ -46,7 +46,15 @@ locals {
   compute_logs_env    = var.compute_logs == null ? {} : { AWS_DEFAULT_REGION = var.compute_logs.region }
   system_env          = concat([{ name = "HOME", value = "/tmp" }], [for k, v in local.compute_logs_env : { name = k, value = v }])
   system_env_secrets  = var.compute_logs == null ? [] : [{ name = local.compute_logs_secret }]
-  env_list            = [for k, v in merge(local.tls_env, local.job_secret_env, local.compute_logs_env, var.solution_env) : { name = k, value = v }]
+  env_map             = merge(local.tls_env, local.job_secret_env, local.compute_logs_env, var.solution_env)
+  env_list            = [for k, v in local.env_map : { name = k, value = v }]
+  # fields a run's user-defined k8s config may use (container context + purge tag env_from)
+  run_config_allowlist = {
+    container_config           = { env = true, env_from = true, volume_mounts = true, resources = true, image_pull_policy = true }
+    pod_spec_config            = { volumes = true, service_account_name = true, automount_service_account_token = true, security_context = true }
+    pod_template_spec_metadata = { annotations = true }
+    namespace                  = true
+  }
 
   code_location = {
     name               = var.code_location_name
@@ -65,7 +73,8 @@ locals {
     podSecurityContext = local.pod_secctx
     securityContext    = local.container_sctx
     resources          = var.resources["code_location"]
-    labels             = var.labels
+    # no labels here: they would enter the container context and the run allowlist
+    # (a run tag could then forge dagster/job); run labels come from the launcher
   }
 }
 
@@ -383,6 +392,91 @@ resource "kubernetes_manifest" "job_secret_guard_binding" {
   }
 }
 
+# Admission guard for every run Job the launcher creates (audit R3-1): exactly the
+# launcher's entrypoint (no command, args `dagster api execute_run|resume_run`),
+# one container from the code location image, no init/ephemeral containers, the
+# label dagster/job equal to the launcher-set DAGSTER_RUN_JOB_NAME, and only the
+# Secrets of the platform contract. Complements the tag allowlist of the launcher.
+locals {
+  run_secrets = concat(
+    [local.env_secret, local.pg_secret],
+    var.compute_logs == null ? [] : [local.compute_logs_secret],
+    values(local.job_secret_names),
+  )
+  run_job_checks = [
+    {
+      expression = "size(variables.ps.containers) == 1 && !has(variables.ps.initContainers) && !has(variables.ps.ephemeralContainers)"
+      message    = "Dagster run Jobs have exactly one container and no init or ephemeral containers"
+    },
+    {
+      expression = "variables.ctrs.all(c, !has(c.command) || size(c.command) == 0)"
+      message    = "Dagster run Jobs may not override the container command"
+    },
+    {
+      expression = "variables.ctrs.all(c, has(c.args) && size(c.args) >= 3 && c.args[0] == 'dagster' && c.args[1] == 'api' && c.args[2] in ['execute_run', 'resume_run'])"
+      message    = "Dagster run Jobs must run the launcher's entrypoint (dagster api execute_run|resume_run)"
+    },
+    {
+      expression = "variables.ctrs.all(c, c.image in ${jsonencode([var.code_location_image])})"
+      message    = "Dagster run Jobs must use the deployed code location image"
+    },
+    {
+      expression = "variables.job != '' && variables.ctrs.all(c, c.?env.orValue([]).exists(e, e.name == 'DAGSTER_RUN_JOB_NAME' && e.?value.orValue('') == variables.job))"
+      message    = "label dagster/job must equal the launcher's DAGSTER_RUN_JOB_NAME"
+    },
+    {
+      expression = <<-CEL
+        variables.ctrs.all(c,
+          c.?envFrom.orValue([]).all(e, !has(e.secretRef) || e.secretRef.name in variables.allowed) &&
+          c.?env.orValue([]).all(e, !has(e.valueFrom) || !has(e.valueFrom.secretKeyRef) || e.valueFrom.secretKeyRef.name in variables.allowed)) &&
+        variables.ps.?volumes.orValue([]).all(v, !has(v.secret) || v.secret.secretName in variables.allowed) &&
+        variables.ps.?volumes.orValue([]).all(v, !has(v.projected))
+      CEL
+      message    = "Dagster run Jobs may only use the Secrets ${join(", ", local.run_secrets)}"
+    },
+  ]
+}
+
+resource "kubernetes_manifest" "run_job_guard" {
+  manifest = {
+    apiVersion = "admissionregistration.k8s.io/v1"
+    kind       = "ValidatingAdmissionPolicy"
+    metadata   = { name = "${var.namespace}-dagster-run-jobs", labels = var.labels }
+    spec = {
+      failurePolicy = "Fail"
+      matchConstraints = {
+        resourceRules = [{ apiGroups = ["batch"], apiVersions = ["v1"], operations = ["CREATE", "UPDATE"], resources = ["jobs"] }]
+      }
+      matchConditions = [{
+        name       = "created-by-the-run-launcher"
+        expression = "request.userInfo.username == 'system:serviceaccount:${var.namespace}:${var.run_launcher_service_account}'"
+      }]
+      variables = [
+        { name = "ps", expression = "object.spec.template.spec" },
+        { name = "ctrs", expression = "object.spec.template.spec.containers" },
+        { name = "job", expression = "object.spec.template.metadata.?labels.orValue({})[?'dagster/job'].orValue('')" },
+        { name = "allowed", expression = jsonencode(local.run_secrets) },
+      ]
+      validations = local.run_job_checks
+    }
+  }
+}
+
+resource "kubernetes_manifest" "run_job_guard_binding" {
+  manifest = {
+    apiVersion = "admissionregistration.k8s.io/v1"
+    kind       = "ValidatingAdmissionPolicyBinding"
+    metadata   = { name = "${var.namespace}-dagster-run-jobs", labels = var.labels }
+    spec = {
+      policyName        = kubernetes_manifest.run_job_guard.manifest.metadata.name
+      validationActions = ["Deny"]
+      matchResources = {
+        namespaceSelector = { matchLabels = { "kubernetes.io/metadata.name" = var.namespace } }
+      }
+    }
+  }
+}
+
 # --- Dagster ---------------------------------------------------------------------------
 resource "helm_release" "this" {
   name       = local.name
@@ -459,18 +553,39 @@ resource "helm_release" "this" {
       deployments    = [local.code_location]
     }
 
+    # K8sRunLauncher through the chart's CustomRunLauncher: the chart has no value for
+    # only_allow_user_defined_k8s_config_fields (audit R3-1). The allowlist is what
+    # the code location's container context sets plus env_from for the purge tag;
+    # a dagster-k8s/config run tag with anything else (command, args, image,
+    # labels, init containers, ...) makes the launch fail. Env var names are limited
+    # to the platform contract (only_allow_user_defined_env_vars).
     runLauncher = {
-      type = "K8sRunLauncher"
+      type = "CustomRunLauncher"
       config = {
-        k8sRunLauncher = {
-          imagePullPolicy     = "IfNotPresent"
-          resources           = var.resources["run"]
-          securityContext     = local.container_sctx
-          failPodOnRunFailure = true
-          runK8sConfig = {
-            podSpecConfig           = { securityContext = local.pod_secctx, enableServiceLinks = false }
-            jobSpecConfig           = { ttlSecondsAfterFinished = var.run_ttl_seconds, backoffLimit = 0 }
-            podTemplateSpecMetadata = { labels = { "app.kubernetes.io/name" = "dagster-run" } }
+        customRunLauncher = {
+          module = "dagster_k8s"
+          class  = "K8sRunLauncher"
+          config = {
+            load_incluster_config    = true
+            job_namespace            = var.namespace
+            image_pull_policy        = "IfNotPresent"
+            service_account_name     = var.run_launcher_service_account
+            dagster_home             = "/opt/dagster/dagster_home"
+            instance_config_map      = "${local.name}-instance"
+            postgres_password_secret = module.db_credentials.secret_name
+            resources                = var.resources["run"]
+            fail_pod_on_run_failure  = true
+            security_context         = local.container_sctx
+            # common labels on run Jobs/pods come from the launcher, not from the
+            # container context (labels are not allowed from tags)
+            labels = var.labels
+            run_k8s_config = {
+              pod_spec_config            = { securityContext = local.pod_secctx, enableServiceLinks = false }
+              pod_template_spec_metadata = { labels = { "app.kubernetes.io/name" = "dagster-run" } }
+              job_spec_config            = { backoffLimit = 0, ttlSecondsAfterFinished = var.run_ttl_seconds }
+            }
+            only_allow_user_defined_k8s_config_fields = local.run_config_allowlist
+            only_allow_user_defined_env_vars          = sort(keys(local.env_map))
           }
         }
       }

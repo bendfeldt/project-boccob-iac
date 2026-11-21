@@ -53,15 +53,15 @@ req = urllib.request.Request("http://127.0.0.1:80/graphql", data=sys.stdin.buffe
 print(urllib.request.urlopen(req, timeout=60).read().decode())'
 }
 
-# dp_dagster_launch <job> [partition] -> run id
+# dp_dagster_launch <job> [partition] [extra tags as JSON array of {key,value}] -> run id
 dp_dagster_launch() {
-  local job="$1" partition="${2:-}"
-  jq -n --arg job "$job" --arg p "$partition" '{
+  local job="$1" partition="${2:-}" extra="${3:-[]}"
+  jq -n --arg job "$job" --arg p "$partition" --argjson extra "$extra" '{
     query: "mutation($p: ExecutionParams!) { launchRun(executionParams: $p) { __typename ... on LaunchRunSuccess { run { runId } } ... on PythonError { message } ... on RunConfigValidationInvalid { errors { message } } ... on InvalidSubsetError { message } } }",
     variables: { p: {
       selector: { repositoryLocationName: "lakehouse", repositoryName: "__repository__", jobName: $job },
       runConfigData: {},
-      executionMetadata: { tags: (if $p == "" then [] else [{key: "dagster/partition", value: $p}] end) }
+      executionMetadata: { tags: ((if $p == "" then [] else [{key: "dagster/partition", value: $p}] end) + $extra) }
     } } }' | dp_dagster_graphql | jq -r '.data.launchRun | if .__typename == "LaunchRunSuccess" then .run.runId else error(tostring) end'
 }
 
@@ -84,4 +84,10 @@ dp_dagster_wait() {
     (( $(date +%s) - start > timeout )) && { err "run ${id}: still ${status} after ${timeout}s"; return 1; }
     sleep 15
   done
+}
+
+# dp_dagster_failure <run id> -> messages of the run's failure events (engine/run failure)
+dp_dagster_failure() {
+  jq -n --arg id "$1" '{query: "query($id: ID!) { logsForRun(runId: $id) { ... on EventConnection { events { __typename ... on MessageEvent { message } ... on EngineEvent { error { message } } ... on RunFailureEvent { error { message } } } } } }", variables: {id: $id}}' \
+    | dp_dagster_graphql | jq -r '.data.logsForRun.events[] | select(.__typename | test("Failure|EngineEvent")) | ((.error.message // "") + " " + (.message // ""))' | tr '\n' ' '
 }

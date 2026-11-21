@@ -64,7 +64,7 @@ variable "trino_service_account" {
 }
 
 variable "dagster_ui_groups" {
-  description = "Keycloak groups allowed into the Dagster UI (launching runs included: Dagster OSS has no roles)."
+  description = "Keycloak groups allowed into the Dagster UI. Privileged: launching runs (with run config and tags) is acting as svc-dagster, Dagster OSS has no roles (audit R3-1). test/prod tfvars: platform-admin only."
   type        = list(string)
   default     = ["platform-admin", "data-engineer"]
 }
