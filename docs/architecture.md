@@ -100,7 +100,9 @@ not compress. On 2026-11-18 `12-foundation-services` reached 1,035,915 of
 after it had changed the cluster. Keycloak, the identity namespace and
 keycloak-db were therefore moved into `13-identity` **with their state**
 (`tofu state mv` between the pulled states, pushed back with
-`STATE_READ_UNENCRYPTED=1 scripts/tofu.sh <env> <stack> state push <file>`;
+`STATE_READ_UNENCRYPTED=1 scripts/tofu.sh <env> <stack> state push <file>` —
+the variable is refused for anything but `state` subcommands, warns, and must
+not stay exported; delete the plaintext files afterwards;
 plans of both stacks afterwards: 0 to add/change/destroy). Sizes after the
 split (dev): 12 = 53 %, 13 = 38 %, 22 = 30 %, 20 = 27 %, 21 = 26 % of 1 MiB.
 Big items: every `kubernetes_manifest` stores the full object incl. the CRD
