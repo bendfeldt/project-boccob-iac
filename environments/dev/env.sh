@@ -17,12 +17,24 @@ export DEV_REGISTRY_PORT="${DEV_REGISTRY_PORT:-5000}"
 #    dev cluster may ever use -> absolute thresholds instead;
 #  - cgroup v1 container hosts are rejected by kubelet >= 1.35 unless told otherwise.
 K3S_EXTRA_KUBELET_ARGS="eviction-hard=memory.available<100Mi,nodefs.available<1Gi,imagefs.available<1Gi image-gc-high-threshold=98 image-gc-low-threshold=95"
-if [[ "$(stat -fc %T /sys/fs/cgroup 2>/dev/null)" != "cgroup2fs" ]]; then
+# (a podman machine runs Fedora CoreOS: always cgroup v2)
+if [[ "${CLUSTER_RUNTIME:-native}" == "native" && "$(stat -fc %T /sys/fs/cgroup 2>/dev/null)" != "cgroup2fs" ]]; then
   K3S_EXTRA_KUBELET_ARGS+=" fail-cgroupv1=false"
 fi
 export K3S_EXTRA_KUBELET_ARGS
 # manage a marked block in /etc/hosts so <svc>.dev.lakehouse.internal resolves on this machine
-export DEV_MANAGE_ETC_HOSTS="${DEV_MANAGE_ETC_HOSTS:-1}"
+# (Linux: on by default, the scripts run as root; macOS: opt-in, the edit needs sudo)
+if [[ "${CLUSTER_RUNTIME:-native}" == "podman-machine" ]]; then
+  export DEV_MANAGE_ETC_HOSTS="${DEV_MANAGE_ETC_HOSTS:-0}"
+else
+  export DEV_MANAGE_ETC_HOSTS="${DEV_MANAGE_ETC_HOSTS:-1}"
+fi
+# podman machine (macOS): its name (empty = the default machine) and the VM
+# directory that receives the files bind-mounted into the node/registry containers
+export PODMAN_MACHINE="${PODMAN_MACHINE:-}"
+export DEV_MACHINE_DIR="${DEV_MACHINE_DIR:-/var/lib/boccob/dev}"
+# address the dev ports are published on (machine: forwarded to the Mac by gvproxy)
+export DEV_PUBLISH_ADDR="${DEV_PUBLISH_ADDR:-127.0.0.1}"
 export DEV_INGRESS_HOSTS="keycloak openbao s3 s3-console trino polaris dagster grafana"
 
 # OpenBao init: 1 key share in dev (kept in ${STATE_DIR}/openbao/, never in git)

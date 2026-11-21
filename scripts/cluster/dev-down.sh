@@ -16,6 +16,10 @@ if [[ "${2:-}" == "--purge" ]]; then
   done
   podman network rm "${CLUSTER_NAME}" >/dev/null 2>&1 || true
   if [[ "${DEV_MANAGE_ETC_HOSTS:-0}" == "1" ]]; then "${REPO_ROOT}/scripts/cluster/etc-hosts.sh" "$ENV" remove; fi
+  if [[ "$CLUSTER_RUNTIME" == "podman-machine" ]]; then
+    container_host_hosts_block "$CLUSTER_NAME" ""
+    container_host_exec "rm -rf '${DEV_MACHINE_DIR:-/var/lib/boccob/${ENV}}' '/etc/containers/certs.d/${REGISTRY_HOST}'" || true
+  fi
   rm -rf "${STATE_DIR}"
   log "purged ${CLUSTER_NAME} including ${STATE_DIR}"
 else

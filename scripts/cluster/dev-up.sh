@@ -3,6 +3,13 @@
 # dedicated podman network shared with the Zot bootstrap registry.
 # The node has no internet access by design: every image comes from Zot
 # through /etc/rancher/k3s/registries.yaml.
+#
+# CLUSTER_RUNTIME=native (Linux, run as root): containers on this machine.
+# CLUSTER_RUNTIME=podman-machine (macOS): containers in a ROOTFUL podman machine
+# (make machine-init). Kernel settings and the files bind-mounted into the node
+# are applied inside the VM (podman machine ssh); ports are published in the VM
+# and forwarded to the Mac by podman's gvproxy. The node image architecture is
+# the VM's (arm64 on Apple Silicon): CLUSTER_ARCH selects the locked digests.
 # shellcheck source=../lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 # shellcheck source=../lib/registry.sh
@@ -12,6 +19,10 @@ source "${REPO_ROOT}/scripts/lib/k3s-config.sh"
 load_env "${1:-${ENV:-}}"
 [[ "$CLUSTER_MODE" == "podman" ]] || die "dev-up.sh only handles CLUSTER_MODE=podman"
 require_cmd podman kubectl jq skopeo
+require_rootful_podman
+runtime="$(cluster_runtime)"
+ensure_cluster_arch
+log "runtime: ${runtime}, node architecture: linux/${CLUSTER_ARCH}"
 
 NODE="${CLUSTER_NAME}-server-0"
 CFG="${STATE_DIR}/k3s"
@@ -28,13 +39,19 @@ if [[ "${SKIP_MIRROR:-0}" != "1" ]]; then
 fi
 
 step "kernel parameters required by protect-kernel-defaults"
-while IFS='=' read -r key want; do
-  got="$(sysctl -n "$key")"
-  if [[ "$got" != "$want" ]]; then
-    log "sysctl ${key}: ${got} -> ${want}"
-    sysctl -q -w "${key}=${want}" || die "cannot set ${key}=${want} on the podman host"
-  fi
-done < <(k3s_required_sysctls)
+if [[ "$runtime" == "podman-machine" ]]; then
+  # in the VM; also persisted there so they survive a machine restart
+  k3s_required_sysctls | container_host_write_file /etc/sysctl.d/90-boccob-k3s.conf 0644
+  container_host_exec "sysctl -q -p /etc/sysctl.d/90-boccob-k3s.conf" || die "cannot set the kernel parameters in the podman machine"
+else
+  while IFS='=' read -r key want; do
+    got="$(sysctl -n "$key")"
+    if [[ "$got" != "$want" ]]; then
+      log "sysctl ${key}: ${got} -> ${want}"
+      sysctl -q -w "${key}=${want}" || die "cannot set ${key}=${want} on the podman host"
+    fi
+  done < <(k3s_required_sysctls)
+fi
 
 step "render hardened k3s configuration"
 render_k3s_server_config "$NODE" false "127.0.0.1,localhost,${NODE},k3s.${BASE_DOMAIN}" > "${CFG}/etc/config.yaml"
@@ -53,19 +70,31 @@ node_ip="${DEV_NODE_IP:-${subnet%.*}.10}"
 # cannot lower oom_score_adj, which runc needs for the pause container
 # (-998). containerd can clamp it to its own value instead.
 extra_mounts=()
+dropin=false
 : > "${CFG}/etc/containerd-dropin.toml"
-if ! ( echo -1 > /proc/self/oom_score_adj ) 2>/dev/null; then
+if ! container_host_exec 'echo -1 > /proc/self/oom_score_adj' 2>/dev/null; then
   warn "host lacks CAP_SYS_RESOURCE: enabling containerd restrict_oom_score_adj (dev only)"
   printf "[plugins.'io.containerd.cri.v1.runtime']\n  restrict_oom_score_adj = true\n" > "${CFG}/etc/containerd-dropin.toml"
-  extra_mounts+=(-v "${CFG}/etc/containerd-dropin.toml:/var/lib/rancher/k3s/agent/etc/containerd/config-v3.toml.d/10-boccob-dev.toml:ro")
+  dropin=true
 fi
-cfg_sum="$(echo "$node_ip" | cat - "${CFG}/etc/containerd-dropin.toml" "${CFG}/etc/hosts" "${CFG}/etc/config.yaml" "${CFG}/etc/registries.yaml" "${CFG}/etc/hardening/"* | sha256sum | awk '{print $1}')"
+cfg_sum="$(echo "$node_ip" | cat - "${CFG}/etc/containerd-dropin.toml" "${CFG}/etc/hosts" "${CFG}/etc/config.yaml" "${CFG}/etc/registries.yaml" "${CFG}/etc/hardening/"* | sha256_stream | awk '{print $1}')"
+# bind mounts are resolved on the container host: native = ${CFG}/etc itself,
+# podman machine = a root-owned copy in the VM
+etc="$(container_host_sync_dir "${CFG}/etc" "${DEV_MACHINE_DIR:-/var/lib/boccob/${ENV}}/k3s-etc")"
+if $dropin; then
+  extra_mounts+=(-v "${etc}/containerd-dropin.toml:/var/lib/rancher/k3s/agent/etc/containerd/config-v3.toml.d/10-boccob-dev.toml:ro")
+fi
 
 step "k3s node container ${NODE}"
 k3s_ref="$(image_zot_digest_ref k3s)"
 if ! podman image exists "$k3s_ref"; then
   # the host pulls the node image from Zot as well (same path prod nodes use)
-  skopeo copy --quiet --preserve-digests "docker://${k3s_ref}" "containers-storage:${k3s_ref}"
+  if [[ "$runtime" == "podman-machine" ]]; then
+    # the VM's podman (registry name + CA set up by registry-up.sh)
+    podman pull -q "$k3s_ref" >/dev/null
+  else
+    skopeo copy --quiet --preserve-digests "docker://${k3s_ref}" "containers-storage:${k3s_ref}"
+  fi
 fi
 
 if podman_container_alive "$NODE"; then
@@ -86,18 +115,18 @@ if ! podman container exists "$NODE"; then
   podman run -d --name "$NODE" --hostname "$NODE" \
     --privileged \
     --network "${CLUSTER_NAME}" --ip "${node_ip}" --no-hosts \
-    -v "${CFG}/etc/hosts:/etc/hosts:ro" \
+    -v "${etc}/hosts:/etc/hosts:ro" \
     --label "boccob.config-sha256=${cfg_sum}" \
-    -p "127.0.0.1:${DEV_API_PORT}:6443" \
-    -p "127.0.0.1:${DEV_HTTPS_PORT}:443" \
-    -p "127.0.0.1:${DEV_HTTP_PORT}:80" \
+    -p "${DEV_PUBLISH_ADDR:-127.0.0.1}:${DEV_API_PORT}:6443" \
+    -p "${DEV_PUBLISH_ADDR:-127.0.0.1}:${DEV_HTTPS_PORT}:443" \
+    -p "${DEV_PUBLISH_ADDR:-127.0.0.1}:${DEV_HTTP_PORT}:80" \
     --tmpfs /run --tmpfs /var/run \
     -v "${NODE}-data:/var/lib/rancher/k3s" \
     -v "${NODE}-kubelet:/var/lib/kubelet" \
     -v "${NODE}-log:/var/log" \
-    -v "${CFG}/etc/config.yaml:/etc/rancher/k3s/config.yaml:ro" \
-    -v "${CFG}/etc/registries.yaml:/etc/rancher/k3s/registries.yaml:ro" \
-    -v "${CFG}/etc/hardening:${K3S_HARDENING_DIR}:ro" \
+    -v "${etc}/config.yaml:/etc/rancher/k3s/config.yaml:ro" \
+    -v "${etc}/registries.yaml:/etc/rancher/k3s/registries.yaml:ro" \
+    -v "${etc}/hardening:${K3S_HARDENING_DIR}:ro" \
     "${extra_mounts[@]}" \
     --restart always \
     "$k3s_ref" server >/dev/null
@@ -115,6 +144,11 @@ wait_for 180 "node Ready" kubectl wait --for=condition=Ready "node/${NODE}" --ti
 wait_for 300 "coredns" kubectl -n kube-system rollout status deploy/coredns --timeout=5s
 wait_for 300 "traefik" kubectl -n kube-system rollout status deploy/traefik --timeout=5s
 kubectl get nodes -o wide >&2
+if [[ "$runtime" == "podman-machine" ]] && ! port_listening 127.0.0.1 "${DEV_HTTPS_PORT}"; then
+  warn "nothing answers on 127.0.0.1:${DEV_HTTPS_PORT} on this Mac: podman did not forward the ingress port."
+  warn "macOS lets unprivileged programs (gvproxy) bind ports < 1024 only on 0.0.0.0. Options: DEV_PUBLISH_ADDR=0.0.0.0"
+  warn "make cluster-up ENV=${ENV} (exposes the dev ports on your network: enable the macOS firewall), see docs/getting-started.md"
+fi
 
 # OpenBao seals itself whenever its pod restarts. In dev the single unseal key
 # is on this machine, so bring it back automatically (test/prod: custodians run

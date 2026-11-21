@@ -15,15 +15,15 @@ S := scripts
 .PHONY: help
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-	@echo; echo "  Variables: ENV=dev|test|prod  STACK=<stacks/NN-*>  GROUPS=cluster,foundation,...  BUNDLE=<dir>"
+	@echo; echo "  Variables: ENV=dev|test|prod  STACK=<stacks/NN-*>  GROUPS=cluster,foundation,...  BUNDLE=<dir>  MIRROR_ARCHES=amd64,arm64"
 
 # --- versions / air-gap ---------------------------------------------------------
 .PHONY: lock tools airgap-mirror airgap-bundle airgap-load airgap-check providers-mirror node-bundle solution-bundle solution-load release-publish
 lock: ## Resolve versions.yaml -> versions.lock.yaml (needs internet)
 	$(S)/lock-update.sh
-tools: ## Install pinned cosign/trivy/syft into ~/.cache/boccob/bin
+tools: ## Install pinned cosign/trivy/syft/oras for this machine (linux amd64/arm64, macOS arm64) into ~/.cache/boccob/bin
 	$(S)/tools-install.sh
-airgap-mirror: ## Connected: copy locked images + charts into Zot (GROUPS=.. to limit)
+airgap-mirror: ## Connected: copy locked images + charts into Zot (GROUPS=.. to limit, MIRROR_ARCHES=amd64,arm64)
 	MIRROR_GROUPS=$(GROUPS) $(S)/airgap/mirror.sh sync $(ENV)
 airgap-bundle: ## Connected: export a transferable bundle (BUNDLE=<dir>, TAR=1 for a tarball)
 	MIRROR_GROUPS=$(GROUPS) $(S)/airgap/mirror.sh bundle $(ENV) $(BUNDLE)
@@ -35,7 +35,7 @@ solution-bundle: ## Connected: export solution artefacts + signatures by digest 
 	$(S)/airgap/solution.sh bundle $(ENV) $(BUNDLE) $(REFS)
 solution-load: ## Air-gapped: load a solution bundle (BUNDLE=<dir>) into Zot and verify digests + signatures
 	$(S)/airgap/solution.sh load $(ENV) $(BUNDLE)
-release-publish: ## Build, push and sign a solution release into Zot (SOLUTION_DIR=.. VERSION=.. SBOM=0 SKIP_BUILD=1)
+release-publish: ## Build, push and sign a solution release into Zot (SOLUTION_DIR=.. VERSION=.. SBOM=0 SKIP_BUILD=1 PLATFORMS=linux/amd64,linux/arm64)
 	$(S)/release/publish.sh $(ENV)
 providers-mirror: ## Mirror OpenTofu providers for offline `tofu init`
 	$(S)/airgap/providers-mirror.sh $(BUNDLE)
@@ -58,7 +58,13 @@ trivy-db: ## Connected: mirror the Trivy vulnerability DB into Zot (JAVA_DB=1 ad
 	$(S)/supply-chain/trivy-db.sh sync $(ENV)
 
 # --- cluster ----------------------------------------------------------------------
-.PHONY: registry-up cluster-up cluster-down
+.PHONY: doctor machine-init macos-trust registry-up cluster-up cluster-down
+doctor: ## Check this machine's prerequisites for ENV (arch, tools, podman/machine, resources, ports); changes nothing
+	$(S)/doctor.sh $(ENV)
+machine-init: ## macOS: create/resize + start the ROOTFUL podman machine (MACHINE_CPUS=6 MACHINE_MEMORY=16384 MACHINE_DISK=100)
+	$(S)/cluster/machine-init.sh
+macos-trust: ## macOS: trust the dev registry + platform CA in the System keychain (sudo; ACTION=check|add|remove)
+	$(S)/cluster/macos-trust.sh $(ENV) $(or $(ACTION),add)
 registry-up: ## dev: start the Zot bootstrap registry (Podman)
 	$(S)/cluster/registry-up.sh $(ENV)
 cluster-up: ## dev: Zot + hardened k3s in Podman; test/prod: install k3s on hosts over SSH

@@ -109,6 +109,58 @@ container_host_sync_dir() {
   printf '%s' "$dst"
 }
 
+# container_host_write_file <path> [mode] : stdin -> file on the container host (as root)
+container_host_write_file() {
+  local path="$1" mode="${2:-0644}"
+  if [[ "$(cluster_runtime)" == "podman-machine" ]]; then
+    local m; m="$(podman_machine_args)"
+    # shellcheck disable=SC2086
+    podman machine ssh ${m} "sudo sh -c $(printf '%q' "mkdir -p \"\$(dirname '${path}')\" && cat > '${path}.tmp' && chmod ${mode} '${path}.tmp' && mv '${path}.tmp' '${path}'")"
+  else
+    mkdir -p "$(dirname "$path")"
+    cat > "${path}.tmp" && chmod "$mode" "${path}.tmp" && mv "${path}.tmp" "$path"
+  fi
+}
+
+# container_host_hosts_block <name> <line|""> : maintain a marked block in the
+# container host's /etc/hosts (podman machine VM: podman inside it must resolve
+# the registry name to its own published port). Empty line removes the block.
+container_host_hosts_block() {
+  local name="$1" line="$2" b e f="${CONTAINER_HOST_HOSTS_FILE:-/etc/hosts}" script
+  b="# >>> ${name} (managed by project-boccob-iac)"; e="# <<< ${name}"
+  script="awk -v b='${b}' -v e='${e}' '\$0==b{s=1} !s{print} \$0==e{s=0}' ${f} > ${f}.boccob"
+  if [[ -n "$line" ]]; then
+    script+=" && printf '%s\\n%s\\n%s\\n' '${b}' '${line}' '${e}' >> ${f}.boccob"
+  fi
+  script+=" && cat ${f}.boccob > ${f} && rm -f ${f}.boccob"
+  container_host_exec "$script"
+}
+
+# require_rootful_podman : podman must run containers as root (privileged k3s node,
+# ports 80/443, netfilter). Native: run the scripts as root. Machine: rootful VM.
+require_rootful_podman() {
+  local rootless
+  rootless="$(podman info --format '{{.Host.Security.Rootless}}' 2>/dev/null)" \
+    || die "podman is not reachable$([[ "$(cluster_runtime)" == podman-machine ]] && echo ': start the machine (podman machine start) or create it (make machine-init)')"
+  if [[ "$rootless" != "false" ]]; then
+    if [[ "$(cluster_runtime)" == "podman-machine" ]]; then
+      die "the podman machine is rootless; the dev cluster needs a rootful machine: podman machine stop; podman machine set --rootful; podman machine start (or make machine-init)"
+    fi
+    die "rootless podman is not supported: run the dev scripts as root (sudo -i)"
+  fi
+}
+
+# name_resolves <hostname> : true when this machine resolves the name (portable:
+# curl exit code 6 = could not resolve host)
+name_resolves() {
+  local rc=0
+  curl -s -o /dev/null --noproxy '*' --connect-timeout 2 --max-time 3 "http://${1}:9/" || rc=$?
+  [[ $rc -ne 6 ]]
+}
+
+# port_listening <addr> <port> : true when something accepts TCP connections there
+port_listening() { (exec 3<>"/dev/tcp/${1}/${2}") 2>/dev/null; }
+
 # tar_c_root <dir> : tar of a directory's content on stdout, entries owned by root (GNU or BSD tar)
 tar_c_root() {
   if tar --version 2>/dev/null | grep -q 'GNU tar'; then
@@ -130,7 +182,7 @@ sha256_of() { sha256_stream "$1" | awk '{print $1}'; }
 # sha256_manifest : SHA256SUMS of every file below the current directory (stable order)
 sha256_manifest() {
   local f
-  find . -type f ! -name SHA256SUMS | LC_ALL=C sort | while IFS= read -r f; do
+  find . -type f ! -name 'SHA256SUMS*' | LC_ALL=C sort | while IFS= read -r f; do
     printf '%s  %s\n' "$(sha256_of "$f")" "$f"
   done
 }
