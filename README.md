@@ -1,5 +1,7 @@
 # project-boccob-iac
 
+**New here? Start with [docs/getting-started.md](docs/getting-started.md)** (run it locally or on your own Linux VM).
+
 Infrastructure as code for the Boccob lakehouse: on-prem, open source,
 air-gapped, k3s everywhere. OpenTofu only, driven by bash scripts wrapped in a
 Makefile.
