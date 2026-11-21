@@ -47,6 +47,21 @@ if [[ "$os" == "darwin" && "$arch" == "amd64" ]]; then
   soft "Intel Mac: untested; the locked operator tools exist for darwin/arm64 only (install cosign/trivy/syft/oras with Homebrew)"
 fi
 
+if [[ "$os" == "darwin" ]]; then
+  section "Homebrew (required on macOS; Brewfile)"
+  if ! command -v brew >/dev/null 2>&1; then
+    bad "Homebrew not found: install it (https://brew.sh), then make brew-bundle"
+  else
+    ok "brew: $(command -v brew)"
+    missing="$(brew_missing | tr '\n' ' ')"
+    if [[ -z "${missing// /}" ]]; then ok "all Brewfile formulae installed ($(brew_formulae | tr '\n' ' '))"
+    else bad "missing formulae: brew install ${missing% }   (or: make brew-bundle)"; fi
+    brew list --formula -1 2>/dev/null | grep -qx yq && bad "the 'yq' formula (Go yq) is installed: brew uninstall yq (python-yq provides yq)"
+    gnubin="$(brew --prefix 2>/dev/null)/opt/make/libexec/gnubin"
+    [[ ":$PATH:" == *":${gnubin}:"* ]] && ok "GNU make first in PATH" || soft "put ${gnubin} first in PATH (docs/getting-started.md, C.1)"
+  fi
+fi
+
 section "tools"
 need=(make git curl jq yq openssl tofu helm kubectl skopeo podman)
 [[ "$os" == "linux" ]] && need+=(sysctl)
@@ -161,6 +176,21 @@ if [[ "$CLUSTER_MODE" == "podman" ]]; then
     elif port_listening 127.0.0.1 "$p"; then bad "port ${p} is used by another program (stop it; moving the dev ports breaks the Keycloak redirects)"
     else ok "port ${p} is free"; fi
   done
+
+  if [[ "$runtime" == "podman-machine" ]]; then
+    pub="${DEV_PUBLIC_HTTPS_PORT:-443}"
+    if [[ "$pub" == "443" ]]; then
+      if "${REPO_ROOT}/scripts/cluster/macos-ports.sh" "$ENV" check >/dev/null 2>&1; then
+        ok "pf redirect active: 127.0.0.1:443 -> ${DEV_HTTPS_PORT}, :80 -> ${DEV_HTTP_PORT} (public URLs without port)"
+      else
+        bad "public URLs use port 443 but the pf redirect is not active: make macos-ports ENV=${ENV} (sudo), or DEV_PUBLIC_HTTPS_PORT=${DEV_HTTPS_PORT} (URLs with :${DEV_HTTPS_PORT}) and redeploy"
+      fi
+    elif [[ "$pub" == "$DEV_HTTPS_PORT" ]]; then
+      ok "public URLs use :${pub} (no pf redirect needed)"
+    else
+      bad "DEV_PUBLIC_HTTPS_PORT=${pub} must be 443 (with make macos-ports) or DEV_HTTPS_PORT=${DEV_HTTPS_PORT}"
+    fi
+  fi
 
   section "names and trust"
   reg="${REGISTRY_HOST%%:*}"

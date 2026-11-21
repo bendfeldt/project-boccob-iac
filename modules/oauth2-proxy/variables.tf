@@ -19,6 +19,12 @@ variable "replicas" {
   default     = 1
 }
 
+variable "public_port" {
+  description = "\":<port>\" when the public URL uses a non-default https port, else \"\"."
+  type        = string
+  default     = ""
+}
+
 variable "public_host" {
   description = "Public hostname of the protected application (redirect URL https://<host>/oauth2/callback)."
   type        = string

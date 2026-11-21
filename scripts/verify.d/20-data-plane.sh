@@ -15,7 +15,7 @@ if kubectl get namespace catalog query orchestration >/dev/null 2>&1; then
   check "Polaris uses the PostgreSQL metastore (relational-jdbc)" bash -c \
     "kubectl -n catalog get configmap polaris -o jsonpath='{.data.application\.properties}' | grep -q '^polaris.persistence.type=relational-jdbc'"
   check "Polaris API serves TLS from the platform CA (ingress, OAuth2 required)" bash -c \
-    "test \"\$(curl -sS -o /dev/null -w '%{http_code}' --noproxy '*' --cacert '$ca' --resolve 'polaris.${BASE_DOMAIN}:443:${DP_INGRESS_IP}' https://polaris.${BASE_DOMAIN}/api/management/v1/catalogs)\" = 401"
+    "test \"\$(curl -sS -o /dev/null -w '%{http_code}' --noproxy '*' --cacert '$ca' --resolve 'polaris.${BASE_DOMAIN}:${DP_INGRESS_PORT}:${DP_INGRESS_IP}' https://polaris.${BASE_DOMAIN}${DP_PORT_SUFFIX}/api/management/v1/catalogs)\" = 401"
   check "Polaris principal credentials stored in OpenBao (synced for Trino)" bash -c \
     "kubectl -n query get secret trino-polaris -o jsonpath='{.data.credential}' | base64 -d | grep -q ':'"
 
@@ -25,7 +25,7 @@ if kubectl get namespace catalog query orchestration >/dev/null 2>&1; then
     "kubectl -n query get configmap opa-config -o jsonpath='{.data.config\.yaml}' | grep -Eq '\"?resource\"?: \"?[^\" ]+@sha256:[0-9a-f]{64}'"
   check "Trino coordinator ready" kubectl -n query wait --for=condition=Available deploy/trino-coordinator --timeout=10s
   check "Trino catalogs raw/clean/consolidated/curated (svc-dagster over TLS, password auth)" bash -c \
-    "$(declare -f dp_trino_sa dp_secret); REPO_ROOT='$REPO_ROOT' DP_TRINO_URL='$DP_TRINO_URL' DP_INGRESS_IP='$DP_INGRESS_IP' dp_trino_sa svc-dagster '$ca' 'show catalogs' | tr -d '\"[]' | sort | tr '\n' ' ' | grep -qx 'clean consolidated curated raw system '"
+    "$(declare -f dp_trino_sa dp_secret); REPO_ROOT='$REPO_ROOT' DP_TRINO_URL='$DP_TRINO_URL' DP_INGRESS_IP='$DP_INGRESS_IP' DP_INGRESS_PORT='$DP_INGRESS_PORT' dp_trino_sa svc-dagster '$ca' 'show catalogs' | tr -d '\"[]' | sort | tr '\n' ' ' | grep -qx 'clean consolidated curated raw system '"
   vs_schema="verify_smoke_$(random_secret 9 | tr -dc 'a-z0-9' | head -c 8)"
   dp_iceberg_roundtrip() {
     local q=(dp_trino_sa svc-dagster "$ca")
@@ -39,7 +39,7 @@ if kubectl get namespace catalog query orchestration >/dev/null 2>&1; then
   }
   check "Iceberg round trip Trino -> Polaris -> RustFS (create/select/drop with purge)" dp_iceberg_roundtrip
   check "unauthenticated Trino request rejected" bash -c \
-    "test \"\$(curl -sS -o /dev/null -w '%{http_code}' --noproxy '*' --cacert '$ca' --resolve 'trino.${BASE_DOMAIN}:443:${DP_INGRESS_IP}' -H 'X-Trino-User: svc-dagster' -X POST --data 'select 1' https://trino.${BASE_DOMAIN}/v1/statement)\" = 401"
+    "test \"\$(curl -sS -o /dev/null -w '%{http_code}' --noproxy '*' --cacert '$ca' --resolve 'trino.${BASE_DOMAIN}:${DP_INGRESS_PORT}:${DP_INGRESS_IP}' -H 'X-Trino-User: svc-dagster' -X POST --data 'select 1' https://trino.${BASE_DOMAIN}${DP_PORT_SUFFIX}/v1/statement)\" = 401"
   check "Trino group provider has the Keycloak groups (group sync)" bash -c \
     "kubectl -n query exec deploy/trino-coordinator -c trino-coordinator -- cat /groups/group.db | grep -q '^data-engineer:.*svc-dagster'"
   check "lakehouse-service held only by service accounts (svc-dagster), never synced from Keycloak" bash -c \
@@ -141,5 +141,5 @@ if kubectl get namespace catalog query orchestration >/dev/null 2>&1; then
   check "Kyverno: running solution pods pass verify-solution-image-signatures" bash -c \
     "! kubectl -n orchestration get policyreports -o json | jq -e -r '.items[] | select(.scope.kind == \"Pod\") | .scope.name as \$n | .results[]? | select(.policy == \"verify-solution-image-signatures\" and .result != \"pass\") | \$n' | grep ."
   check "Dagster UI requires a Keycloak login (oauth2-proxy redirect)" bash -c \
-    "curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' --noproxy '*' --cacert '$ca' --resolve 'dagster.${BASE_DOMAIN}:443:${DP_INGRESS_IP}' https://dagster.${BASE_DOMAIN}/ | grep -Eq '^(302|403) '"
+    "curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' --noproxy '*' --cacert '$ca' --resolve 'dagster.${BASE_DOMAIN}:${DP_INGRESS_PORT}:${DP_INGRESS_IP}' https://dagster.${BASE_DOMAIN}${DP_PORT_SUFFIX}/ | grep -Eq '^(302|403) '"
 fi

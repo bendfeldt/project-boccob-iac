@@ -163,6 +163,7 @@ module "dagster_auth" {
   image          = module.versions.images["oauth2-proxy"].ref
   replicas       = var.ha ? 2 : 1
   public_host    = "dagster.${var.base_domain}"
+  public_port    = local.platform.public_port
   upstream       = module.dagster.webserver_url
   oidc           = { issuer = local.platform.oidc_issuer, client_id = "dagster", client_secret_kv_path = "identity/oidc-clients/dagster" }
   allowed_groups = var.dagster_ui_groups

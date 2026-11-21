@@ -58,13 +58,19 @@ trivy-db: ## Connected: mirror the Trivy vulnerability DB into Zot (JAVA_DB=1 ad
 	$(S)/supply-chain/trivy-db.sh sync $(ENV)
 
 # --- cluster ----------------------------------------------------------------------
-.PHONY: doctor machine-init macos-trust registry-up cluster-up cluster-down
+.PHONY: doctor brew-bundle machine-init macos-trust macos-ports macos-ports-remove registry-up cluster-up cluster-down
 doctor: ## Check this machine's prerequisites for ENV (arch, tools, podman/machine, resources, ports); changes nothing
 	$(S)/doctor.sh $(ENV)
+brew-bundle: ## macOS: install the Homebrew prerequisites listed in Brewfile (brew bundle --file=Brewfile)
+	brew bundle --file=Brewfile
 machine-init: ## macOS: create/resize + start the ROOTFUL podman machine (MACHINE_CPUS=6 MACHINE_MEMORY=16384 MACHINE_DISK=100)
 	$(S)/cluster/machine-init.sh
 macos-trust: ## macOS: trust the dev registry + platform CA in the System keychain (sudo; ACTION=check|add|remove)
 	$(S)/cluster/macos-trust.sh $(ENV) $(or $(ACTION),add)
+macos-ports: ## macOS: pf redirect 127.0.0.1:443->8443 and :80->8080 (anchor "boccob", sudo; idempotent)
+	$(S)/cluster/macos-ports.sh $(ENV) add
+macos-ports-remove: ## macOS: remove the pf redirect, its anchor, pf.conf lines and LaunchDaemon (sudo)
+	$(S)/cluster/macos-ports.sh $(ENV) remove
 registry-up: ## dev: start the Zot bootstrap registry (Podman)
 	$(S)/cluster/registry-up.sh $(ENV)
 cluster-up: ## dev: Zot + hardened k3s in Podman; test/prod: install k3s on hosts over SSH

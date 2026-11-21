@@ -109,6 +109,10 @@ export TF_VAR_base_domain="$BASE_DOMAIN"
 export TF_VAR_registry_host="$REGISTRY_HOST"
 ensure_cluster_arch
 export TF_VAR_cluster_arch="$CLUSTER_ARCH"
+# public URL port (dev on macOS without the pf redirect: 8443); unset = 443
+if [[ -n "${DEV_PUBLIC_HTTPS_PORT:-}" && "${DEV_PUBLIC_HTTPS_PORT}" != "443" ]]; then
+  export TF_VAR_public_https_port="$DEV_PUBLIC_HTTPS_PORT" TF_VAR_public_http_port="${DEV_PUBLIC_HTTP_PORT:-8080}"
+fi
 export TF_VAR_kubeconfig_path="$KUBECONFIG"
 # CA of the Zot registry, for workloads that pull OCI artefacts themselves (OPA bundle)
 if [[ -f "${REGISTRY_CA_FILE}" ]]; then

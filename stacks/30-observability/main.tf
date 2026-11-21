@@ -319,13 +319,14 @@ module "grafana_oidc_client" {
 }
 
 module "grafana" {
-  count     = var.grafana_enabled ? 1 : 0
-  source    = "../../modules/grafana"
-  name      = "grafana"
-  namespace = module.ns_observability.name
-  chart     = module.versions.charts["grafana"]
-  image     = module.versions.images["grafana"]
-  hostname  = "grafana.${var.base_domain}"
+  count       = var.grafana_enabled ? 1 : 0
+  source      = "../../modules/grafana"
+  name        = "grafana"
+  namespace   = module.ns_observability.name
+  chart       = module.versions.charts["grafana"]
+  image       = module.versions.images["grafana"]
+  hostname    = "grafana.${var.base_domain}"
+  public_port = local.platform.public_port
   oidc = {
     issuer        = local.platform.oidc_issuer
     client_id     = "grafana"
@@ -342,13 +343,14 @@ module "grafana" {
 }
 
 module "grafana_audit" {
-  count     = var.grafana_enabled ? 1 : 0
-  source    = "../../modules/grafana"
-  name      = "grafana-audit"
-  namespace = module.ns_observability.name
-  chart     = module.versions.charts["grafana"]
-  image     = module.versions.images["grafana"]
-  hostname  = "grafana-audit.${var.base_domain}"
+  count       = var.grafana_enabled ? 1 : 0
+  source      = "../../modules/grafana"
+  name        = "grafana-audit"
+  namespace   = module.ns_observability.name
+  chart       = module.versions.charts["grafana"]
+  image       = module.versions.images["grafana"]
+  hostname    = "grafana-audit.${var.base_domain}"
+  public_port = local.platform.public_port
   oidc = {
     issuer        = local.platform.oidc_issuer
     client_id     = "grafana-audit"

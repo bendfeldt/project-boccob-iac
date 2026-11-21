@@ -4,8 +4,13 @@
 
 # ingress address as seen from this machine (dev: loopback of the node container)
 DP_INGRESS_IP="${INGRESS_IP:-127.0.0.1}"
-DP_TRINO_URL="https://trino.${BASE_DOMAIN}"
-DP_KEYCLOAK_URL="https://keycloak.${BASE_DOMAIN}"
+# port of the ingress on this machine: 443 on Linux; on macOS the forwarded 8443 (it
+# answers with and without the pf redirect of make macos-ports)
+DP_INGRESS_PORT="${DEV_HTTPS_PORT:-443}"
+DP_PORT_SUFFIX=""
+[[ "$DP_INGRESS_PORT" == "443" ]] || DP_PORT_SUFFIX=":${DP_INGRESS_PORT}"
+DP_TRINO_URL="https://trino.${BASE_DOMAIN}${DP_PORT_SUFFIX}"
+DP_KEYCLOAK_URL="https://keycloak.${BASE_DOMAIN}${DP_PORT_SUFFIX}"
 
 # dp_ca_file <path> : platform CA bundle from the cluster
 dp_ca_file() {
@@ -33,7 +38,7 @@ dp_keycloak_token() {
   { printf 'grant_type=password&client_id=trino&scope=openid&username=%s&' "$user"
     printf 'client_secret=%s&password=' "$secret"
     python3 -I -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read().strip()),end="")' < "$pwfile"
-  } | curl -fsS --noproxy '*' --cacert "$ca" --resolve "keycloak.${BASE_DOMAIN}:443:${DP_INGRESS_IP}" \
+  } | curl -fsS --noproxy '*' --cacert "$ca" --resolve "keycloak.${BASE_DOMAIN}:${DP_INGRESS_PORT}:${DP_INGRESS_IP}" \
         --data-binary @- "${DP_KEYCLOAK_URL}/realms/lakehouse/protocol/openid-connect/token" | jq -r .access_token
 }
 

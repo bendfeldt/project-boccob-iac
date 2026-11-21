@@ -14,6 +14,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 load_env "${1:-${ENV:-}}"
 only="${2:-${STACK:-}}"
+require_brew_prereqs
 require_cmd tofu kubectl jq
 
 kubectl get --raw /readyz >/dev/null 2>&1 || die "cluster not reachable with ${KUBECONFIG} (make cluster-up ENV=${ENV})"

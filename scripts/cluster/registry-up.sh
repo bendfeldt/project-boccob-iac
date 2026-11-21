@@ -14,6 +14,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 # shellcheck source=../lib/registry.sh
 source "${REPO_ROOT}/scripts/lib/registry.sh"
 load_env "${1:-${ENV:-}}"
+require_brew_prereqs
 require_cmd podman openssl helm jq curl
 require_rootful_podman
 runtime="$(cluster_runtime)"

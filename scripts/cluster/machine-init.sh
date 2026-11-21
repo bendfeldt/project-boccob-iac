@@ -13,6 +13,7 @@
 # Silicon), so the cluster runs linux/arm64 images natively (no emulation).
 # shellcheck source=../lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
+require_brew_prereqs
 require_cmd podman jq
 
 name="${PODMAN_MACHINE:-podman-machine-default}"

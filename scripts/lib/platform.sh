@@ -170,6 +170,26 @@ tar_c_root() {
   fi
 }
 
+# --- Homebrew (hard requirement on macOS; Brewfile = the list of formulae) ----------
+brew_formulae() { sed -nE 's/^brew "([^"]+)".*/\1/p' "${REPO_ROOT}/Brewfile"; }
+# brew_missing -> formulae of the Brewfile that are not installed (one per line)
+brew_missing() {
+  local have f
+  have="$(brew list --formula -1 2>/dev/null)"
+  for f in $(brew_formulae); do grep -qx "$f" <<<"$have" || echo "$f"; done
+}
+# require_brew_prereqs : macOS only; fails with the exact `brew install` line
+require_brew_prereqs() {
+  [[ "$(uname -s)" == "Darwin" ]] || return 0
+  command -v brew >/dev/null 2>&1 \
+    || die "Homebrew is required on macOS (https://brew.sh), then: make brew-bundle"
+  local missing; missing="$(brew_missing | tr '\n' ' ')"
+  [[ -z "${missing// /}" ]] || die "missing Homebrew formulae: brew install ${missing% }   (or: make brew-bundle)"
+  if brew list --formula -1 2>/dev/null | grep -qx yq; then
+    die "the Homebrew 'yq' formula (Go yq) shadows python-yq: brew uninstall yq"
+  fi
+}
+
 # --- portable wrappers (GNU coreutils vs. macOS/BSD) ---------------------------------
 # sha256 of stdin or files, "<sum>  <name>" lines like GNU sha256sum
 sha256_stream() {
