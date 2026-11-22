@@ -40,7 +40,7 @@ case "$what" in
     openbao_export_token
     log "restoring ${key}"
     curl -fsS --noproxy '*' --cacert "$VAULT_CACERT" --resolve "openbao.secrets.svc:${VAULT_ADDR##*:}:127.0.0.1" \
-      -H "X-Vault-Token: ${VAULT_TOKEN}" -X POST --data-binary @"${tmp}/snap" \
+      -H @<(printf 'X-Vault-Token: %s\n' "$VAULT_TOKEN") -X POST --data-binary @"${tmp}/snap" \
       "https://openbao.secrets.svc:${VAULT_ADDR##*:}/v1/sys/storage/raft/snapshot"
     log "snapshot restored; check \`make openbao-unseal ENV=${ENV}\` and \`make verify ENV=${ENV}\`"
     ;;

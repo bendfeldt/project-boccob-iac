@@ -62,10 +62,10 @@ case "$action" in
     rc=0
     for ref in "$@"; do
       need_digest "$ref"
-      if cosign verify --key "$key" --insecure-ignore-tlog=true "$ref" >/dev/null 2>"${TMPDIR:-/tmp}/cosign-verify.err"; then
+      if out="$(cosign verify --key "$key" --insecure-ignore-tlog=true "$ref" 2>&1 >/dev/null)"; then
         log "verified ${ref}"
       else
-        err "NOT verified ${ref}: $(tail -n 1 "${TMPDIR:-/tmp}/cosign-verify.err" | cut -c1-200)"; rc=1
+        err "NOT verified ${ref}: $(tail -n 1 <<<"$out" | cut -c1-200)"; rc=1
       fi
     done
     exit $rc ;;
