@@ -89,17 +89,16 @@ equal the previous lock. Notes:
 
 ## Mirroring per architecture
 
-`make airgap-mirror` / `airgap-bundle` / `airgap-load` / `airgap-check` copy and check
-`MIRROR_ARCHES` (default: `CLUSTER_ARCH`), e.g. `MIRROR_ARCHES=amd64,arm64` for a bundle that
-serves both kinds of site.
+`make airgap-mirror` / `airgap-bundle` / `airgap-load` / `airgap-check` copy and check the
+images of `CLUSTER_ARCH` only: every cluster has one architecture (mixed clusters are refused)
+and every environment has its own Zot.
 
 - One single-platform manifest per architecture is copied with
   `skopeo copy --preserve-digests source@<arch digest>`: the digest in Zot is byte-identical to
   the lock, and pods reference exactly that digest.
-- Zot tags: `<tag>` holds the cluster's own architecture (k3s pulls its system images by tag),
-  `<tag>-<arch>` any additional one.
-- Bundles: `images/<arch>/<key>.tar`; binaries for `linux/<arch>` of each `MIRROR_ARCHES` entry,
-  this machine's own tool builds and `BUNDLE_TOOL_PLATFORMS` (e.g. `darwin/arm64`).
+- Zot tags: `<tag>` (k3s pulls its system images by tag).
+- Bundles: `images/<key>.tar`; binaries for `linux/<CLUSTER_ARCH>` (cluster binaries and the
+  tools for the air-gapped operator hosts) and this machine's own tool builds.
 
 **Why not the whole index (manifest list)?** Referencing the index digest everywhere would make
 one reference valid on both architectures, but it needs every child manifest of the index in

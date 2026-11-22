@@ -41,8 +41,7 @@ Connected side:
 
 ```
 make lock                                    # only when versions.yaml changed
-SUPPLY_CHAIN_HOOKS=1 VERIFY_SIGNATURES=1 \
-  make airgap-bundle ENV=prod BUNDLE=/media/out/boccob-bundle TAR=1     # [verified with GROUPS=cluster]
+make airgap-bundle ENV=prod BUNDLE=/media/out/boccob-bundle TAR=1       # verifies signatures + scans each image
 make providers-mirror BUNDLE=/media/out/tofu-provider-mirror            # [static]
 make node-bundle ENV=prod                                               # [verified: bundle content]
 ```
@@ -53,9 +52,7 @@ bundle and a checkout of this repository at the same commit.
 Architecture: the bundle and the node bundle contain the images and k3s binaries
 of `CLUSTER_ARCH` (`environments/<env>/env.sh`, default amd64 = x64/x86_64; arm64
 for aarch64 servers). All nodes of a cluster must have that architecture
-(`host-install.sh` refuses others). `MIRROR_ARCHES=amd64,arm64` puts both into one
-bundle (images under `images/<arch>/`; the cluster's own architecture gets the plain
-tags in Zot). See [versions.md](versions.md). arm64 nodes have not been tested.
+(`host-install.sh` refuses others). See [versions.md](versions.md). arm64 nodes have not been tested.
 
 Air-gapped side:
 

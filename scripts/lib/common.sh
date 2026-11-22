@@ -178,14 +178,6 @@ image_digest() {
   [[ "$d" == sha256:* ]] || die "image ${key}: no linux/${arch} digest in ${LOCK_FILE} (run make lock; docs/versions.md lists images without that platform)"
   printf '%s' "$d"
 }
-# image_zot_tag <key> [arch] -> tag in Zot: the locked tag for the cluster's own
-# architecture; <tag>-<arch> for an additional architecture (MIRROR_ARCHES)
-image_zot_tag() {
-  local key="$1" arch="${2:-}" tag
-  [[ -n "$arch" ]] || { ensure_cluster_arch; arch="$CLUSTER_ARCH"; }
-  tag="$(lock_q '.images[$k].tag' --arg k "$key")"
-  if [[ "$arch" == "${CLUSTER_ARCH:-}" ]]; then printf '%s' "$tag"; else printf '%s-%s' "$tag" "$arch"; fi
-}
 # image_zot_repo <key>      -> <registry>/<source>
 image_zot_repo() { printf '%s/%s' "${REGISTRY_HOST}" "$(lock_q '.images[$k].source' --arg k "$1")"; }
 # image_zot_ref <key> [arch]       -> <registry>/<source>:<tag>@<digest>

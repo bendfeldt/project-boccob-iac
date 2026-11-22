@@ -63,5 +63,10 @@ export OPENBAO_REPLICAS=1
 # state encryption key provider: pbkdf2 passphrase generated into ${STATE_DIR}
 export STATE_ENCRYPTION="pbkdf2"
 
+# signature verification + Trivy scan while mirroring (scripts/airgap/mirror.sh) are
+# always on for test/prod; dev skips them by default (needs sigstore + the Trivy DB
+# online; dev images never leave this machine). SKIP_SUPPLY_CHAIN=0 turns them on.
+export SKIP_SUPPLY_CHAIN="${SKIP_SUPPLY_CHAIN:-1}"
+
 # optional components not deployed on dev (Grafana, ~480 MB): not mirrored, not checked
 export MIRROR_EXCLUDE_GROUPS="${MIRROR_EXCLUDE_GROUPS-observability-ui}"

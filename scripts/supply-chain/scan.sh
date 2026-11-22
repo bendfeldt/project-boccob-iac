@@ -9,6 +9,8 @@
 #   TRIVY_SKIP_DB_UPDATE=1  use the DB already in the trivy cache
 #   TRIVY_OFFLINE=1         no network for trivy at all: cached DB, no Java DB
 #                           update, --offline-scan (air-gapped workstation)
+#   SCAN_INPUT=<file>       scan this image archive (oci-archive of a bundle) instead
+#                           of the Zot copy (one image key)
 # shellcheck source=../lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 # shellcheck source=../lib/registry.sh
@@ -32,8 +34,8 @@ else
 fi
 rc=0
 for key in "${keys[@]}"; do
-  ref="$(image_zot_digest_ref "$key")"
-  if ! trivy "${args[@]}" --output "${out}/${key}.json" "$ref"; then err "trivy failed for ${key}"; rc=1; continue; fi
+  if [[ -n "${SCAN_INPUT:-}" ]]; then target=(--input "$SCAN_INPUT"); else target=("$(image_zot_digest_ref "$key")"); fi
+  if ! trivy "${args[@]}" --output "${out}/${key}.json" "${target[@]}"; then err "trivy failed for ${key}"; rc=1; continue; fi
   summary="$(jq -r '[.Results[]?.Vulnerabilities[]?.Severity] | group_by(.) | map("\(.[0])=\(length)") | join(" ")' "${out}/${key}.json")"
   log "${key}: ${summary:-no findings}"
   if [[ -n "${FAIL_ON:-}" ]] && jq -e --arg s "$FAIL_ON" '[.Results[]?.Vulnerabilities[]?.Severity] | any(. as $x | ($s | split(",")) | index($x))' "${out}/${key}.json" >/dev/null; then

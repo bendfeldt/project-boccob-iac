@@ -8,10 +8,13 @@
 #
 # Environment:
 #   MIRROR_GROUPS=cluster,foundation   only entries tagged with one of these groups (default: all)
-#   MIRROR_ARCHES=amd64,arm64          image architectures to copy (default: CLUSTER_ARCH, the
-#                                      cluster's own; amd64 = x64/x86_64, arm64 = aarch64)
-#   SUPPLY_CHAIN_HOOKS=1               run scripts/supply-chain/hooks/{pre,post}-mirror.d/*.sh per image
+#   SKIP_SUPPLY_CHAIN=1                (sync, bundle) skip signature verification and scan (loud warning)
 #   TAR=1                              (bundle) also write <dir>.tar
+#
+# Supply chain on every path from upstream: the upstream signature is verified
+# (scripts/supply-chain/verify-signatures.sh) before an image is copied, and the
+# copy is scanned with Trivy (scan.sh; FAIL_ON=CRITICAL gates) - the Zot copy on
+# sync, the archive on bundle. `load` relies on the bundle checksums.
 #
 # Images are copied with skopeo --preserve-digests: the manifest digest in Zot
 # is byte-identical to the locked upstream digest (podman pull/push would
@@ -20,9 +23,8 @@
 # platform, all platforms or the bare index, and "all" would also bring
 # arm/v7, ppc64le, s390x, ... (2-6x the bytes). Workloads reference the
 # per-arch manifest digest (modules/versions, var.arch), so no index is needed.
-# Zot tags: <tag> = the cluster's own architecture (k3s pulls its system images
-# by tag), <tag>-<arch> = any additional architecture in MIRROR_ARCHES.
-# Bundles keep images per architecture: images/<arch>/<key>.tar.
+# One architecture per mirror: CLUSTER_ARCH (every cluster has one, every
+# environment its own Zot). Bundles: images/<key>.tar.
 # shellcheck source=../lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 # shellcheck source=../lib/registry.sh
@@ -33,26 +35,21 @@ load_env "${1:-${ENV:-}}"; shift || true
 require_cmd skopeo helm jq yq curl
 MIRROR_GROUPS="${MIRROR_GROUPS:-}"
 ensure_cluster_arch
-arches=()
-IFS=',' read -ra _req <<<"${MIRROR_ARCHES:-$CLUSTER_ARCH}"
-for a in "${_req[@]}"; do
-  [[ -n "$a" ]] && arches+=("$(arch_or_die "$a" "MIRROR_ARCHES")")
-done
-[[ ${#arches[@]} -gt 0 ]] || die "MIRROR_ARCHES is empty"
-log "image architectures: ${arches[*]} (cluster: ${CLUSTER_ARCH})"
+log "image architecture: linux/${CLUSTER_ARCH}"
 
-run_hooks() {
-  # run_hooks <stage> <image-key> <arch>
-  [[ "${SUPPLY_CHAIN_HOOKS:-0}" == "1" ]] || return 0
-  local stage="$1" key="$2" arch="$3" hook
-  for hook in "${REPO_ROOT}/scripts/supply-chain/hooks/${stage}.d/"*.sh; do
-    [[ -x "$hook" ]] || continue
-    IMAGE_KEY="$key" IMAGE_ARCH="$arch" \
-    IMAGE_UPSTREAM_REF="$(image_upstream_ref "$key" "$arch")" \
-    IMAGE_INDEX_DIGEST="$(lock_q '.images[$k].index_digest // ""' --arg k "$key")" \
-    IMAGE_ZOT_REF="$(image_zot_ref "$key" "$arch")" \
-      "$hook" "$ENV" || die "hook $(basename "$hook") failed for image ${key} (${arch})"
-  done
+sc_skip="${SKIP_SUPPLY_CHAIN:-0}"
+if [[ "$sc_skip" == "1" && ( "$cmd" == sync || "$cmd" == bundle ) ]]; then
+  warn "SKIP_SUPPLY_CHAIN=1: images are copied WITHOUT signature verification and WITHOUT vulnerability scan"
+fi
+# verify_signature <key>: upstream signature per scripts/supply-chain/signature-policy.yaml
+verify_signature() {
+  [[ "$sc_skip" == "1" ]] && return 0
+  "${REPO_ROOT}/scripts/supply-chain/verify-signatures.sh" "$ENV" "$1" || die "signature verification failed for image $1"
+}
+# scan_image <key> [archive]: Trivy scan of the Zot copy, or of the bundle archive
+scan_image() {
+  [[ "$sc_skip" == "1" ]] && return 0
+  SCAN_INPUT="${2:-}" "${REPO_ROOT}/scripts/supply-chain/scan.sh" "$ENV" "$1" || die "vulnerability scan failed for image $1"
 }
 
 chart_fetch() {
@@ -89,53 +86,50 @@ chart_push() {
 }
 
 image_in_registry() {
-  # image_in_registry <key> <arch>: true when <source>:<zot tag> in Zot resolves to the locked digest
-  local key="$1" arch="$2" src got
+  # image_in_registry <key>: true when <source>:<tag> in Zot resolves to the locked digest
+  local key="$1" src got
   src="$(lock_q '.images[$k].source' --arg k "$key")"
   got="$(curl -fsS -o /dev/null -I -w '%header{docker-content-digest}' \
     -H 'Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json' \
-    "https://${REGISTRY_HOST}/v2/${src}/manifests/$(image_zot_tag "$key" "$arch")" 2>/dev/null || true)"
-  [[ "$got" == "$(image_digest "$key" "$arch")" ]]
+    "https://${REGISTRY_HOST}/v2/${src}/manifests/$(lock_q '.images[$k].tag' --arg k "$key")" 2>/dev/null || true)"
+  [[ "$got" == "$(image_digest "$key")" ]]
 }
 
-# bundle_image_file <bundle dir> <key> <arch>
-bundle_image_file() { printf '%s/images/%s/%s.tar' "$1" "$3" "$2"; }
+# bundle_image_file <bundle dir> <key>
+bundle_image_file() { printf '%s/images/%s.tar' "$1" "$2"; }
 
 sync_images() {
   # sync_images <from: upstream|bundle-dir>
-  local from="$1" key src tag arch dst f
+  local from="$1" key src tag dst f
   while read -r key; do
     src="$(lock_q '.images[$k].source' --arg k "$key")"
-    for arch in "${arches[@]}"; do
-      tag="$(image_zot_tag "$key" "$arch")"
-      dst="docker://${REGISTRY_HOST}/${src}:${tag}"
-      if image_in_registry "$key" "$arch"; then
-        log "image ${src}:${tag} (${arch}) already in registry"
-      else
-        if [[ "$from" == "upstream" ]]; then
-          run_hooks pre-mirror "$key" "$arch"
-          log "copy ${src}:${tag} (linux/${arch})"
-          skopeo_copy "docker://$(image_upstream_ref "$key" "$arch")" "$dst"
-        else
-          f="$(bundle_image_file "$from" "$key" "$arch")"
-          [[ -f "$f" ]] || die "bundle has no linux/${arch} image ${key} (${f#"${from}/"}); build it with MIRROR_ARCHES=${arch}"
-          log "load ${src}:${tag} (linux/${arch})"
-          skopeo_copy "oci-archive:${f}" "$dst"
-        fi
-        image_in_registry "$key" "$arch" || die "digest mismatch after copying ${src}:${tag}"
-      fi
-      run_hooks post-mirror "$key" "$arch"
-    done
+    tag="$(lock_q '.images[$k].tag' --arg k "$key")"
+    dst="docker://${REGISTRY_HOST}/${src}:${tag}"
+    if image_in_registry "$key"; then
+      log "image ${src}:${tag} already in registry"
+      continue
+    fi
+    if [[ "$from" == "upstream" ]]; then
+      verify_signature "$key"
+      log "copy ${src}:${tag} (linux/${CLUSTER_ARCH})"
+      skopeo_copy "docker://$(image_upstream_ref "$key")" "$dst"
+    else
+      f="$(bundle_image_file "$from" "$key")"
+      [[ -f "$f" ]] || die "bundle has no image ${key} (${f#"${from}/"})"
+      log "load ${src}:${tag} (linux/${CLUSTER_ARCH})"
+      skopeo_copy "oci-archive:${f}" "$dst"
+    fi
+    image_in_registry "$key" || die "digest mismatch after copying ${src}:${tag}"
+    [[ "$from" == "upstream" ]] && scan_image "$key"
   done < <(lock_keys images "$MIRROR_GROUPS")
 }
 
 # bundle_binary_platforms <key>: platforms of a binary that go into a bundle:
-# platform-independent files, linux/<arch> for every MIRROR_ARCHES entry, and
-# this machine's platform plus BUNDLE_TOOL_PLATFORMS (e.g. darwin/arm64) for tools
+# platform-independent files, linux/<CLUSTER_ARCH> (cluster binaries, and tools for
+# the air-gapped operator hosts) and this machine's own platform
 bundle_binary_platforms() {
-  local key="$1" p a extra="${BUNDLE_TOOL_PLATFORMS:-}" want
-  want=" any $(host_platform) ${extra//,/ } "
-  for a in "${arches[@]}"; do want+="linux/${a} "; done
+  local key="$1" p want
+  want=" any $(host_platform) linux/${CLUSTER_ARCH} "
   while read -r p; do
     [[ "$want" == *" ${p} "* ]] && printf '%s\n' "$p"
   done < <(lock_q '.binaries[$k].platforms | keys[]' --arg k "$key")
@@ -156,20 +150,18 @@ case "$cmd" in
   bundle)
     out="${1:-${BOCCOB_CACHE_DIR}/bundle}"
     mkdir -p "${out}/images" "${out}/charts" "${out}/binaries"
-    step "bundle images -> ${out}/images (groups: ${MIRROR_GROUPS:-all}; linux/${arches[*]})"
+    step "bundle images -> ${out}/images (groups: ${MIRROR_GROUPS:-all}; linux/${CLUSTER_ARCH})"
     while read -r key; do
-      for arch in "${arches[@]}"; do
-        f="$(bundle_image_file "$out" "$key" "$arch")"
-        mkdir -p "$(dirname "$f")"
-        if [[ -f "$f" && -f "${f}.digest" && "$(cat "${f}.digest")" == "$(image_digest "$key" "$arch")" ]]; then
-          log "image ${key} (${arch}) already bundled"; continue
-        fi
-        run_hooks pre-mirror "$key" "$arch"
-        log "save $(image_upstream_ref "$key" "$arch")"
-        rm -f "$f"
-        skopeo copy --quiet --preserve-digests --retry-times 3 "docker://$(image_upstream_ref "$key" "$arch")" "oci-archive:${f}"
-        image_digest "$key" "$arch" > "${f}.digest"
-      done
+      f="$(bundle_image_file "$out" "$key")"
+      if [[ -f "$f" && -f "${f}.digest" && "$(cat "${f}.digest")" == "$(image_digest "$key")" ]]; then
+        log "image ${key} already bundled"; continue
+      fi
+      verify_signature "$key"
+      log "save $(image_upstream_ref "$key")"
+      rm -f "$f"
+      skopeo copy --quiet --preserve-digests --retry-times 3 "docker://$(image_upstream_ref "$key")" "oci-archive:${f}"
+      scan_image "$key" "$f"
+      image_digest "$key" > "${f}.digest"
     done < <(lock_keys images "$MIRROR_GROUPS")
     step "bundle charts"
     while read -r key; do chart_fetch "$key" "${out}/charts" >/dev/null; done < <(lock_keys charts "$MIRROR_GROUPS")
@@ -213,15 +205,13 @@ case "$cmd" in
   check)
     rc=0
     while read -r key; do
-      for arch in "${arches[@]}"; do
-        image_in_registry "$key" "$arch" || { err "missing or wrong digest: image ${key} (linux/${arch})"; rc=1; }
-      done
+      image_in_registry "$key" || { err "missing or wrong digest: image ${key} (linux/${CLUSTER_ARCH})"; rc=1; }
     done < <(lock_keys images "$MIRROR_GROUPS")
     while read -r key; do
       name="$(lock_q '.charts[$k].name' --arg k "$key")"; ver="$(lock_q '.charts[$k].version' --arg k "$key")"
       registry_has_manifest "charts/${name}" "${ver//+/_}" || { err "missing chart ${name}:${ver}"; rc=1; }
     done < <(lock_keys charts "$MIRROR_GROUPS")
-    [[ $rc -eq 0 ]] && log "registry ${REGISTRY_HOST} holds every locked image (linux/${arches[*]}) and chart (groups: ${MIRROR_GROUPS:-all})"
+    [[ $rc -eq 0 ]] && log "registry ${REGISTRY_HOST} holds every locked image (linux/${CLUSTER_ARCH}) and chart (groups: ${MIRROR_GROUPS:-all})"
     exit $rc
     ;;
 

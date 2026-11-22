@@ -443,7 +443,7 @@ Leave at least 4 GB of RAM for macOS (the script checks it). Another name than t
 ```bash
 make macos-ports ENV=dev                                          # mode A (C.4): pf redirect 443 -> 8443 (sudo)
 DEV_MANAGE_ETC_HOSTS=1 DEV_TRUST_CA=1 make cluster-up ENV=dev   # asks for your sudo password (/etc/hosts, keychain)
-make airgap-mirror ENV=dev           # the linux/arm64 images only (MIRROR_ARCHES defaults to the cluster's arch)
+make airgap-mirror ENV=dev           # the linux/arm64 images only (the cluster's architecture)
 export KUBECONFIG=~/.boccob/dev/kubeconfig
 kubectl get nodes -o wide            # one node, Ready, arm64
 ```

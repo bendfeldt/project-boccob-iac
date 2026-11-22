@@ -15,7 +15,7 @@ S := scripts
 .PHONY: help
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-	@echo; echo "  Variables: ENV=dev|test|prod  STACK=<stacks/NN-*>  GROUPS=cluster,foundation,...  BUNDLE=<dir>  MIRROR_ARCHES=amd64,arm64"
+	@echo; echo "  Variables: ENV=dev|test|prod  STACK=<stacks/NN-*>  GROUPS=cluster,foundation,...  BUNDLE=<dir>  SKIP_SUPPLY_CHAIN=1"
 
 # --- versions / air-gap ---------------------------------------------------------
 .PHONY: lock tools airgap-mirror airgap-bundle airgap-load airgap-check providers-mirror node-bundle solution-bundle solution-load release-publish
@@ -23,9 +23,9 @@ lock: ## Resolve versions.yaml -> versions.lock.yaml (needs internet)
 	$(S)/lock-update.sh
 tools: ## Install pinned cosign/trivy/syft/oras for this machine (linux amd64/arm64, macOS arm64) into ~/.cache/boccob/bin
 	$(S)/tools-install.sh
-airgap-mirror: ## Connected: copy locked images + charts into Zot (GROUPS=.. to limit, MIRROR_ARCHES=amd64,arm64)
+airgap-mirror: ## Connected: verify signatures, copy locked images + charts into Zot, scan (GROUPS=.. to limit)
 	MIRROR_GROUPS=$(GROUPS) $(S)/airgap/mirror.sh sync $(ENV)
-airgap-bundle: ## Connected: export a transferable bundle (BUNDLE=<dir>, TAR=1 for a tarball)
+airgap-bundle: ## Connected: verify signatures, export a transferable bundle, scan (BUNDLE=<dir>, TAR=1 for a tarball)
 	MIRROR_GROUPS=$(GROUPS) $(S)/airgap/mirror.sh bundle $(ENV) $(BUNDLE)
 airgap-load: ## Air-gapped: push a bundle (BUNDLE=<dir>) into Zot
 	MIRROR_GROUPS=$(GROUPS) $(S)/airgap/mirror.sh load $(ENV) $(BUNDLE)

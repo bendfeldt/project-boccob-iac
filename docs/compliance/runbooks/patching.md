@@ -11,10 +11,11 @@ pinned by digest or tagged `latest` once `policy_mode = "Enforce"`.
    release, or the regular patch window **[manual: set the cadence]**.
 2. Edit `versions.yaml` (tag/version), `make lock` → review the lock diff.
 3. Refresh the vulnerability DB: `make trivy-db ENV=<env>` (or bundle/load).
-4. `make airgap-mirror ENV=<env> GROUPS=<group>` with
-   `SUPPLY_CHAIN_HOOKS=1 VERIFY_SIGNATURES=1 SCAN=1 SBOM=1` (signature
-   verification before the image enters Zot, scan + SBOM after) — or
-   `make airgap-bundle` → transfer → `make airgap-load`.
+4. `make airgap-mirror ENV=<env> GROUPS=<group>` (verifies the upstream
+   signature before an image enters Zot and scans it after) — or
+   `make airgap-bundle` (same checks) → transfer → `make airgap-load`;
+   then `make sbom ENV=<env> GROUPS=<group>`. `SKIP_SUPPLY_CHAIN=1` skips the
+   checks (warned loudly; never for test/prod).
 5. Gate: `FAIL_ON=CRITICAL make scan ENV=<env> GROUPS=<group>`; record
    accepted risks with a justification and expiry.
 6. Solution artefacts: built and pushed by the solution repo, then
