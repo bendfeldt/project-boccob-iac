@@ -77,7 +77,7 @@ environments/<env>/NN-name.tfvars        (optional sizing per environment)
 ```
 
 - `make deploy` applies `stacks/[0-9]*` in lexical order; each stack has its
-  own encrypted state (`tfstate-default-NN-name` in namespace `tofu-state`).
+  own encrypted state (architecture.md, "OpenTofu state").
 - Custom resources of a CRD must live in a **later** stack than the operator
   that installs the CRD (`kubernetes_manifest` plans against the live API).
 - Do not read other stacks' state. Use the well-known names, data sources
@@ -85,12 +85,6 @@ environments/<env>/NN-name.tfvars        (optional sizing per environment)
 - `STACK_NEEDS_OPENBAO=1` gives the stack a configured `vault` provider
   (`provider "vault" { skip_child_token = true }`): port-forward, CA and token
   are handled by `scripts/tofu.sh`.
-- Keep states small (see architecture.md, "OpenTofu state"): a state Secret
-  is capped at 1 MiB and every `kubernetes_manifest` stores its full object.
-  `make verify` fails above 85 % and warns from 70 %; split a stack before
-  that (the data plane is split into `20-catalog`, `21-query`,
-  `22-orchestration`; identity was moved out of 12 into `13-identity` with
-  `tofu state mv`, see architecture.md).
 - Commit the `.terraform.lock.hcl` of the stack.
 
 ## 4. Add a mirrored image or chart

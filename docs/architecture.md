@@ -85,34 +85,22 @@ verifies them (`ServersTransport`) against the platform CA.
 
 ## OpenTofu state
 
-Backend `kubernetes` (Secrets in namespace `tofu-state`, one per stack) plus
-OpenTofu state/plan encryption (`enforced`).
+One state per stack and environment, never inside the cluster it manages, plus
+OpenTofu state/plan encryption (AES-GCM, PBKDF2 key, `enforced`; the passphrase
+is part of key custody, see the runbook):
 
-Why not S3 on RustFS: RustFS is itself deployed by these stacks. With the
-kubernetes backend the only prerequisite is the cluster, which exists before
-any stack runs, so there is no state migration step and no chicken-and-egg:
-`cluster-up` -> state backend available. The cluster datastore is encrypted at
-rest (k3s secrets encryption) and the state is encrypted again by OpenTofu
-before it leaves the workstation. etcd snapshots therefore contain the state;
-the encryption passphrase is part of key custody (runbook).
+| | backend | where | lock |
+|---|---|---|---|
+| dev | `local` | `~/.boccob/dev/tofu/state/<stack>.tfstate` | lock file next to it |
+| test/prod | `s3` | bucket outside the cluster and the site (`TOFU_STATE_S3_*`), key `<prefix>/<env>/<stack>.tfstate` | `use_lockfile` (`.tflock` object) |
 
-Limit to watch: a state Secret must stay below 1 MiB, and encrypted state does
-not compress. On 2026-11-18 `12-foundation-services` reached 1,035,915 of
-1,048,576 bytes and an apply failed to persist its state ("data: Too long")
-after it had changed the cluster. Keycloak, the identity namespace and
-keycloak-db were therefore moved into `13-identity` **with their state**
-(`tofu state mv` between the pulled states, pushed back with
-`STATE_READ_UNENCRYPTED=1 scripts/tofu.sh <env> <stack> state push <file>` —
-the variable is refused for anything but `state` subcommands, warns, and must
-not stay exported; delete the plaintext files afterwards;
-plans of both stacks afterwards: 0 to add/change/destroy). Sizes after the
-split (dev): 12 = 53 %, 13 = 38 %, 22 = 30 %, 20 = 27 %, 21 = 26 % of 1 MiB.
-Big items: every `kubernetes_manifest` stores the full object incl. the CRD
-schema (an S3 user's credentials ~25 kB, a namespace SecretStore ~90 kB).
-`make verify` fails above 85 % and warns from 70 %; `scripts/tofu.sh apply`
-warns from 70 %. Keep stacks smallKeep stacks small — split a stack (e.g. `20-catalog`, `21-query`,
-`22-orchestration`) well before it reaches ~700 kB:
-`kubectl -n tofu-state get secret -o json | jq '.items[] | {n: .metadata.name, bytes: (.data.tfstate | @base64d | length)}'`.
+`scripts/tofu.sh` selects the backend from `TOFU_BACKEND` (`environments/<env>/env.sh`)
+by writing the stack's `backend_override.tf` (gitignored; one environment at a
+time per checkout). A working directory initialised with another backend type
+is migrated automatically on the next run (`tofu init -migrate-state`; the old
+copy is kept). The state survives the loss of the cluster or the site (DR
+runbook, scenario D) and needs only the state passphrase. `make verify` checks
+that every stack's stored state is encrypted.
 
 ## Namespaces and network
 
@@ -134,7 +122,6 @@ done by the k3s embedded network policy controller (verified by
 | `observability-agent` | 30 | OTel log collector DaemonSet (PSS privileged: read-only hostPath) |
 | `kyverno` | 31 | Kyverno, PolicyExceptions |
 | `backup` | 32 | backup CronJobs (OpenBao snapshot, off-site copy) |
-| `tofu-state` | scripts | OpenTofu state Secrets |
 
 The contract namespace `registry` is not used: Zot must exist before the
 cluster can pull anything, so it runs outside the cluster (Podman container in

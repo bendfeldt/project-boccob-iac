@@ -32,7 +32,7 @@ environments install k3s directly on several servers instead; they are covered i
 | **Zot** | A private container registry. The cluster pulls images **only** from here (the "air-gap" design), never from the internet | Podman container `boccob-dev-zot` |
 | **k3s node** | The Kubernetes cluster, running inside one Podman container | Podman container `boccob-dev-server-0` |
 | **Stacks** | Ordered OpenTofu projects, each deployed with its own encrypted state: `00-bootstrap`, `10/11/12/13` foundation, `20/21/22` data plane, `30/31/32` ops | `project-boccob-iac/stacks/` |
-| **Local secrets** | Kubeconfig, registry CA, OpenBao unseal key, state passphrase | `~/.boccob/dev/` (never in git) |
+| **Local secrets and state** | Kubeconfig, registry CA, OpenBao unseal key, OpenTofu state + its passphrase | `~/.boccob/dev/` (never in git) |
 
 The two repositories are completely separate. They only meet through:
 
@@ -252,8 +252,8 @@ Settings → Privacy and security → Security → Manage certificates → Autho
 | Remove everything | `CONFIRM=dev CLUSTER=1 make destroy ENV=dev`, then `rm -rf ~/.boccob/dev` |
 | Lint before you commit | `make lint` |
 
-> **Never delete `~/.boccob/dev/` while the cluster exists.** It holds the only copy of the state
-> passphrase and the OpenBao unseal key. Without them the environment cannot be recovered; you can only
+> **Never delete `~/.boccob/dev/` while the cluster exists.** It holds the only copy of the
+> OpenTofu state, its passphrase and the OpenBao unseal key. Without them the environment cannot be recovered; you can only
 > destroy it and start over.
 
 ---

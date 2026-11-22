@@ -100,21 +100,9 @@ check "workload images come only from the Zot mirror" bash -c \
 check "workload images are pinned by digest" bash -c \
   "! kubectl get pods -A -o json | jq -r '.items[] | select(.metadata.namespace != \"kube-system\") | .spec.containers[].image' | sort -u | grep -v '@sha256:'"
 check "registry holds every locked image and chart" "${REPO_ROOT}/scripts/airgap/mirror.sh" check "$ENV"
-# a state Secret above 1 MiB cannot be saved (an apply then fails AFTER changing
-# the cluster): fail at 85 %, warn from 70 % - split the stack (architecture.md)
-tofu_state_sizes() {
-  local rc=0 name bytes pct
-  while read -r name bytes; do
-    pct=$(( bytes * 100 / 1048576 ))
-    if (( pct >= 85 )); then echo "TOO BIG ${name}: ${bytes} bytes (${pct}% of 1 MiB)"; rc=1
-    elif (( pct >= 70 )); then echo "WARN ${name}: ${bytes} bytes (${pct}% of 1 MiB) - split the stack soon"; warn "tofu state ${name} at ${pct}% of the 1 MiB Secret limit"
-    else echo "${name}: ${pct}%"; fi
-  done < <(kubectl -n tofu-state get secret -o json | jq -r '.items[] | select(.data.tfstate) | "\(.metadata.name) \(.data.tfstate | @base64d | length)"')
-  return $rc
-}
-check "tofu state Secrets below 85% of the 1 MiB limit (warning from 70%)" tofu_state_sizes
-check "tofu state is encrypted (no plaintext in the state Secret)" bash -c \
-  'kubectl -n tofu-state get secret tfstate-default-12-foundation-services -o jsonpath="{.data.tfstate}" | base64 -d | gunzip | jq -e "has(\"encrypted_data\") and (has(\"resources\") | not)"'
+for d in "${REPO_ROOT}"/stacks/[0-9]*/; do
+  check "tofu state of $(basename "$d") is stored encrypted" "${REPO_ROOT}/scripts/tofu.sh" "$ENV" "$(basename "$d")" state-encrypted
+done
 
 # ------------------------------------------------------------------------------
 step "OpenBao"

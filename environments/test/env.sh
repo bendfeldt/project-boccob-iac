@@ -35,6 +35,12 @@ export OPENBAO_ROOT_TOKEN_PGP_KEY="${OPENBAO_ROOT_TOKEN_PGP_KEY:-}"
 # TOFU_STATE_PASSPHRASE (from the password vault / HSM-backed secret store);
 # never written to disk by the scripts in this mode.
 export STATE_ENCRYPTION="pbkdf2-env"
+# state backend: S3 OUTSIDE this cluster and site (e.g. the off-site backup target),
+# one object per stack (<prefix>/<env>/<stack>.tfstate) + lock file. The operator
+# exports TOFU_STATE_S3_ENDPOINT (https URL), TOFU_STATE_S3_BUCKET, optionally
+# TOFU_STATE_S3_REGION / TOFU_STATE_S3_PREFIX / TOFU_STATE_S3_CA_FILE, and the
+# bucket credentials AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (never in git).
+export TOFU_BACKEND="s3"
 
 # deploy.sh refuses to deploy while admission policies are in Audit mode
 export REQUIRE_POLICY_ENFORCE=1

@@ -1,7 +1,5 @@
 # 13-identity: Keycloak (namespace identity, realm lakehouse, OIDC clients) and
 # its PostgreSQL cluster keycloak-db (namespace database, owned by stack 12).
-# Split out of 12-foundation-services (state Secret size, docs/architecture.md);
-# the resources were moved with their state, nothing was recreated.
 
 data "kubernetes_config_map_v1" "platform_ca" {
   metadata {

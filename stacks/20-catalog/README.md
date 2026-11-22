@@ -16,4 +16,4 @@ make deploy ENV=<env> STACK=20-catalog
 
 Changing `layers` or `principals` re-runs the idempotent provisioning Job
 (`polaris-provision-<hash>`); privileges removed from the variable are revoked.
-State: Secret `tfstate-default-20-catalog`. Design notes: docs/data-plane.md.
+Design notes: docs/data-plane.md.

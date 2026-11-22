@@ -12,7 +12,8 @@ from its business impact analysis **[manual]**. What the mechanisms give:
 | OpenBao | raft snapshot CronJob (`openbao_snapshot_schedule`, default hourly), `s3://platform-backup/openbao/` | schedule interval | snapshot integrity checked by `make restore-test` **[verified]**; full restore **[static]** |
 | Object storage (layer buckets) | Iceberg snapshots (time travel within their expiry); off-site copy of the four lakehouse buckets to their own unlocked target bucket (`offsite.lake`, stack 32; deletions propagated so erasure reaches the copy) and of `platform-backup` to a locked target (`offsite.bucket`); noncurrent versions expire after `lakehouse_noncurrent_version_days` | off-site schedule (default 6 h) | dev: 746 lake objects copied to the stand-in target in 23 s **[verified]**; restore from it **[static]** |
 | Audit trail | Loki (`platform-logs`, versioned) + WORM archive `platform-audit` (daily) | 1 day for the archive | **[verified]** archive written and locked |
-| Cluster state (k3s datastore) | etcd snapshots on HA servers every 6 h, 28 kept (`scripts/lib/k3s-config.sh`) | 6 h | **[static]** |
+| Cluster state (k3s datastore) | etcd snapshots on HA servers every 6 h, 28 kept, prod also copied to an off-site S3 target (`K3S_ETCD_S3_CONFIG_SECRET`, `scripts/lib/k3s-config.sh`) | 6 h | **[static]** |
+| OpenTofu state | test/prod: S3 bucket outside the site (`TOFU_STATE_S3_*`, `scripts/tofu.sh`), AES-GCM encrypted; dev: `~/.boccob/dev/tofu/state/` | every apply | **[static]** (dev: local backend **[verified]**) |
 | Configuration | git (both repositories) + `versions.lock.yaml` + Zot | — | redeploy with `make deploy` |
 
 Retention:
@@ -81,9 +82,15 @@ exists); after a PITR into a new cluster, consumers take the new cluster's
 
 ### D. Whole site lost
 1. New hosts → `make cluster-up` (node bundle, air-gap) → Zot from the bundle (`make airgap-load`).
-2. `make deploy` stacks 00–12 (OpenBao: scenario B with the old keys first; OpenTofu state: from the etcd snapshot or re-import).
+2. `make deploy` stacks 00–12 (OpenBao: scenario B with the old keys first). The OpenTofu state
+   is in the off-site state bucket (`TOFU_STATE_S3_*`) and needs only the state passphrase; if the
+   cluster itself is restored from an off-site etcd snapshot instead of rebuilt, `k3s server
+   --cluster-reset --cluster-reset-restore-path=...` needs the old k3s server token.
 3. Restore `platform-backup` from off-site (C), PostgreSQL clusters (A), data plane, `make verify`.
 4. Re-apply erasure requests executed after the backup date (erasure log in the solution repo) **[DPO/legal review]**.
 
-Prerequisites kept outside the site: off-site copy, unseal key shares, state
-passphrase, registry CA, a checkout of both repositories, the air-gap bundle.
+Prerequisites kept outside the site: off-site copy, OpenTofu state bucket,
+unseal key shares, state passphrase, k3s server token
+(`/var/lib/rancher/k3s/server/token`, needed to restore an etcd snapshot) and
+agent token (`~/.boccob/<env>/k3s/agent-token`), registry CA, a checkout of both
+repositories, the air-gap bundle.

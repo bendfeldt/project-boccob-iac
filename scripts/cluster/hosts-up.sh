@@ -30,21 +30,36 @@ run() { # run <host> <command>
   ssh "${ssh_opts[@]}" "${K3S_SSH_USER}@$1" "$2"
 }
 
+# Agents join with their own token (k3s agent-token): a compromised worker cannot
+# join a server (etcd member). Kept for re-runs and node additions (0600).
+agent_token="${STATE_DIR}/k3s/agent-token"
+[[ -f "$agent_token" ]] || random_secret 32 | write_secret_file "$agent_token"
+put_agent_token() { # every server gets the agent token for agent-token-file
+  scp "${ssh_opts[@]}" "$agent_token" "${K3S_SSH_USER}@$1:/root/k3s-agent-token"
+  run "$1" "chmod 600 /root/k3s-agent-token"
+}
+
 first="${servers[0]}"
 step "first server ${first} (cluster-init)"
 push "$first"
-run "$first" "cd /root/${dir} && ./host-install.sh server --cluster-init"
+put_agent_token "$first"
+run "$first" "cd /root/${dir} && K3S_AGENT_TOKEN_FILE=/root/k3s-agent-token ./host-install.sh server --cluster-init"
 
-step "fetch kubeconfig and join token"
+step "fetch kubeconfig and server join token"
 run "$first" "cat /etc/rancher/k3s/k3s.yaml" | sed "s|https://127.0.0.1:6443|${url}|" | write_secret_file "$KUBECONFIG"
-token_tmp="$(mktemp)"; trap 'rm -f "$token_tmp"' EXIT
+token_tmp="$(mktemp)" agent_tmp="$(mktemp)"; trap 'rm -f "$token_tmp" "$agent_tmp"' EXIT
 run "$first" "cat /var/lib/rancher/k3s/server/token" | write_secret_file "$token_tmp"
+# the full form (K10<CA hash>::...) of the agent token: agents pin the cluster CA
+run "$first" "cat /var/lib/rancher/k3s/server/agent-token" | write_secret_file "$agent_tmp"
 
-join() { # join <host> <role>
+join() { # join <host> <role>: servers get the server token, agents only the agent token
+  local token="$token_tmp" env=""
   step "$2 $1"
   push "$1"
-  scp "${ssh_opts[@]}" "$token_tmp" "${K3S_SSH_USER}@$1:/root/k3s-token"
-  run "$1" "chmod 600 /root/k3s-token && cd /root/${dir} && K3S_TOKEN_FILE=/root/k3s-token ./host-install.sh $2 --join '${url}'"
+  if [[ "$2" == server ]]; then put_agent_token "$1"; env="K3S_AGENT_TOKEN_FILE=/root/k3s-agent-token "
+  else token="$agent_tmp"; fi
+  scp "${ssh_opts[@]}" "$token" "${K3S_SSH_USER}@$1:/root/k3s-token"
+  run "$1" "chmod 600 /root/k3s-token && cd /root/${dir} && ${env}K3S_TOKEN_FILE=/root/k3s-token ./host-install.sh $2 --join '${url}'"
 }
 for h in "${servers[@]:1}"; do join "$h" server; done
 for h in "${agents[@]}"; do join "$h" agent; done

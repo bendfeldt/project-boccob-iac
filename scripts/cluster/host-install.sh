@@ -2,14 +2,17 @@
 # Air-gap install of a hardened k3s node (test/prod). Runs ON THE NODE as root,
 # from the unpacked node bundle (scripts/airgap/node-bundle.sh).
 #
-#   first server : ./host-install.sh server --cluster-init
-#   more servers : K3S_TOKEN_FILE=/root/k3s-token ./host-install.sh server --join https://<api-endpoint>:6443
+#   first server : K3S_AGENT_TOKEN_FILE=/root/k3s-agent-token ./host-install.sh server --cluster-init
+#   more servers : K3S_AGENT_TOKEN_FILE=/root/k3s-agent-token K3S_TOKEN_FILE=/root/k3s-token \
+#                  ./host-install.sh server --join https://<api-endpoint>:6443
 #   agents       : K3S_TOKEN_FILE=/root/k3s-token ./host-install.sh agent  --join https://<api-endpoint>:6443
 #
 # HA = 3 (or 5) servers with embedded etcd behind a fixed registration address
 # (K3S_API_ENDPOINT: VIP, load balancer or round-robin DNS).
-# The join token is read from K3S_TOKEN_FILE (mode 0600); the first server
-# generates it at /var/lib/rancher/k3s/server/token.
+# Tokens are files with mode 0600: K3S_TOKEN_FILE = the server token for servers
+# (the first server generates it at /var/lib/rancher/k3s/server/token) and the
+# agent token for agents; K3S_AGENT_TOKEN_FILE (servers) = the agent token, so an
+# agent never holds the server token.
 #
 # NOTE: this script cannot be exercised in the build sandbox (no systemd hosts);
 # it is shellcheck-clean and mirrors the configuration the dev cluster runs with.
@@ -79,9 +82,15 @@ fi
 render_registries_yaml "$REGISTRY_HOST" "https://${REGISTRY_HOST}" "${K3S_HARDENING_DIR}/registry-ca.crt" > /etc/rancher/k3s/registries.yaml
 chmod 0600 /etc/rancher/k3s/config.yaml /etc/rancher/k3s/registries.yaml
 
+token_file_ok() { [[ "$(stat -c %a "$1")" == "600" ]] || { echo "$1 must have mode 0600" >&2; exit 1; }; }
+if [[ "$role" == "server" ]]; then
+  : "${K3S_AGENT_TOKEN_FILE:?K3S_AGENT_TOKEN_FILE must point to the agent join token}"
+  token_file_ok "$K3S_AGENT_TOKEN_FILE"
+  printf 'agent-token-file: "%s"\n' "$K3S_AGENT_TOKEN_FILE" >> /etc/rancher/k3s/config.yaml
+fi
 if [[ -n "$join_url" ]]; then
-  : "${K3S_TOKEN_FILE:?K3S_TOKEN_FILE must point to the cluster join token}"
-  [[ "$(stat -c %a "$K3S_TOKEN_FILE")" == "600" ]] || { echo "K3S_TOKEN_FILE must have mode 0600" >&2; exit 1; }
+  : "${K3S_TOKEN_FILE:?K3S_TOKEN_FILE must point to the join token}"
+  token_file_ok "$K3S_TOKEN_FILE"
   printf 'token-file: "%s"\n' "$K3S_TOKEN_FILE" >> /etc/rancher/k3s/config.yaml
 fi
 
@@ -97,7 +106,7 @@ if [[ "$role" == "server" ]]; then
   k3s kubectl get nodes
   chmod 0600 /etc/rancher/k3s/k3s.yaml
   if [[ "$cluster_init" == "true" ]]; then
-    echo "join token for further nodes: /var/lib/rancher/k3s/server/token (transfer securely, mode 0600)"
+    echo "server join token: /var/lib/rancher/k3s/server/token (servers only; agents use the agent token; transfer securely, mode 0600)"
   fi
 fi
 echo "done: ${node_name} (${role})"

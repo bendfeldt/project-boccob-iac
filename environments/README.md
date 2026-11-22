@@ -6,11 +6,14 @@
 | `<env>/common.tfvars` | variables shared by every stack (`ha`, `cluster_cidrs`) |
 | `<env>/<stack>.tfvars` | sizing and options of one stack |
 
-State backend and encryption are identical in every environment and are
-configured by `scripts/tofu.sh` (not by files here):
+State backend (`TOFU_BACKEND` in `env.sh`) and encryption are configured by
+`scripts/tofu.sh`; the state never lives in the cluster it manages:
 
-- backend `kubernetes`: Secret `tfstate-default-<stack>` in namespace `tofu-state`
-  of the target cluster (lock: Lease `lock-tfstate-default-<stack>`)
+- dev: backend `local`, `~/.boccob/dev/tofu/state/<stack>.tfstate` (lock file next to it)
+- test/prod: backend `s3` on a bucket outside the cluster and site
+  (`<prefix>/<env>/<stack>.tfstate`, `use_lockfile`); endpoint, bucket and
+  credentials come from the operator's environment (`TOFU_STATE_S3_*`,
+  `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`), see `test/env.sh`
 - OpenTofu state + plan encryption (AES-GCM, key derived with PBKDF2), `enforced`
   - dev: passphrase generated into `~/.boccob/dev/tofu/state-passphrase` (0600)
   - test/prod: `STATE_ENCRYPTION=pbkdf2-env`, the operator exports

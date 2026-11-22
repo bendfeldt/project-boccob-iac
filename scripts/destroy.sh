@@ -19,7 +19,7 @@ if kubectl get --raw /readyz >/dev/null 2>&1; then
       < <(find "${REPO_ROOT}/stacks" -mindepth 1 -maxdepth 1 -type d -name '[0-9]*' | sort -r)
   fi
   for stack in "${stacks[@]}"; do
-    if ! kubectl -n tofu-state get secret "tfstate-default-${stack}" >/dev/null 2>&1; then
+    if [[ -z "$("${REPO_ROOT}/scripts/tofu.sh" "$ENV" "$stack" state list 2>/dev/null)" ]]; then
       log "skip ${stack}: no state"; continue
     fi
     step "destroy ${stack} (${ENV})"

@@ -53,6 +53,8 @@ export OPENBAO_KEY_THRESHOLD=1
 export OPENBAO_REPLICAS=1
 # state encryption key provider: pbkdf2 passphrase generated into ${STATE_DIR}
 export STATE_ENCRYPTION="pbkdf2"
+# state backend: a local file per stack in ${STATE_DIR}/tofu/state/ (scripts/tofu.sh)
+export TOFU_BACKEND="local"
 
 # signature verification + Trivy scan while mirroring (scripts/airgap/mirror.sh) are
 # always on for test/prod; dev skips them by default (needs sigstore + the Trivy DB

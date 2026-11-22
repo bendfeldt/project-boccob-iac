@@ -2,10 +2,11 @@
 # Do not put stack specific code here.
 
 terraform {
-  # State lives in Kubernetes Secrets (namespace tofu-state), one per stack and
-  # environment; additionally encrypted client-side (TF_ENCRYPTION, see
-  # scripts/tofu.sh). Backend settings are injected by scripts/tofu.sh.
-  backend "kubernetes" {}
+  # One encrypted state per stack and environment, outside the cluster: dev = local
+  # file in ~/.boccob/dev/tofu/state/, test/prod = S3 with a lock file. scripts/tofu.sh
+  # selects the backend (backend_override.tf) and injects its settings; encryption:
+  # TF_ENCRYPTION, see scripts/tofu.sh.
+  backend "local" {}
 }
 
 # --- inputs set by scripts/tofu.sh from environments/<env>/env.sh --------------
