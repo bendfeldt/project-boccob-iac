@@ -262,20 +262,20 @@ images:
       - data-plane
   dagster:
     source: docker.io/dagster/dagster-celery-k8s
-    tag: 1.13.30
-    index_digest: sha256:d2a97760b77d3b3be68600a3bbab5272d7bbe519eb073a302b491612c2d90de3
+    tag: 1.13.31
+    index_digest: sha256:30b8078e9a1a100b5c02e842154c5a3d43e2181452a1578004f77e8ca16a6758
     digests:
-      amd64: sha256:91a36b78f1816563fdffb11442de324e5705fe2e1f0ac6ec909d9c768ea9f6c8
-      arm64: sha256:fe55839300d07cdba4e5cabe11db4e758163207b30d13189cd472242113706bc
+      amd64: sha256:419569fc872a7335cb50a518ce4e56322ebd99bb43297d3c864a94b160d456b5
+      arm64: sha256:55fbf8ebfe5902eb9c8283c0963872861f7ec1af38d83d2165958ac5905ffc54
     groups:
       - data-plane
   python:
     source: docker.io/library/python
-    tag: 3.13-slim-bookworm
-    index_digest: sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72
+    tag: 3.15-slim-trixie
+    index_digest: sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928
     digests:
-      amd64: sha256:f3dac913ab53b78c64f26d5518fcd7043d5a1a46522d6a493b598c3ed12f62a6
-      arm64: sha256:aed314f1f0c7e988b7aee5d889414ec977430bad37770966c52aff5366a13a06
+      amd64: sha256:fd2aef5e0d8438208de9fe154ab5b331a2428fc0c9838d41611e611fd7a80d85
+      arm64: sha256:80bc4d643a415f579f2b701f6a5f9f6d504805c9f6b63e0d26f2123f8a8ee6eb
     groups:
       - data-plane
   kyverno:
@@ -343,20 +343,20 @@ images:
       - observability
   loki:
     source: docker.io/grafana/loki
-    tag: 3.6.18
-    index_digest: sha256:700eaaa9fbd4275914d6b11f77c080b5ba0b983f6690055e48264ea77cb0bf6f
+    tag: 3.7.10
+    index_digest: sha256:b43c257ccfc925d4a50b8717cac61a3b51df8c48d01847936057e5c4075a24a7
     digests:
-      amd64: sha256:8352b4b12073e37932d58ab5c4aece77213c3a3956d8532ec3b9c0f7a5535a03
-      arm64: sha256:c6c136eadf8ca77611c819328bce5ed477a77f7daf2cdc3cdbfed0766cb37175
+      amd64: sha256:6d789ab9a603ee4429d0fdc4d11512bf2423e8a8c5fc898a9e5aa2d8471ce459
+      arm64: sha256:a2a64cb6d64855d13a4578581de191bebce9e6722fdddaa22f0904e698d3697b
     groups:
       - observability
   otel-collector:
     source: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
-    tag: 0.163.2
-    index_digest: sha256:cce4142919331aa26dd9e2900b0583dac12c44d2f87c270d3a2110912d4785a9
+    tag: 0.165.0
+    index_digest: sha256:ce55d0a38923c83120e4ba613fbdf446786652d2ce9f29d1cd7879e5d869829f
     digests:
-      amd64: sha256:a65df9129a5b3f99ee4434c5e53aee1965ff0129eda6a2da75ea917165b7fa6b
-      arm64: sha256:15a0c0cbf31fbf94407d0a15ac4569b62fb1bf0d9d7d36f9d4cc19aa9cf4d90a
+      amd64: sha256:f4e4579594a4582f026beab555a2cf212779f7aa4d5c03be3f0e24baeeb783c5
+      arm64: sha256:4a93e7a50f68d5dd34c8a1dd6499d50e90a51b7ebc70cc6d242ec7b1a63c7c4b
     groups:
       - observability
   grafana:
@@ -421,15 +421,15 @@ charts:
   dagster:
     repo: https://dagster-io.github.io/helm
     name: dagster
-    version: 1.13.30
-    sha256: bce50b219c64a5f1666f33c25e2c84127aa1a74154f5dbdb22aefc2e27fcf872
+    version: 1.13.31
+    sha256: c6a6768b114788737e9148596af8a4800103d2905919bb5e688eaad359727eea
     groups:
       - data-plane
   dagster-user-deployments:
     repo: https://dagster-io.github.io/helm
     name: dagster-user-deployments
-    version: 1.13.30
-    sha256: ed9fe6cc5e6b185441bc4110eaf94c546841b8f8b3a0abefa53a1d6d87573621
+    version: 1.13.31
+    sha256: e31f0d3de51ac47db5d992386499ce4842b43f6470c2fadfb24fe2d32f2c0d0c
     groups:
       - data-plane
   kyverno:
@@ -442,29 +442,29 @@ charts:
   prometheus:
     repo: https://prometheus-community.github.io/helm-charts
     name: prometheus
-    version: 29.47.2
-    sha256: ed5e5fc1f051637f6dad1306c30feba2a1cba3644ccdd1df5c0af0e42662ea1a
+    version: 29.49.0
+    sha256: 2fe02e1bd524084644474a0b5b493d9f18976ffc12a809054d53abca787946ba
     groups:
       - observability
   loki:
-    repo: https://grafana.github.io/helm-charts
+    repo: oci://ghcr.io/grafana-community/helm-charts
     name: loki
-    version: 7.6.0
-    sha256: 9a2d779cb749c2d5dab7bc900578c7288aacc198248687acc6de363ddef6e605
+    version: 21.4.3
+    sha256: a773890d1fe0f21a46d9604745806ef48fcf190277482e30477c68b62c0c00f3
     groups:
       - observability
   opentelemetry-collector:
     repo: oci://ghcr.io/open-telemetry/opentelemetry-helm-charts
     name: opentelemetry-collector
-    version: 0.178.3
-    sha256: 6c5df6fcb8dfa54b9514eeae08b47f641f32c3ab236d8881a6008599b4f18b12
+    version: 0.182.0
+    sha256: 5508c3c3d8873588a8a3f73848924c5bb597a6989cead0403ad81e62572e8d06
     groups:
       - observability
   grafana:
     repo: oci://ghcr.io/grafana-community/helm-charts
     name: grafana
-    version: 14.4.2
-    sha256: 0827c659f45c772e517b83f3b9df524cdda5877f04ee630980d7211fd181ac8f
+    version: 14.5.0
+    sha256: e243e77eba1bf3078e6adc0979d694c0e00b998e07875cfb7800a7f5fb69c245
     groups:
       - observability-ui
 binaries:

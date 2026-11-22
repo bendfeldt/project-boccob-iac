@@ -83,6 +83,16 @@ resource "helm_release" "this" {
         initialDelaySeconds = 30
         timeoutSeconds      = 1
       }
+      # the chart's default liveness probe speaks plain HTTP; the server is TLS only
+      livenessProbe = {
+        httpGet          = { path = "/loki/api/v1/status/buildinfo", port = "http-metrics", scheme = "HTTPS" }
+        periodSeconds    = 30
+        failureThreshold = 10
+        timeoutSeconds   = 1
+      }
+      # the chart aborts start-up when memberlist cannot join its peers; a single
+      # replica has none before it is ready (Loki's own default: false)
+      extraMemberlistConfig = { abort_if_cluster_join_fails = false }
       commonConfig = { replication_factor = var.replicas > 1 ? 2 : 1 }
       schemaConfig = {
         configs = [{
@@ -162,7 +172,6 @@ resource "helm_release" "this" {
     lokiCanary        = { enabled = false }
     test              = { enabled = false }
     sidecar           = { rules = { enabled = false } }
-    minio             = { enabled = false }
     memcachedExporter = { enabled = false }
   })]
 
