@@ -93,7 +93,7 @@ resource "helm_release" "this" {
       # the chart aborts start-up when memberlist cannot join its peers; a single
       # replica has none before it is ready (Loki's own default: false)
       extraMemberlistConfig = { abort_if_cluster_join_fails = false }
-      commonConfig = { replication_factor = var.replicas > 1 ? 2 : 1 }
+      commonConfig          = { replication_factor = var.replicas > 1 ? 2 : 1 }
       schemaConfig = {
         configs = [{
           from         = "2024-01-01"
