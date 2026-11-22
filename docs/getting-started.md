@@ -333,7 +333,7 @@ interfaces), all on `127.0.0.1`:
 | 8443 | ingress https (Traefik) | `DEV_HTTPS_PORT` |
 | 8080 | ingress http (redirects to https) | `DEV_HTTP_PORT` |
 | 6443 | Kubernetes API | `DEV_API_PORT` |
-| 5000 | Zot registry | `DEV_REGISTRY_PORT` |
+| 5050 | Zot registry (not 5000: AirPlay Receiver uses it on macOS) | port of `REGISTRY_HOST` |
 | 443 → 8443, 80 → 8080 | pf redirect (`make macos-ports`, required) | |
 
 **Homebrew is required on macOS.** `Brewfile` in this repository is the single list of the macOS

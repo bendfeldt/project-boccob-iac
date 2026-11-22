@@ -24,7 +24,7 @@ make cluster-up ENV=dev     # idempotent; also recovers after a host restart and
 
 Hosts (in /etc/hosts on the dev machine, published on 127.0.0.1:443):
 `keycloak|openbao|s3|s3-console|trino|polaris|dagster|grafana.dev.lakehouse.internal`.
-Registry: `registry.dev.lakehouse.internal:5000` (anonymous pull, authenticated push).
+Registry: `registry.dev.lakehouse.internal:5000` (macOS: `:5050`; anonymous pull, authenticated push).
 
 ## 1. Well-known names (`local.platform` in `stacks/_shared/common.tf`)
 

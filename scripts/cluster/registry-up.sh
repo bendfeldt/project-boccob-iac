@@ -109,7 +109,7 @@ step "zot container ${ZOT_NAME}"
 zot_upstream="$(image_upstream_ref zot)"
 zot_image="$zot_upstream"
 if ! podman image exists "$zot_upstream"; then
-  bundle_img="${BUNDLE_DIR:-}/images/${CLUSTER_ARCH}/zot.tar"
+  bundle_img="${BUNDLE_DIR:-}/images/zot.tar"
   if [[ -n "${BUNDLE_DIR:-}" && -f "$bundle_img" ]]; then
     log "loading zot image from bundle"
     if [[ "$runtime" == "podman-machine" ]]; then
@@ -142,7 +142,7 @@ else
   podman volume exists "${ZOT_NAME}-log" || podman volume create "${ZOT_NAME}-log" >/dev/null
   podman run -d --name "$ZOT_NAME" \
     --network "${CLUSTER_NAME}" --network-alias "$REG_NAME" \
-    -p "${DEV_PUBLISH_ADDR:-127.0.0.1}:${DEV_REGISTRY_PORT:-$REG_PORT}:${REG_PORT}" \
+    -p "${DEV_PUBLISH_ADDR:-127.0.0.1}:${REG_PORT}:${REG_PORT}" \
     --restart always \
     --read-only --cap-drop ALL --security-opt no-new-privileges \
     --tmpfs /tmp \

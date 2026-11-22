@@ -173,7 +173,10 @@ if [[ "$CLUSTER_MODE" == "podman" ]]; then
   done
   for p in "$DEV_HTTPS_PORT" "$DEV_HTTP_PORT" "$DEV_API_PORT" "$DEV_REGISTRY_PORT"; do
     if [[ " $ours " == *" ${p} "* ]]; then ok "port ${p}: published by the ${CLUSTER_NAME} containers"
-    elif port_listening 127.0.0.1 "$p"; then bad "port ${p} is used by another program (stop it; moving the dev ports breaks the Keycloak redirects)"
+    elif port_listening 127.0.0.1 "$p"; then
+      if [[ "$p" == 5000 && "$(uname -s)" == Darwin ]]; then
+        bad "port 5000 is used by AirPlay Receiver: turn it off (System Settings > General > AirDrop & Handoff) or keep the macOS default REGISTRY_HOST port 5050"
+      else bad "port ${p} is used by another program (stop it; moving the dev ports breaks the Keycloak redirects)"; fi
     else ok "port ${p} is free"; fi
   done
 

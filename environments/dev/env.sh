@@ -4,7 +4,11 @@
 export CLUSTER_NAME="boccob-dev"
 export CLUSTER_MODE="podman"
 export BASE_DOMAIN="dev.lakehouse.internal"
-export REGISTRY_HOST="registry.dev.lakehouse.internal:5000"
+# registry port: one value, part of every image reference. macOS: 5050, because
+# AirPlay Receiver listens on 5000 there by default.
+if [[ "${CLUSTER_RUNTIME:-native}" == "podman-machine" ]]; then _reg_port=5050; else _reg_port=5000; fi
+export REGISTRY_HOST="${REGISTRY_HOST:-registry.dev.lakehouse.internal:${_reg_port}}"
+unset _reg_port
 
 # podman-mode only -------------------------------------------------------------
 export DEV_API_PORT="${DEV_API_PORT:-6443}"       # 127.0.0.1:<port> -> kube-apiserver
@@ -20,7 +24,7 @@ else
 fi
 # The public URLs are always https://<svc>.dev.lakehouse.internal (port 443; Keycloak
 # wants one fixed URL): on macOS through the pf redirect 443 -> DEV_HTTPS_PORT.
-export DEV_REGISTRY_PORT="${DEV_REGISTRY_PORT:-5000}"
+export DEV_REGISTRY_PORT="${REGISTRY_HOST##*:}"     # derived: one port everywhere
 # kubelet tweaks for the dev node container (never for test/prod hosts):
 #  - eviction: the default "nodefs.available<10%" is relative to the size of
 #    the host filesystem, which on a shared build machine is far more than a
