@@ -26,7 +26,7 @@ disk="${MACHINE_DISK:-100}"
 (( disk >= 60 )) || die "MACHINE_DISK=${disk} GB: at least 60 (100 recommended)"
 
 os="$(host_os)"; arch="$(host_arch)"
-[[ "$os" == "darwin" ]] || warn "podman machine on ${os}: untested (on Linux the dev scripts run podman natively as root)"
+[[ "$os" == "darwin" ]] || die "make machine-init is for macOS only (Linux runs podman natively as root)"
 log "host ${os}/${arch}: the machine and the cluster will be linux/${arch}"
 if [[ "$os" == "darwin" ]]; then
   host_cpus="$(sysctl -n hw.ncpu)"; host_mem=$(( $(sysctl -n hw.memsize) / 1024 / 1024 ))

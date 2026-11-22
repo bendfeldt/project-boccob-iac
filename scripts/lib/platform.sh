@@ -14,7 +14,7 @@
 # Default: macOS -> podman-machine, Linux -> native.
 # shellcheck shell=bash
 
-export SUPPORTED_ARCHES="amd64 arm64"
+SUPPORTED_PLATFORMS_MSG="Supported: linux amd64/arm64 (x64/aarch64), macOS arm64 (Apple Silicon)"
 
 # normalize_arch <name>: uname -m / podman / OCI spelling -> amd64|arm64 (exit 1 otherwise)
 normalize_arch() {
@@ -25,20 +25,9 @@ normalize_arch() {
   esac
 }
 
-# arch_or_die <raw name> <what> : normalized arch, or a clear error for unsupported ones
+# arch_or_die <raw name> <what> : normalized arch, or one clear error
 arch_or_die() {
-  local raw="$1" what="$2" a
-  if a="$(normalize_arch "$raw")"; then echo "$a"; return 0; fi
-  case "$raw" in
-    i?86|x86|386)
-      die "${what}: 32-bit x86 (${raw}) is not supported. Supported: x64 (x86_64/amd64) and arm64 (aarch64)." ;;
-    arm|armv*|arm/v*)
-      die "${what}: 32-bit ARM (${raw}) is not supported. Supported: x64 (x86_64/amd64) and arm64 (aarch64)." ;;
-    "")
-      die "${what}: could not determine the CPU architecture" ;;
-    *)
-      die "${what}: CPU architecture '${raw}' is not supported. Supported: x64 (x86_64/amd64) and arm64 (aarch64)." ;;
-  esac
+  normalize_arch "$1" || die "${2}: CPU architecture '${1:-unknown}' is not supported. ${SUPPORTED_PLATFORMS_MSG}."
 }
 
 # host_os -> linux|darwin
@@ -52,13 +41,11 @@ host_os() {
 
 # host_arch -> amd64|arm64 of THIS machine (where the scripts run)
 host_arch() {
-  local m; m="$(uname -m)"
-  if [[ "$(uname -s)" == "Darwin" && "$m" == "x86_64" ]] \
-     && [[ "$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)" == "1" ]]; then
-    # an x86_64 shell under Rosetta 2 on Apple Silicon
-    die "this shell runs under Rosetta 2 (x86_64 emulation) on an Apple Silicon Mac; use a native arm64 shell (e.g. /opt/homebrew/bin/bash)"
-  fi
-  arch_or_die "$m" "this machine"
+  local a
+  a="$(arch_or_die "$(uname -m)" "this machine")"
+  # Intel Macs and x86_64 shells under Rosetta alike
+  [[ "$(uname -s)" == "Darwin" && "$a" == amd64 ]] && die "this machine: macOS x86_64 is not supported. ${SUPPORTED_PLATFORMS_MSG}."
+  echo "$a"
 }
 
 # host_platform -> <os>/<arch> of this machine, e.g. linux/amd64, darwin/arm64
@@ -71,7 +58,10 @@ cluster_runtime() {
     if [[ "$(uname -s)" == "Darwin" ]]; then r="podman-machine"; else r="native"; fi
   fi
   case "$r" in
-    native|podman-machine) echo "$r" ;;
+    native) echo "$r" ;;
+    podman-machine)
+      [[ "$(uname -s)" == "Darwin" ]] || die "CLUSTER_RUNTIME=podman-machine is for macOS only (Linux runs podman natively)"
+      echo "$r" ;;
     *) die "CLUSTER_RUNTIME=${r}: must be native or podman-machine" ;;
   esac
 }

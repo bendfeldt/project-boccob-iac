@@ -43,9 +43,6 @@ fi
 if [[ "$os" == "darwin" && "$runtime" != "podman-machine" ]]; then
   bad "macOS needs CLUSTER_RUNTIME=podman-machine (the default there)"
 fi
-if [[ "$os" == "darwin" && "$arch" == "amd64" ]]; then
-  soft "Intel Mac: untested; the locked operator tools exist for darwin/arm64 only (install cosign/trivy/syft/oras with Homebrew)"
-fi
 
 if [[ "$os" == "darwin" ]]; then
   section "Homebrew (required on macOS; Brewfile)"

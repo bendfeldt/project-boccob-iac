@@ -58,8 +58,7 @@ The two repositories are completely separate. They only meet through:
 > **Two architectures.** `versions.lock.yaml` pins every image twice, once per platform
 > (`linux/amd64` and `linux/arm64`), and every downloaded binary per platform. The cluster uses
 > the digests of its own architecture, which the scripts detect (`uname -m` on Linux, the podman
-> machine on macOS). Other architectures (32-bit x86, 32-bit ARM, ppc64le, ...) are refused with a
-> clear message. Details: [versions.md](versions.md).
+> machine on macOS). Other platforms are refused with one clear message. Details: [versions.md](versions.md).
 >
 > `make doctor ENV=dev` checks this machine (architecture, tools, podman, resources, ports) and
 > changes nothing. Run it whenever something does not work.
@@ -103,7 +102,7 @@ The few changes to the Mac itself (`/etc/hosts`, trusting the dev CA) ask for yo
 | **Linux (Ubuntu 24.04 recommended), x64 or arm64** | Continue with A.2 directly on your machine. arm64 is untested. |
 | **Windows 10/11** | *Untested.* Install WSL2 with Ubuntu 24.04 (`wsl --install -d Ubuntu-24.04`), give WSL at least 16 GB RAM in `%UserProfile%\.wslconfig` (`[wsl2]` → `memory=16GB`, `processors=4`), then follow A.2 inside the Ubuntu shell. If WSL gives you trouble, use a Hyper-V VM and follow **Part B** instead. |
 | **macOS (Apple Silicon)** | Follow **Part C** (podman machine). *Untested on real hardware.* Alternative: an arm64 Ubuntu VM (UTM, Multipass) and **Part B**. |
-| **macOS (Intel)** | Create an Ubuntu 24.04 x64 VM (e.g. with UTM or Multipass, 4+ CPU, 16+ GB RAM, 80 GB disk) and follow **Part B**. Part C may work but is not supported (the pinned tool downloads exist for Apple Silicon only). |
+| **macOS (Intel)** | Not supported directly: create an Ubuntu 24.04 x64 VM (e.g. with UTM or Multipass, 4+ CPU, 16+ GB RAM, 80 GB disk) and follow **Part B**. |
 
 ### A.2 Install the prerequisites (Ubuntu 24.04)
 
@@ -446,7 +445,7 @@ before `make cluster-up ENV=dev`; to free the RAM, `make cluster-down ENV=dev` a
 | `deploy.sh` refuses a plan "that deletes or replaces …" | Safety guard against destroying OpenBao, databases or storage. Read the plan; if you really mean it on dev, run it again with `ALLOW_DESTROY=dev`. |
 | `ImagePullBackOff` on the Dagster code location or OPA | The tfvars reference a solution digest that is not in your Zot. Repeat A.5 step 2. |
 | Port 443 or 80 already in use | Stop the other web server. Moving the dev ports (`DEV_HTTPS_PORT`) breaks the Keycloak login redirects. |
-| `... is not supported. Supported: x64 (x86_64/amd64) and arm64 (aarch64)` | The machine (or the podman machine) has another CPU architecture: 32-bit x86/ARM, ppc64le, ... are not supported. |
+| `... is not supported. Supported: linux amd64/arm64 (x64/aarch64), macOS arm64 (Apple Silicon)` | The machine (or the podman machine) has another platform, e.g. 32-bit, ppc64le, an Intel Mac or a shell under Rosetta. |
 | `image X: no linux/arm64 digest` | The lock has no build of that image for your architecture: see [versions.md](versions.md) ("missing_platforms"). |
 | macOS: `x509: certificate signed by unknown authority` from skopeo/helm/tofu | The dev CA is not in the System keychain: `make macos-trust ENV=dev`. |
 | macOS: `bash ... is too old` / Makefile errors about `.SHELLFLAGS` | Homebrew's bash and GNU make must come first in `PATH` (C.1). |
