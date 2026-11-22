@@ -117,7 +117,7 @@ curl -fsSLo /tmp/helm.tgz "https://get.helm.sh/helm-v3.18.6-linux-${ARCH}.tar.gz
 tar -xzf /tmp/helm.tgz -C /tmp && install "/tmp/linux-${ARCH}/helm" /usr/local/bin/
 
 # kubectl (1.33+ works; the cluster runs 1.35)
-curl -fsSLo /tmp/kubectl "https://dl.k8s.io/release/v1.35.0/bin/linux/${ARCH}/kubectl"
+curl -fsSLo /tmp/kubectl "https://dl.k8s.io/release/v1.37.2/bin/linux/${ARCH}/kubectl"
 install /tmp/kubectl /usr/local/bin/
 
 ```

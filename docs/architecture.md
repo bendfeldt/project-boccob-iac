@@ -152,4 +152,4 @@ deployed in the build sandbox.
   default upstream.
 - CloudNativePG 1.30.1: in-tree Barman object store still present in the CRD
   (used by `modules/postgres-cluster` with the `system` operand image).
-- Keycloak 26.8.2, External Secrets 2.15.0, cert-manager 1.21.3, k3s 1.35.10.
+- Keycloak 26.8.2, External Secrets 2.15.0, cert-manager 1.21.3, k3s 1.37.2.
