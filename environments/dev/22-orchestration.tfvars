@@ -1,5 +1,5 @@
 # Solution artefact (published by the solution repository: make image-push)
-dagster_code_location_image = "registry.dev.lakehouse.internal:5000/boccob/dagster-code-location@sha256:3b60dab661786b9ed3915d318610ff1f908e43db13ac41f2649ef91f69be6375"
+dagster_code_location_image = "registry.dev.lakehouse.internal:5000/boccob/dagster-code-location@sha256:b887f77c9028b786d7c1945cbcb5a40f110dfee1186ba48a7d107b5b95294440"
 solution_env = {
   DBT_THREADS = "2"
 }
