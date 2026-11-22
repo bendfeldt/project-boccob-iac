@@ -367,3 +367,17 @@ binaries:
       darwin/arm64:
         url: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_darwin_arm64.tar.gz
         checksums: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_checksums.txt
+  tofu:
+    # OpenTofu for the operator machines (stacks require ~> 1.10.0); make tools installs it
+    groups: [tools]
+    extract: tofu
+    platforms:
+      linux/amd64:
+        url: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_linux_amd64.tar.gz
+        checksums: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_SHA256SUMS
+      linux/arm64:
+        url: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_linux_arm64.tar.gz
+        checksums: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_SHA256SUMS
+      darwin/arm64:
+        url: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_darwin_arm64.tar.gz
+        checksums: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_SHA256SUMS

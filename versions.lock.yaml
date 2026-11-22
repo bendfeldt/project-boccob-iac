@@ -583,3 +583,23 @@ binaries:
         file: oras_1.3.6_darwin_arm64.tar.gz
         sha256: e2b25a53234e2471c5fc81936f957fa612065ab559c21834c02d8bfbc2f62b30
         checksums: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_checksums.txt
+  tofu:
+    groups:
+      - tools
+    extract: tofu
+    platforms:
+      linux/amd64:
+        url: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_linux_amd64.tar.gz
+        file: tofu_1.10.6_linux_amd64.tar.gz
+        sha256: b6b46b4fd8dd0b96e624f2a2d5fbc4efae2fc0174529b37292775c847c2e7d2c
+        checksums: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_SHA256SUMS
+      linux/arm64:
+        url: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_linux_arm64.tar.gz
+        file: tofu_1.10.6_linux_arm64.tar.gz
+        sha256: b2cac25defd5009d644daaadb05f9b9bdc2b4a544d6d7eb05ea41487e0d6c0c3
+        checksums: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_SHA256SUMS
+      darwin/arm64:
+        url: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_darwin_arm64.tar.gz
+        file: tofu_1.10.6_darwin_arm64.tar.gz
+        sha256: f5399a1ebca90724fda83d93f8a76790979fadb4d896e2be964efcd7df3c146c
+        checksums: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_SHA256SUMS

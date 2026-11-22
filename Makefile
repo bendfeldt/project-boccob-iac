@@ -21,7 +21,7 @@ help: ## Show this help
 .PHONY: lock tools airgap-mirror airgap-bundle airgap-load airgap-check providers-mirror node-bundle solution-bundle solution-load
 lock: ## Resolve versions.yaml -> versions.lock.yaml (needs internet)
 	$(S)/lock-update.sh
-tools: ## Install pinned cosign/trivy/syft/oras for this machine (linux amd64/arm64, macOS arm64) into ~/.cache/boccob/bin
+tools: ## Install pinned tofu/cosign/trivy/syft/oras for this machine (linux amd64/arm64, macOS arm64) into ~/.cache/boccob/bin
 	$(S)/tools-install.sh
 airgap-mirror: ## Connected: verify signatures, copy locked images + charts into Zot, scan (GROUPS=.. to limit)
 	MIRROR_GROUPS=$(GROUPS) $(S)/airgap/mirror.sh sync $(ENV)

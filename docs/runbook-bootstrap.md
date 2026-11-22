@@ -6,9 +6,11 @@ were available).
 
 ## 1. Prerequisites (operator workstation)
 
-podman, skopeo, helm 3.18+, OpenTofu 1.10.x, kubectl, jq, yq (python-yq),
-curl, openssl, shellcheck. Optional supply-chain tools: `make tools`
-(cosign, trivy, syft; pinned in `versions.lock.yaml`).
+podman, skopeo, helm 3.18+, kubectl, jq, yq (python-yq), curl, openssl,
+shellcheck, and `make tools`: OpenTofu (exactly the locked version), cosign,
+trivy, syft, oras, pinned in `versions.lock.yaml`. Air-gapped operator hosts:
+`BUNDLE_DIR=<bundle> make tools` installs them from the air-gap bundle, which
+carries the linux/<CLUSTER_ARCH> builds.
 
 `skopeo` is used for mirroring instead of `podman pull/push` because it copies
 manifests byte-for-byte (`--preserve-digests`); podman re-compresses layers on

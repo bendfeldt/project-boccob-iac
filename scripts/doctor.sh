@@ -63,7 +63,7 @@ if [[ "$os" == "darwin" ]]; then
 fi
 
 section "tools"
-need=(make git curl jq yq openssl tofu helm kubectl skopeo podman)
+need=(make git curl jq yq openssl helm kubectl skopeo podman)
 [[ "$os" == "linux" ]] && need+=(sysctl)
 for c in "${need[@]}"; do
   if command -v "$c" >/dev/null 2>&1; then ok "${c}: $(command -v "$c")"; else bad "${c} not found"; fi
@@ -86,9 +86,13 @@ if command -v openssl >/dev/null 2>&1; then
   else soft "${v}: OpenSSL 3 is the tested one (macOS LibreSSL: brew install openssl@3 and put it first in PATH)"; fi
 fi
 if command -v tofu >/dev/null 2>&1; then
+  # exactly the locked version: the stacks accept 1.10.x only, and every operator of a
+  # shared state should run the same one
   v="$(tofu version 2>/dev/null | head -1 | sed -E 's/.*v([0-9.]+).*/\1/')"
-  if version_ge "$v" 1.10.0; then ok "OpenTofu ${v}"; else bad "OpenTofu ${v} < 1.10.0"; fi
-fi
+  want="$(yq -r '.binaries.tofu.platforms[] | .url' "$LOCK_FILE" 2>/dev/null | head -1 | sed -E 's#.*/download/v([0-9.]+)/.*#\1#')"
+  if [[ "$v" == "$want" ]]; then ok "OpenTofu ${v} (locked)"
+  else bad "OpenTofu ${v:-?} is not the locked ${want:-?}: make tools (installs it into ${BOCCOB_CACHE_DIR}/bin, first in PATH)"; fi
+else bad "tofu not found: make tools"; fi
 if command -v helm >/dev/null 2>&1; then
   v="$(helm version --short 2>/dev/null | sed -E 's/^v?([0-9.]+).*/\1/')"
   if version_ge "$v" 3.8.0; then ok "helm ${v}"; else bad "helm ${v} < 3.8 (OCI support)"; fi

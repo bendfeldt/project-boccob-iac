@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the pinned supply-chain tools (cosign, trivy, syft, oras) from
+# Install the pinned operator tools (tofu, cosign, trivy, syft, oras) from
 # versions.lock.yaml into ${BOCCOB_CACHE_DIR}/bin (checksum verified), in the
 # build for THIS machine: linux/amd64 (x64), linux/arm64 or darwin/arm64
 # (Apple Silicon). Other platforms fail with a clear message.

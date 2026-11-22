@@ -113,10 +113,6 @@ apt-get update
 apt-get install -y podman skopeo jq yq make git curl openssl shellcheck python3 ca-certificates
 ARCH="$(dpkg --print-architecture)"    # amd64 (x64) or arm64
 
-# OpenTofu 1.10.6
-curl -fsSLo /tmp/tofu.tgz "https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_linux_${ARCH}.tar.gz"
-tar -xzf /tmp/tofu.tgz -C /tmp tofu && install /tmp/tofu /usr/local/bin/
-
 # Helm 3.18.6
 curl -fsSLo /tmp/helm.tgz "https://get.helm.sh/helm-v3.18.6-linux-${ARCH}.tar.gz"
 tar -xzf /tmp/helm.tgz -C /tmp && install "/tmp/linux-${ARCH}/helm" /usr/local/bin/
@@ -130,7 +126,7 @@ install /tmp/kubectl /usr/local/bin/
 Check:
 
 ```bash
-podman --version; skopeo --version; tofu version | head -1; helm version --short; kubectl version --client | head -1; jq --version; yq --version
+podman --version; skopeo --version; helm version --short; kubectl version --client | head -1; jq --version; yq --version
 ```
 
 > `yq` must be the **Python** yq from the Ubuntu package (a jq wrapper), not the Go "mikefarah" yq.
@@ -147,9 +143,10 @@ git -C project-boccob-iac checkout claude/determined-lovelace-ugiz1b
 
 The solution repository has its own getting-started guide; it can live anywhere.
 
-Install the pinned supply-chain tools (cosign, trivy, syft, oras). They are checksum-verified and
-installed into `~/.cache/boccob/bin` in the build for this machine (linux/amd64, linux/arm64 or
-darwin/arm64); the scripts add that directory to `PATH` themselves.
+Install the pinned operator tools (OpenTofu, cosign, trivy, syft, oras). They are
+checksum-verified and installed into `~/.cache/boccob/bin` in the build for this machine
+(linux/amd64, linux/arm64 or darwin/arm64); the scripts put that directory first in `PATH`
+themselves (`export PATH=~/.cache/boccob/bin:$PATH` to use them in your shell).
 
 ```bash
 cd ~/src/project-boccob-iac
@@ -357,8 +354,8 @@ Install Homebrew first (https://brew.sh). Then, in a checkout of this repository
 
 ```bash
 cd ~/src/project-boccob-iac
-make brew-bundle      # = brew bundle --file=Brewfile: bash make podman opentofu helm kubernetes-cli jq
-                      #   python-yq skopeo openssl@3 git uv shellcheck
+make brew-bundle      # = brew bundle --file=Brewfile: bash make podman helm kubernetes-cli jq
+                      #   python-yq skopeo openssl@3 git shellcheck
 # (the first time, before GNU make is installed: brew bundle --file=Brewfile)
 # use the new bash, GNU make and OpenSSL 3 first in PATH (put this into ~/.zprofile)
 export PATH="$(brew --prefix)/opt/make/libexec/gnubin:$(brew --prefix)/opt/openssl@3/bin:$(brew --prefix)/bin:$PATH"
@@ -370,8 +367,9 @@ yq --version                 # "yq 3.x": the Python yq (jq wrapper)
 - **yq**: the scripts use jq syntax, so they need the **Python** yq. Homebrew's `yq` formula is the Go
   "mikefarah" yq, which does not work here: install `python-yq` (or `pipx install yq`) and make sure
   `brew uninstall yq` if you had it. `make doctor` tells you which one you have.
-- **cosign, trivy, syft, oras**: `make tools` installs the pinned, checksum-verified darwin/arm64
-  builds into `~/.cache/boccob/bin` (Homebrew versions also work but are not pinned).
+- **OpenTofu, cosign, trivy, syft, oras**: `make tools` installs the pinned, checksum-verified
+  darwin/arm64 builds into `~/.cache/boccob/bin`. OpenTofu must be exactly the locked version
+  (the stacks accept 1.10.x; `make doctor` checks it), so it is not taken from Homebrew.
 - Then `make tools`.
 
 ### C.2 Create the podman machine
