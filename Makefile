@@ -18,7 +18,7 @@ help: ## Show this help
 	@echo; echo "  Variables: ENV=dev|test|prod  STACK=<stacks/NN-*>  GROUPS=cluster,foundation,...  BUNDLE=<dir>  SKIP_SUPPLY_CHAIN=1"
 
 # --- versions / air-gap ---------------------------------------------------------
-.PHONY: lock tools airgap-mirror airgap-bundle airgap-load airgap-check providers-mirror node-bundle solution-bundle solution-load release-publish
+.PHONY: lock tools airgap-mirror airgap-bundle airgap-load airgap-check providers-mirror node-bundle solution-bundle solution-load
 lock: ## Resolve versions.yaml -> versions.lock.yaml (needs internet)
 	$(S)/lock-update.sh
 tools: ## Install pinned cosign/trivy/syft/oras for this machine (linux amd64/arm64, macOS arm64) into ~/.cache/boccob/bin
@@ -35,8 +35,6 @@ solution-bundle: ## Connected: export solution artefacts + signatures by digest 
 	$(S)/airgap/solution.sh bundle $(ENV) $(BUNDLE) $(REFS)
 solution-load: ## Air-gapped: load a solution bundle (BUNDLE=<dir>) into Zot and verify digests + signatures
 	$(S)/airgap/solution.sh load $(ENV) $(BUNDLE)
-release-publish: ## Build, push and sign a solution release into Zot (SOLUTION_DIR=.. VERSION=.. SBOM=0 SKIP_BUILD=1 PLATFORMS=linux/amd64,linux/arm64)
-	$(S)/release/publish.sh $(ENV)
 providers-mirror: ## Mirror OpenTofu providers for offline `tofu init`
 	$(S)/airgap/providers-mirror.sh $(BUNDLE)
 node-bundle: ## Build the k3s node bundle for test/prod hosts
@@ -79,7 +77,7 @@ cluster-down: ## dev: stop node + registry containers (volumes and local state a
 	$(S)/cluster/dev-down.sh $(ENV)
 
 # --- deploy -----------------------------------------------------------------------
-.PHONY: deploy plan openbao-init openbao-unseal verify destroy
+.PHONY: deploy plan openbao-init openbao-unseal verify destroy dev-env
 deploy: ## Apply all stacks in order, or one with STACK=..
 	$(S)/deploy.sh $(ENV) $(STACK)
 plan: ## Plan all stacks, or one with STACK=..
@@ -90,6 +88,8 @@ openbao-unseal: ## Unseal OpenBao after a restart
 	$(S)/openbao/init.sh $(ENV) --unseal
 verify: ## Smoke test of cluster + foundation
 	$(S)/verify.sh $(ENV)
+dev-env: ## dev: test users + ~/.boccob/dev/developer.env for the solution repository (docs/developer-interface.md)
+	$(S)/dev/dev-env.sh $(ENV)
 destroy: ## Destroy stacks (CONFIRM=<env> required; STACK=.. for one; CLUSTER=1 also removes the dev cluster)
 	$(S)/destroy.sh $(ENV) $(STACK)
 

@@ -112,9 +112,9 @@ mirror through chart values.
 
 Solution-repo artefacts (Dagster code-location image, OPA bundle) are pushed to
 `<registry>/boccob/<name>` by the solution repo and consumed through variables
-(image ref with digest, bundle ref) — they are not in `versions.yaml`.
-Push credentials (dev): user `mirror`, password file
-`~/.boccob/dev/registry/push-password`, CA `~/.boccob/dev/pki/registry-ca.crt`.
+(image ref with digest, bundle ref) — they are not in `versions.yaml`. The
+registry, CA and push credentials reach the solution through
+[developer-interface.md](developer-interface.md) (`make dev-env`).
 
 Sandbox note: container registries `docker.io`, `quay.io`, `ghcr.io`,
 `registry.k8s.io` are reachable from the build machine; other registries

@@ -27,16 +27,18 @@ stack measured on dev: 20-catalog ~180 kB.
 
 ## Solution artefacts (the only interface to the solution repository)
 
+The solution repository builds and pushes its artefacts to
+`<registry>/boccob/<name>` itself, with the settings of
+[developer-interface.md](developer-interface.md) (dev) or the registry host, CA
+and push credentials of the target environment. This repository knows nothing
+about how they are built; it only handles them **by digest**:
+
 ```
-make release-publish ENV=dev            # SOLUTION_DIR=../project-boccob (default), SBOM=0, SKIP_BUILD=1
+make sign                       ENV=<env> REFS="<image@sha256:..> <bundle@sha256:..>"   # OpenBao transit key
+make verify-solution-signatures ENV=<env> REFS="..."
 make solution-bundle ENV=test BUNDLE=<dir> REFS="<image ref> <bundle ref>"   # air gap: export
 make solution-load   ENV=prod BUNDLE=<dir>                                   # air gap: import + verify
 ```
-
-`release-publish` wraps the solution's publish targets (its docs/releases.md,
-"Publishing": `REGISTRY`, `REGISTRY_HOST`, `REGISTRY_CA_FILE`,
-`REGISTRY_USERNAME`/`REGISTRY_PASSWORD`, `VERSION`) and signs the results; no
-host trust store is modified (patching runbook, "Solution release").
 
 Put the two digest references into `environments/<env>/22-orchestration.tfvars`
 (`dagster_code_location_image`) and `environments/<env>/21-query.tfvars`
@@ -354,7 +356,8 @@ with it (an extra group and extra environment variables are ignored).
 - OIDC client `trino-group-sync` (service account, realm-management
   `view-users`, `query-groups`, optional client scope `kc-admin-api`; Keycloak
   26.8 rejects admin API tokens without that scope). dev only: direct access
-  grants on `trino` (password grant for the e2e script).
+  grants on `trino` (password grant for the solution's dev tests, see
+  [developer-interface.md](developer-interface.md)).
 - Foundation module changes (minimal): `modules/keycloak` client options
   `service_account_client_roles` and `optional_client_scopes`;
   `modules/postgres-cluster` sets `backup.target` explicitly;
@@ -369,14 +372,13 @@ with it (an extra group and extra environment variables are ignored).
   logs, only the coordinator can connect), Trino (catalogs over TLS with
   password auth, Iceberg create/select/drop round trip, 401 without auth, group
   file, audit events), Dagster (deployments, code location loaded, pool limit 1,
-  pepper present, UI redirects to login).
-- `scripts/dev/e2e.sh dev` (dev only) — the functional proof: test users
-  (`scripts/dev/test-users.sh`, `environments/dev/test-users.conf`, passwords in
-  `~/.boccob/dev/test-users/`), `daily_refresh` for 2026-11-01 and 2026-11-02 as
-  real run pods, curated tables and keystore populated with reused keys,
-  analyst masked / denied raw, pii-reader clear, erasure request queued with
-  `lakehouse-erase --submit` in the code-location pod and processed by the
-  `erasure` job.
+  pepper present, UI redirects to login), the admission policies of the purge
+  credential and run Jobs (server-side dry runs), and the signatures of the
+  solution artefacts in use. No solution job is run.
+- The functional proof of the data code (loads, masking, erasure, run-tag
+  injection attempts) lives in the solution repository and runs against the
+  platform through [developer-interface.md](developer-interface.md)
+  (`make dev-env ENV=dev`: test users, endpoints, CA).
 
 ## Open items
 

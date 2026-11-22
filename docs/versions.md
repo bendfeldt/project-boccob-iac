@@ -115,13 +115,9 @@ explicit, reviewable input (`CLUSTER_ARCH`).
 
 ## Solution artefacts
 
-The solution repository builds its code-location image for the target platform(s):
-`make release-publish ENV=<env>` passes `PLATFORMS` (default `linux/<CLUSTER_ARCH>`; a single
-platform gives a plain image, as before). `PLATFORMS=linux/amd64,linux/arm64` builds one image
-per platform plus a manifest list, pushes the **index** and records and signs the index digest
-(`dist/image/image.ref`); a foreign platform needs qemu-user-static on the build machine.
-Its base images are pinned by index digest, and `make lint` there checks that every locked
-Python dependency has cp313 manylinux x86_64 + aarch64 wheels.
+The solution repository builds its artefacts for `linux/<CLUSTER_ARCH>`
+(`BOCCOB_CLUSTER_ARCH` in [developer-interface.md](developer-interface.md)); this repository
+signs and transfers them by digest only.
 
 ## Changing a version
 

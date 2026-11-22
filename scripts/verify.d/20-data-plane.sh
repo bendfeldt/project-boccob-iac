@@ -2,7 +2,8 @@
 # Data-plane checks (stacks 20-catalog, 21-query, 22-orchestration). Sourced by
 # scripts/verify.sh: uses check(), step(), $tmp, $ca. Read-only except for a
 # throw-away Iceberg schema `curated.verify_smoke_<random>` that is dropped again.
-# The full functional proof (Dagster runs, masking, erasure) is scripts/dev/e2e.sh.
+# Platform checks only: no solution job is run here. The functional proof of the
+# data code (Dagster runs, masking, erasure) belongs to the solution repository.
 # shellcheck disable=SC2154  # $tmp and $ca come from scripts/verify.sh
 # shellcheck source=../lib/dataplane.sh
 source "${REPO_ROOT}/scripts/lib/dataplane.sh"
@@ -68,7 +69,7 @@ if kubectl get namespace catalog query orchestration >/dev/null 2>&1; then
   check "pseudonym pepper present in the code location environment (value not shown)" bash -c \
     "kubectl -n orchestration get secret lakehouse-env -o jsonpath='{.data.PSEUDONYM_PEPPER}' | base64 -d | wc -c | awk '{exit !(\$1 >= 32)}'"
   # purge credential (s3:DeleteObjectVersion): only in lakehouse-purge-env, attached
-  # only by the purge jobs; admission-guarded (audit N-3)
+  # only by the purge jobs; admission-guarded
   check "purge S3 key only in lakehouse-purge-env, not in lakehouse-env (code server, ordinary runs)" bash -c \
     "kubectl -n orchestration get secret lakehouse-purge-env -o json | jq -e '.data | has(\"PURGE_S3_ACCESS_KEY_ID\") and has(\"PURGE_S3_SECRET_ACCESS_KEY\")' >/dev/null && kubectl -n orchestration get secret lakehouse-env -o json | jq -e '[.data | keys[] | select(startswith(\"PURGE_S3\"))] | length == 0'"
   # dp_purge_admit <kind Job|Pod> <dagster/job label> <user>: server-side dry run of
@@ -99,26 +100,6 @@ if kubectl get namespace catalog query orchestration >/dev/null 2>&1; then
   check "purge guard: the run launcher may start an erasure Job with lakehouse-purge-env" dp_purge_guard_allows_erasure
   check "purge guard: the run launcher may NOT attach lakehouse-purge-env to another job (transform)" dp_purge_guard_denies_other_job
   check "purge guard: a run pod's ServiceAccount may NOT create a Job or Pod with lakehouse-purge-env" dp_purge_guard_denies_run_sa
-  # run-tag injection (audit R3-1): a Dagster UI user forges a dagster-k8s/config tag
-  # on a non-purge job; the launcher's allowlist or the admission policy must stop
-  # it before any Job exists (the run fails, no Job with its run id)
-  dp_forged_run() { # dp_forged_run <dagster-k8s/config JSON> -> "refused" or details
-    local tags run status jobs
-    tags="$(jq -cn --arg v "$1" '[{key: "dagster-k8s/config", value: $v}]')"
-    run="$(dp_dagster_launch migrate "" "$tags")" || { echo "launch failed"; return 1; }
-    dp_dagster_wait "$run" 300 >/dev/null 2>&1 || true
-    status="$(dp_dagster_status "$run")"
-    jobs="$(kubectl -n orchestration get job -l "dagster/run-id=${run}" --no-headers 2>/dev/null | wc -l)"
-    echo "run ${run}: ${status}, ${jobs} Job(s): $(dp_dagster_failure "$run" | grep -oE 'violated the allowed list: [a-z_.]+|DagsterK8sUnrecoverableAPIError' | head -1)"
-    [[ "$status" == FAILURE && "$jobs" == 0 ]]
-  }
-  purge_from='{"secret_ref": {"name": "lakehouse-purge-env"}}'
-  check "tag injection: command override + purge Secret on a non-purge job is refused" \
-    dp_forged_run '{"container_config": {"command": ["sh", "-c", "env"], "env_from": ['"$purge_from"']}}'
-  check "tag injection: purge Secret on a non-purge job is refused (admission: dagster/job)" \
-    dp_forged_run '{"container_config": {"env_from": ['"$purge_from"']}}'
-  check "tag injection: forged dagster/job label is refused" \
-    dp_forged_run '{"pod_template_spec_metadata": {"labels": {"dagster/job": "erasure"}}, "container_config": {"env_from": ['"$purge_from"']}}'
   # the run-job policy itself: the launcher's identity cannot create a Job with a custom command
   dp_run_job_admit() { # dp_run_job_admit <command JSON or null> -> allowed|denied
     local cmd="$1" img

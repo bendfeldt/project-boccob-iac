@@ -12,7 +12,7 @@ oidc_clients = {
     optional_client_scopes = ["kc-admin-api"]
   }
   # dev only: password grant on the trino client so that scripts/verify.sh and
-  # scripts/dev/e2e.sh can obtain user tokens without a browser
+  # the solution's dev tests can obtain user tokens without a browser
   trino = {
     name                 = "Trino"
     redirect_uris        = ["https://trino.dev.lakehouse.internal/oauth2/callback", "https://trino.dev.lakehouse.internal/ui/logout/logout.html"]

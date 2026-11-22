@@ -12,5 +12,4 @@ brew "python-yq"       # the Python yq (jq syntax); NOT the "yq" formula (Go, mi
 brew "skopeo"
 brew "openssl@3"       # LibreSSL in macOS lacks options the CA scripts use
 brew "git"
-brew "uv"              # Python tooling of the solution repository
 brew "shellcheck"      # make lint

@@ -27,23 +27,15 @@ pinned by digest or tagged `latest` once `policy_mode = "Enforce"`.
 
 ## Solution release (code location image + OPA bundle)
 
-The solution's release procedure is `project-boccob/docs/releases.md`; a
-release may carry schema migrations that rewrite lake data (not reversible
-without a backup). On the platform side, per environment (test first):
+The release procedure, including any data migration after the deployment, is
+owned by the solution repository (its release documentation); a release may
+rewrite lake data (not reversible without a backup). On the platform side, per
+environment (test first):
 
-0. **Publish** (connected build host that reaches the environment's Zot):
-   `make release-publish ENV=<env>` with `SOLUTION_DIR=<checkout of the solution
-   repository at the release commit>` (default `../project-boccob`). It runs the
-   solution's `make image image-push bundle bundle-push` with `REGISTRY` /
-   `REGISTRY_HOST` = the Zot of `<env>`, `REGISTRY_CA_FILE` = its CA
-   (`~/.boccob/<env>/pki/registry-ca.crt`; passed per call, nothing in `/etc`),
-   the push credentials (`REGISTRY_PASSWORD`, default the env's push-password
-   file), `NO_PROXY` for the internal names and, when `HTTPS_PROXY` is set, the
-   proxy and its CA for the image build (`BUILD_PROXY`, `BUILD_CA_BUNDLE`,
-   `BUILD_NETWORK=host`). Then it signs and verifies both artefacts with the
-   environment's transit key and prints the two references for the tfvars.
-   `SBOM=0` skips the build-time SBOM/scan on a disk-constrained host,
-   `SKIP_BUILD=1` re-pushes what was built (same digests).
+0. **Publish**: the solution repository pushes the code-location image and the
+   OPA bundle to the environment's Zot (registry host, CA and push credentials
+   of `<env>`), then `make sign ENV=<env> REFS="<image@sha256:..> <bundle@sha256:..>"`
+   and `make verify-solution-signatures ENV=<env> REFS=...` here.
    **Air-gapped environment** (no route from the build host): publish to the
    connected environment (test), then
    `make solution-bundle ENV=test BUNDLE=<dir> REFS="<image ref> <bundle ref>"`
@@ -69,15 +61,11 @@ without a backup). On the platform side, per environment (test first):
    `21-query.tfvars`), `make sign`, `make deploy ENV=<env> STACK=21-query` and
    `STACK=22-orchestration`. Let running jobs finish; schedules may stay on
    (every writing job waits for the `lakehouse_writer` pool).
-3. **Migrate**: launch the Dagster job `migrate` (Dagster UI, or let the next
-   `daily_refresh` do it) and check its materialization metadata (`applied`,
-   `history_purged`) and `curated.audit.schema_migrations`. A failure leaves the
-   lake on the old shape (or partially migrated; the statements are idempotent):
-   fix forward with a new release, or restore step 1's backup within the window.
-4. `make verify ENV=<env>`; the next `daily_refresh` must pass all asset checks.
-
-Never run `dbt --full-refresh` outside dev: the code refuses it unless
-`LAKEHOUSE_ENV=dev` (stack 22 sets it to the environment name).
+3. **Post-deployment steps of the release** (e.g. a data migration job) as
+   the solution's release documentation describes them. A failure there is
+   fixed forward with a new release, or step 1's backup is restored within the
+   window.
+4. `make verify ENV=<env>` (platform checks), then the solution's own checks.
 
 ## Special cases
 

@@ -1,7 +1,8 @@
 # Getting started: run the Boccob lakehouse yourself
 
 This guide is for a developer who is new to the project. By the end you will have the whole
-platform running, with the demo data loaded through all four layers. You can run it in three places:
+platform running, ready for the solution repository (the data code) to be deployed onto it. You
+can run it in three places:
 
 - **Part A**: on your own Linux machine (x64 or arm64), as containers.
 - **Part B**: on a Linux virtual machine (VM) that you host yourself, for example on your laptop,
@@ -15,11 +16,10 @@ environments install k3s directly on several servers instead; they are covered i
 
 > **What has been tested.** The steps in Part A were run end to end on Ubuntu 24.04 on x64 (x86_64,
 > amd64), as `root`, with 4 CPU cores and 15 GB RAM. The result was `make verify ENV=dev` passing all
-> checks and `scripts/dev/e2e.sh dev` passing 39/39. **Not tested:** Part C (macOS / podman machine;
+> checks. **Not tested:** Part C (macOS / podman machine;
 > its code paths were only exercised with stand-ins for `podman` and `uname` on Linux), any arm64
 > cluster (the arm64 image digests and binary checksums are resolved and verified against upstream,
-> but nothing has run on arm64 yet), Windows/WSL2 and the "k3s directly on the VM" variant (Part B,
-> option 2). Where this guide describes them, it says so.
+> but nothing has run on arm64 yet) and Windows/WSL2. Where this guide describes them, it says so.
 
 ---
 
@@ -34,12 +34,14 @@ environments install k3s directly on several servers instead; they are covered i
 | **Stacks** | Ordered OpenTofu projects, each deployed with its own encrypted state: `00-bootstrap`, `10/11/12/13` foundation, `20/21/22` data plane, `30/31/32` ops | `project-boccob-iac/stacks/` |
 | **Local secrets** | Kubeconfig, registry CA, OpenBao unseal key, state passphrase | `~/.boccob/dev/` (never in git) |
 
-The two repositories only meet through two **artifacts** published to Zot: the Dagster
-code-location image and the OPA policy bundle. You build them from the solution repo, and the IaC
-repo deploys them.
+The two repositories are completely separate. They only meet through:
 
-Data flows `raw → clean → consolidated → curated`. See `project-boccob/docs/data-layers.md` once you
-are up and running.
+- two **artifacts** in Zot, referenced by digest: the Dagster code-location image and the OPA
+  policy bundle. The solution repository builds and pushes them; this repository signs and deploys
+  them;
+- one **file** outside both checkouts, `~/.boccob/dev/developer.env` (`make dev-env ENV=dev`):
+  endpoints, CA, registry and test users for the solution's tools
+  ([developer-interface.md](developer-interface.md)).
 
 ---
 
@@ -123,16 +125,12 @@ tar -xzf /tmp/helm.tgz -C /tmp && install "/tmp/linux-${ARCH}/helm" /usr/local/b
 curl -fsSLo /tmp/kubectl "https://dl.k8s.io/release/v1.35.0/bin/linux/${ARCH}/kubectl"
 install /tmp/kubectl /usr/local/bin/
 
-# uv (Python tooling for the solution repo); it fetches Python 3.13 itself
-curl -LsSf https://astral.sh/uv/install.sh | sh
-export PATH="$HOME/.local/bin:$PATH"
-uv python install 3.13
 ```
 
 Check:
 
 ```bash
-podman --version; skopeo --version; tofu version | head -1; helm version --short; kubectl version --client | head -1; jq --version; yq --version; uv --version
+podman --version; skopeo --version; tofu version | head -1; helm version --short; kubectl version --client | head -1; jq --version; yq --version
 ```
 
 > `yq` must be the **Python** yq from the Ubuntu package (a jq wrapper), not the Go "mikefarah" yq.
@@ -140,17 +138,14 @@ podman --version; skopeo --version; tofu version | head -1; helm version --short
 
 ### A.3 Get the code
 
-Clone the two repositories **next to each other**. The IaC scripts find the solution as
-`../project-boccob` by default.
-
 ```bash
 mkdir -p ~/src && cd ~/src
-git clone https://github.com/bendfeldt/project-boccob.git
 git clone https://github.com/bendfeldt/project-boccob-iac.git
-# while the work is not merged yet, use the development branch in both:
-git -C project-boccob checkout claude/determined-lovelace-ugiz1b
+# while the work is not merged yet, use the development branch:
 git -C project-boccob-iac checkout claude/determined-lovelace-ugiz1b
 ```
+
+The solution repository has its own getting-started guide; it can live anywhere.
 
 Install the pinned supply-chain tools (cosign, trivy, syft, oras). They are checksum-verified and
 installed into `~/.cache/boccob/bin` in the build for this machine (linux/amd64, linux/arm64 or
@@ -161,15 +156,6 @@ cd ~/src/project-boccob-iac
 make tools
 make doctor ENV=dev  # prerequisites, architecture, ports, disk: fix every FAIL before you go on
 make help          # every target with a one-line description
-```
-
-In the solution repo, create the Python environment and its tools once:
-
-```bash
-cd ~/src/project-boccob
-make setup         # virtualenv from uv.lock
-make tools         # pinned opa + oras
-make test          # optional sanity check: unit tests, ~1-2 min
 ```
 
 ### A.4 Start the cluster and the registry
@@ -207,26 +193,23 @@ done
 `10-foundation-secrets` also initialises and unseals OpenBao. The dev unseal key and root token are
 written to `~/.boccob/dev/openbao/`. In test and prod they go to key custodians instead.
 
-**Step 2: build, push and sign the solution release into your Zot.**
+**Step 2: publish the solution artifacts into your Zot and sign them.**
 
 ```bash
-make release-publish ENV=dev
+make dev-env ENV=dev       # test users + ~/.boccob/dev/developer.env (developer-interface.md)
 ```
 
-This runs the solution repo's own build and push targets, then signs both artifacts with the key held
-in OpenBao. At the end it prints two lines like these:
+Build and push the image and the policy bundle with the solution repository's own targets (its
+getting-started guide; it reads `developer.env` through `BOCCOB_PLATFORM_ENV`). You get two
+references by digest. Sign them with the platform's key in OpenBao:
 
+```bash
+make sign ENV=dev REFS="<registry>/boccob/dagster-code-location@sha256:... <registry>/boccob/opa-policy-bundle@sha256:..."
 ```
-opa_bundle_ref = "registry.dev.lakehouse.internal:5000/boccob/opa-policy-bundle@sha256:..."
-dagster_code_location_image = "registry.dev.lakehouse.internal:5000/boccob/dagster-code-location@sha256:..."
-```
 
-Put them into `environments/dev/21-query.tfvars` and `environments/dev/22-orchestration.tfvars`,
-replacing the existing lines with the same names. The digests in git belong to someone else's
-registry and will not exist in yours.
-
-> If disk is tight, `SBOM=0 make release-publish ENV=dev` skips the SBOM and vulnerability scan at build
-> time (they need about 1 GB more).
+Put them into `environments/dev/22-orchestration.tfvars` (`dagster_code_location_image`) and
+`environments/dev/21-query.tfvars` (`opa_bundle_ref`), replacing the existing lines. The digests
+in git belong to someone else's registry and will not exist in yours.
 
 **Step 3: deploy everything, then check.**
 
@@ -235,14 +218,9 @@ make deploy ENV=dev          # all stacks in order; already-deployed ones report
 make verify ENV=dev          # smoke test, about 100 checks; all should pass
 ```
 
-**Step 4: load the demo data and prove it end to end.**
-
-```bash
-scripts/dev/test-users.sh dev    # creates alice-admin, erik-engineer, anna-analyst, petra-pii, axel-auditor
-scripts/dev/e2e.sh dev           # two daily loads, access control, erasure, ... (~15-30 min)
-```
-
-The test users' passwords are in `~/.boccob/dev/test-users/<user>`.
+The demo data and the end-to-end tests of the data code are run from the solution repository.
+The test users (`alice-admin`, `erik-engineer`, `anna-analyst`, `petra-pii`, `axel-auditor`) were
+created by `make dev-env`; their passwords are in `~/.boccob/dev/test-users/<user>`.
 
 ### A.6 Open the web UIs
 
@@ -258,8 +236,6 @@ Settings → Privacy and security → Security → Manage certificates → Autho
 | `https://keycloak.dev.lakehouse.internal` | Keycloak, realm `lakehouse` | test users |
 | `https://polaris.dev.lakehouse.internal`, `https://s3.dev.lakehouse.internal`, `https://openbao.dev.lakehouse.internal` | Catalog, object storage and secrets APIs | used by tools, not people |
 
-Try it: as `anna-analyst` you can only query the `curated` catalog, and personal data shows as
-`*****`. As `petra-pii` you see real values (all synthetic).
 
 ### A.7 Everyday commands
 
@@ -271,10 +247,10 @@ Try it: as `anna-analyst` you can only query the `curated` catalog, and personal
 | See what a change would do | `make plan ENV=dev STACK=<stack>` |
 | Apply one stack | `make deploy ENV=dev STACK=<stack>` |
 | Health check | `make verify ENV=dev` |
-| Publish a new solution release | `make release-publish ENV=dev`, update the two tfvars lines, `make deploy ENV=dev STACK=21-query`, then `STACK=22-orchestration`, then run the Dagster job `migrate` (see `project-boccob/docs/releases.md`) |
-| Wipe the demo data, keep the platform (dev only) | `CONFIRM=dev scripts/dev/reset-lakehouse-data.sh dev` |
+| Deploy a new solution release | the solution pushes it; `make sign ENV=dev REFS=...`, update the two tfvars lines, `make deploy ENV=dev STACK=21-query`, then `STACK=22-orchestration`; post-deployment steps per the solution's release docs |
+| Refresh the developer interface | `make dev-env ENV=dev` |
 | Remove everything | `CONFIRM=dev CLUSTER=1 make destroy ENV=dev`, then `rm -rf ~/.boccob/dev` |
-| Lint before you commit | `make lint` (in both repos) |
+| Lint before you commit | `make lint` |
 
 > **Never delete `~/.boccob/dev/` while the cluster exists.** It holds the only copy of the state
 > passphrase and the OpenBao unseal key. Without them the environment cannot be recovered; you can only
@@ -299,14 +275,10 @@ multipass launch 24.04 --name boccob --cpus 4 --memory 16G --disk 80G
 multipass shell boccob
 ```
 
-There are two ways to run the platform on the VM.
+The VM runs exactly Part A: Zot + k3s in Podman. (k3s installed directly on servers is the
+test/prod path: [runbook-bootstrap.md](runbook-bootstrap.md).)
 
-| Option | What runs on the VM | Status |
-|---|---|---|
-| **1. dev environment inside the VM** (recommended) | Exactly Part A: Zot + k3s in Podman | Same steps as the tested path |
-| **2. k3s directly on the VM** ("hosts" mode, like test/prod) | k3s installed as a system service from the air-gap node bundle | **Not tested**; meant for real servers; needs extra setup |
-
-### B.2 Option 1: the dev environment inside the VM (recommended)
+### B.2 The dev environment inside the VM
 
 1. SSH into the VM and follow **Part A, sections A.2 to A.5**, on the VM. You can skip A.6 for now.
    Run everything on the VM, including `make` and `kubectl`.
@@ -339,26 +311,6 @@ There are two ways to run the platform on the VM.
    from the VM. The kubeconfig already points to `https://127.0.0.1:6443`.
 
 After the VM reboots, SSH in and run `sudo -i`, then `cd ~/src/project-boccob-iac && make cluster-up ENV=dev`.
-
-### B.3 Option 2: k3s directly on the VM (advanced, untested)
-
-This is the test/prod installation path. It uses 3 servers and 3 agents, a load-balanced API address,
-DNS names, an external Zot, Shamir-split OpenBao keys and Kyverno in Enforce mode. Read
-[runbook-bootstrap.md](runbook-bootstrap.md) sections 3–5 first.
-
-To use it on a single VM you would create your own environment, e.g. `environments/vm/`, as a copy
-of `environments/test/` with:
-
-- one server in `K3S_SERVERS`, no `K3S_AGENTS`, and `K3S_API_ENDPOINT` set to the VM's name;
-- `ha = false` in `common.tfvars`, and dev-sized tfvars;
-- a Zot registry reachable from the VM under `REGISTRY_HOST`;
-- OpenBao settings for a single member.
-
-You would then build the node bundle (`make node-bundle`), run `make cluster-up ENV=vm` (which
-installs k3s over SSH), mirror, and deploy as in A.4–A.5.
-
-None of this has been run. Expect to debug it, and ask a platform maintainer before going down this
-path. For learning and day-to-day development, use Option 1.
 
 ---
 
@@ -420,7 +372,7 @@ yq --version                 # "yq 3.x": the Python yq (jq wrapper)
   `brew uninstall yq` if you had it. `make doctor` tells you which one you have.
 - **cosign, trivy, syft, oras**: `make tools` installs the pinned, checksum-verified darwin/arm64
   builds into `~/.cache/boccob/bin` (Homebrew versions also work but are not pinned).
-- Then `make tools` and, in the solution repo, `make setup tools`.
+- Then `make tools`.
 
 ### C.2 Create the podman machine
 
@@ -488,9 +440,8 @@ Grafana). `make doctor` checks that the mode and the redirect agree.
 `DEV_PUBLISH_ADDR` (default `127.0.0.1`) is the address the ports are published on; there is no
 need to change it.
 
-Then deploy as in **A.5** and open the UIs as in **A.6** (mode A: the same URLs; mode B: with `:8443`). `make release-publish
-ENV=dev` builds the solution image inside the VM for `linux/arm64`; to build both architectures use
-`PLATFORMS=linux/amd64,linux/arm64` (the amd64 half runs emulated and is slow).
+Then deploy as in **A.5** and open the UIs as in **A.6** (mode A: the same URLs; mode B: with `:8443`). The solution
+artifacts must be built for `linux/arm64` (`BOCCOB_CLUSTER_ARCH` in `developer.env`).
 
 Everyday commands are those of **A.7**. In addition: after the Mac restarts, `podman machine start`
 before `make cluster-up ENV=dev`; to free the RAM, `make cluster-down ENV=dev` and `podman machine stop`.
@@ -505,11 +456,10 @@ before `make cluster-up ENV=dev`; to free the RAM, `make cluster-down ENV=dev` a
 | `The connection to the server 127.0.0.1:6443 was refused` | The machine restarted, or the node container died. Run `make cluster-up ENV=dev`. |
 | `podman ps` says "Up" but commands fail with "cannot exec in a stopped container" | Stale container after a host restart. `make cluster-up ENV=dev` re-creates it from its volumes. |
 | Pods fail with secret errors; OpenBao pod `0/1` | OpenBao is sealed after a restart. Run `make openbao-unseal ENV=dev` (retry once if it times out while the pod is still starting). |
-| Pods `Evicted`, node has `DiskPressure`, image pulls fail | The disk is full. Free space: `podman exec boccob-dev-server-0 crictl rmi --prune`, `podman image prune -f`, and delete `~/.cache/uv` and `~/.cache/boccob/trivy` (both can be downloaded again). |
+| Pods `Evicted`, node has `DiskPressure`, image pulls fail | The disk is full. Free space: `podman exec boccob-dev-server-0 crictl rmi --prune`, `podman image prune -f`, and delete `~/.cache/boccob/trivy` (it can be downloaded again). |
 | Mirroring fails with 403 / TLS errors | A proxy or firewall blocks a registry host. Check the host list in section 1. Never turn off TLS verification. |
 | `deploy.sh` refuses a plan "that deletes or replaces …" | Safety guard against destroying OpenBao, databases or storage. Read the plan; if you really mean it on dev, run it again with `ALLOW_DESTROY=dev`. |
 | `ImagePullBackOff` on the Dagster code location or OPA | The tfvars reference a solution digest that is not in your Zot. Repeat A.5 step 2. |
-| dbt refuses `--full-refresh` | On purpose outside `LAKEHOUSE_ENV=dev` (it would lose history and break keys). On dev it is allowed. |
 | Port 443 or 80 already in use | Stop the other web server. Moving the dev ports (`DEV_HTTPS_PORT`) breaks the Keycloak login redirects. |
 | `... is not supported. Supported: x64 (x86_64/amd64) and arm64 (aarch64)` | The machine (or the podman machine) has another CPU architecture: 32-bit x86/ARM, ppc64le, ... are not supported. |
 | `image X: no linux/arm64 digest` | The lock has no build of that image for your architecture: see [versions.md](versions.md) ("missing_platforms"). |
@@ -538,9 +488,8 @@ df -h /                                         # disk
 | Understand the platform design | [architecture.md](architecture.md), [data-plane.md](data-plane.md) |
 | Pin or upgrade a version; architectures | [versions.md](versions.md) |
 | Add a module, stack, secret, bucket, OIDC client or firewall rule | [conventions.md](conventions.md) |
-| Add a data source | `project-boccob/docs/adding-a-source.md` |
-| Understand the layers, keystore and SCD2 | `project-boccob/docs/data-layers.md`, `project-boccob/docs/keystore.md` |
-| Know how personal data is handled (GDPR, CPR, erasure) | `project-boccob/docs/gdpr.md`, [compliance/](compliance/README.md) |
-| Ship a release / change a table schema | `project-boccob/docs/releases.md`, [compliance/runbooks/patching.md](compliance/runbooks/patching.md) |
+| Connect the solution's tools to the platform | [developer-interface.md](developer-interface.md) |
+| Data sources, layers, keystore, personal data, releases | the solution repository's documentation |
+| Compliance evidence and runbooks | [compliance/](compliance/README.md), [compliance/runbooks/patching.md](compliance/runbooks/patching.md) |
 | Install test/prod on real servers | [runbook-bootstrap.md](runbook-bootstrap.md) |
 | See what was audited and what is still open | [audit/](audit/) |
