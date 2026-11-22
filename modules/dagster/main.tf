@@ -632,7 +632,10 @@ resource "helm_release" "code_location" {
       postgresqlSecretName = module.db_credentials.secret_name
       dagsterHome          = "/opt/dagster/dagster_home"
     }
-    deployments = [local.code_location]
+    # Recreate: during a rolling update old and new code server answer behind one Service,
+    # so the webserver/daemon can reload the location from the old one and keep launching
+    # runs with the old image (refused by the run-Job policy) until the next reload
+    deployments = [merge(local.code_location, { deploymentStrategy = { type = "Recreate" } })]
   })]
 
   depends_on = [kubernetes_manifest.solution_env, module.compute_logs_credentials]
