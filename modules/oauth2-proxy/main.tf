@@ -95,7 +95,7 @@ resource "kubernetes_deployment_v1" "this" {
             "--cookie-secure=true",
             "--cookie-samesite=lax",
             "--code-challenge-method=S256",
-            "--redirect-url=https://${var.public_host}${var.public_port}/oauth2/callback",
+            "--redirect-url=https://${var.public_host}/oauth2/callback",
             "--upstream=${var.upstream}",
             "--email-domain=*",
             "--scope=openid profile email",

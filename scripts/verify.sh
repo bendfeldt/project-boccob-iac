@@ -46,9 +46,6 @@ kubectl -n platform-system get configmap platform-ca -o jsonpath='{.data.ca\.crt
 # ingress is reached on the node address (dev: loopback ports of the node container)
 INGRESS_IP="${INGRESS_IP:-127.0.0.1}"
 INGRESS_PORT="${INGRESS_PORT:-${DEV_HTTPS_PORT:-443}}"
-# public URLs carry a port only when the platform was deployed with a non-default one
-PUBLIC_PORT_SUFFIX=""
-[[ "${DEV_PUBLIC_HTTPS_PORT:-443}" == "443" ]] || PUBLIC_PORT_SUFFIX=":${DEV_PUBLIC_HTTPS_PORT}"
 icurl() { # icurl <host> <path> [curl args]
   local host="$1" path="$2"; shift 2
   curl -fsS --noproxy '*' --cacert "$ca" --resolve "${host}:${INGRESS_PORT}:${INGRESS_IP}" "$@" "https://${host}:${INGRESS_PORT}${path}"
@@ -244,7 +241,7 @@ check "S3 rejects unauthenticated requests" bash -c \
 step "Keycloak"
 kc_host="keycloak.${BASE_DOMAIN}"
 check "realm lakehouse discovery over TLS, issuer matches" bash -c \
-  "$(declare -f icurl); ca='$ca' INGRESS_PORT='$INGRESS_PORT' INGRESS_IP='$INGRESS_IP' icurl '$kc_host' /realms/lakehouse/.well-known/openid-configuration | jq -e '.issuer == \"https://${kc_host}${PUBLIC_PORT_SUFFIX}/realms/lakehouse\"'"
+  "$(declare -f icurl); ca='$ca' INGRESS_PORT='$INGRESS_PORT' INGRESS_IP='$INGRESS_IP' icurl '$kc_host' /realms/lakehouse/.well-known/openid-configuration | jq -e '.issuer == \"https://${kc_host}/realms/lakehouse\"'"
 kc_token() {
   # client-credentials grant with the polaris client secret generated in-cluster
   local secret

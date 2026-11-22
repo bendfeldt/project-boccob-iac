@@ -3,7 +3,7 @@ locals {
   tls_name        = "${local.name}-server-tls"
   internal_host   = "${local.name}.${var.namespace}.svc"
   internal_url    = "https://${local.internal_host}:8443"
-  issuer          = "https://${var.hostname}${var.public_port}/realms/${var.realm}"
+  issuer          = "https://${var.hostname}/realms/${var.realm}"
   selector_labels = { "app.kubernetes.io/name" = local.name, "app.kubernetes.io/component" = "server" }
   labels          = merge(var.labels, local.selector_labels)
 }
@@ -165,7 +165,7 @@ resource "kubernetes_deployment_v1" "this" {
 
           dynamic "env" {
             for_each = {
-              KC_HOSTNAME                     = "https://${var.hostname}${var.public_port}"
+              KC_HOSTNAME                     = "https://${var.hostname}"
               KC_HOSTNAME_BACKCHANNEL_DYNAMIC = "false"
               KC_HTTP_ENABLED                 = "false"
               KC_HTTPS_PORT                   = "8443"

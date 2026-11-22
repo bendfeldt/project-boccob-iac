@@ -27,12 +27,6 @@ variable "image" {
   })
 }
 
-variable "public_port" {
-  description = "\":<port>\" when the public URLs use a non-default https port, else \"\"."
-  type        = string
-  default     = ""
-}
-
 variable "hostname" {
   description = "Public hostname (grafana.<base_domain>); the OIDC redirect URI is https://<hostname>/login/generic_oauth."
   type        = string

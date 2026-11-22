@@ -94,7 +94,7 @@ resource "helm_release" "this" {
         cert_file = "/etc/grafana/tls/tls.crt"
         cert_key  = "/etc/grafana/tls/tls.key"
         domain    = var.hostname
-        root_url  = "https://${var.hostname}${var.public_port}/"
+        root_url  = "https://${var.hostname}/"
       }
       analytics = { reporting_enabled = false, check_for_updates = false, check_for_plugin_updates = false }
       security = {
@@ -107,7 +107,7 @@ resource "helm_release" "this" {
       auth = {
         disable_login_form   = true
         oauth_auto_login     = true
-        signout_redirect_url = "${var.oidc.issuer}/protocol/openid-connect/logout?post_logout_redirect_uri=https%3A%2F%2F${var.hostname}${urlencode(var.public_port)}%2Flogin&client_id=${var.oidc.client_id}"
+        signout_redirect_url = "${var.oidc.issuer}/protocol/openid-connect/logout?post_logout_redirect_uri=https%3A%2F%2F${var.hostname}%2Flogin&client_id=${var.oidc.client_id}"
       }
       "auth.anonymous" = { enabled = false }
       "auth.basic"     = { enabled = false }

@@ -16,30 +16,30 @@ locals {
   default_oidc_clients = {
     trino = {
       name          = "Trino"
-      redirect_uris = ["https://trino.${var.base_domain}${local.platform.public_port}/oauth2/callback", "https://trino.${var.base_domain}${local.platform.public_port}/ui/logout/logout.html"]
+      redirect_uris = ["https://trino.${var.base_domain}/oauth2/callback", "https://trino.${var.base_domain}/ui/logout/logout.html"]
     }
     polaris = {
       name            = "Apache Polaris"
-      redirect_uris   = ["https://polaris.${var.base_domain}${local.platform.public_port}/*"]
+      redirect_uris   = ["https://polaris.${var.base_domain}/*"]
       service_account = true
     }
     dagster = {
       name          = "Dagster (oauth2-proxy)"
-      redirect_uris = ["https://dagster.${var.base_domain}${local.platform.public_port}/oauth2/callback"]
+      redirect_uris = ["https://dagster.${var.base_domain}/oauth2/callback"]
     }
     grafana = {
       name          = "Grafana"
-      redirect_uris = ["https://grafana.${var.base_domain}${local.platform.public_port}/login/generic_oauth"]
+      redirect_uris = ["https://grafana.${var.base_domain}/login/generic_oauth"]
     }
     # audit trail viewer (stack 30-observability); login restricted to the auditor group
     grafana-audit = {
       name          = "Grafana (audit trail)"
-      redirect_uris = ["https://grafana-audit.${var.base_domain}${local.platform.public_port}/login/generic_oauth"]
+      redirect_uris = ["https://grafana-audit.${var.base_domain}/login/generic_oauth"]
     }
     openbao = {
       name = "OpenBao"
       redirect_uris = [
-        "https://openbao.${var.base_domain}${local.platform.public_port}/ui/vault/auth/oidc/oidc/callback",
+        "https://openbao.${var.base_domain}/ui/vault/auth/oidc/oidc/callback",
         "http://localhost:8250/oidc/callback",
       ]
     }
@@ -133,7 +133,6 @@ module "keycloak" {
   image         = module.versions.images["keycloak"].ref
   replicas      = coalesce(var.keycloak_replicas, var.ha ? 2 : 1)
   hostname      = "keycloak.${var.base_domain}"
-  public_port   = local.platform.public_port
   database = {
     host   = module.keycloak_db.host
     name   = module.keycloak_db.database

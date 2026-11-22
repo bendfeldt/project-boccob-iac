@@ -84,20 +84,17 @@ locals {
     }
     # no anonymous usage statistics / version check (air-gap, privacy)
     globalArguments = []
-    # exposedPort = the Service (and ServiceLB host) port; the http->https redirect
-    # targets it. Only set for a non-default public port (macOS without the pf
-    # redirect): <svc>.<base_domain>:<port> then works in the cluster and outside.
     ports = {
-      web = merge({
+      web = {
         http = {
           redirections = {
             entryPoint = { to = "websecure", scheme = "https", permanent = true }
           }
         }
-      }, var.public_https_port == 443 ? {} : { exposedPort = var.public_http_port })
-      websecure = merge({
+      }
+      websecure = {
         http = { tls = { enabled = true } }
-      }, var.public_https_port == 443 ? {} : { exposedPort = var.public_https_port })
+      }
     }
     ingressRoute = { dashboard = { enabled = false } }
     api          = { dashboard = false, insecure = false }

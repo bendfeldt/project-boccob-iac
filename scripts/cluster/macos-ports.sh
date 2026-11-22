@@ -2,7 +2,7 @@
 # macOS only: pf (packet filter) redirect of the standard web ports on the loopback to
 # the ports podman forwards from the machine:
 #   127.0.0.1:443 -> 127.0.0.1:${DEV_HTTPS_PORT} (8443)    127.0.0.1:80 -> 127.0.0.1:${DEV_HTTP_PORT} (8080)
-# so https://<svc>.dev.lakehouse.internal works without a port (DEV_PUBLIC_HTTPS_PORT=443).
+# so https://<svc>.dev.lakehouse.internal works without a port (the only public URL form).
 #
 #   macos-ports.sh <env> add|remove|check        (make macos-ports / macos-ports-remove; add/remove use sudo)
 #

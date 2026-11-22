@@ -24,22 +24,6 @@ variable "registry_host" {
   type        = string
 }
 
-variable "public_https_port" {
-  description = "Port of the public https URLs (<svc>.<base_domain>[:port]): 443 (default; Linux dev, test/prod, macOS with the pf redirect of make macos-ports) or a non-privileged port such as 8443 (macOS without the redirect). Keycloak's hostname, the OIDC issuer, redirect URIs and the Traefik entry points follow it. Set by scripts/tofu.sh from DEV_PUBLIC_HTTPS_PORT."
-  type        = number
-  default     = 443
-  validation {
-    condition     = var.public_https_port == 443 || (var.public_https_port >= 1024 && var.public_https_port <= 65535)
-    error_message = "public_https_port must be 443 or a port from 1024 to 65535."
-  }
-}
-
-variable "public_http_port" {
-  description = "Port of the plain-http entry point (redirects to https): 80, or e.g. 8080 together with public_https_port = 8443."
-  type        = number
-  default     = 80
-}
-
 variable "cluster_arch" {
   description = "CPU architecture of the cluster nodes (amd64 = x64/x86_64, arm64 = aarch64). Set by scripts/tofu.sh from CLUSTER_ARCH; selects the image digests."
   type        = string
@@ -91,12 +75,6 @@ module "versions" {
 }
 
 locals {
-  # Keycloak (hostname v2) wants ONE fixed public URL incl. a non-default port; every
-  # public https URL of the platform carries the same suffix
-  public_port = var.public_https_port == 443 ? "" : ":${var.public_https_port}"
-}
-
-locals {
   # Well-known names: the contract between stacks. Stacks never read each
   # other's state; they rely on these names (documented in docs/conventions.md).
   platform = {
@@ -123,11 +101,9 @@ locals {
     # platform-system, copied into namespaces by modules/namespace-baseline
     ca_configmap = "platform-ca"
     # in-cluster endpoints
-    openbao_url  = "https://openbao.secrets.svc:8200"
-    keycloak_url = "https://keycloak.${var.base_domain}${local.public_port}"
-    oidc_issuer  = "https://keycloak.${var.base_domain}${local.public_port}/realms/lakehouse"
-    # ":<port>" in public URLs when public_https_port is not 443, else ""
-    public_port   = local.public_port
+    openbao_url   = "https://openbao.secrets.svc:8200"
+    keycloak_url  = "https://keycloak.${var.base_domain}"
+    oidc_issuer   = "https://keycloak.${var.base_domain}/realms/lakehouse"
     s3_url        = "https://rustfs-svc.storage.svc:9000"
     s3_region     = "us-east-1"
     ingress_class = "traefik"

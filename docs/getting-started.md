@@ -334,7 +334,7 @@ interfaces), all on `127.0.0.1`:
 | 8080 | ingress http (redirects to https) | `DEV_HTTP_PORT` |
 | 6443 | Kubernetes API | `DEV_API_PORT` |
 | 5000 | Zot registry | `DEV_REGISTRY_PORT` |
-| 443 → 8443, 80 → 8080 | optional pf redirect (`make macos-ports`) | |
+| 443 → 8443, 80 → 8080 | pf redirect (`make macos-ports`, required) | |
 
 **Homebrew is required on macOS.** `Brewfile` in this repository is the single list of the macOS
 prerequisites; `make doctor` and the entry points (`make machine-init`, `cluster-up`, `deploy`)
@@ -349,7 +349,7 @@ What the scripts do differently (`CLUSTER_RUNTIME=podman-machine`, automatic on 
 | `/etc/hosts` block added (root) | opt-in, with `sudo` (`DEV_MANAGE_ETC_HOSTS=1`); the VM always gets its own entry for the registry |
 | registry CA via `SSL_CERT_FILE` | macOS Go programs ignore `SSL_CERT_FILE`: the CA must be trusted in the System keychain (`make macos-trust`) |
 | node image `linux/amd64` | node image `linux/arm64` (the VM's architecture) |
-| ingress on 127.0.0.1:443/80 | 127.0.0.1:8443/8080 (+ optional pf redirect from 443/80) |
+| ingress on 127.0.0.1:443/80 | 127.0.0.1:8443/8080 + pf redirect from 443/80 |
 
 ### C.1 Install the tools (Homebrew, required)
 
@@ -393,7 +393,7 @@ Leave at least 4 GB of RAM for macOS (the script checks it). Another name than t
 ### C.3 Start the cluster
 
 ```bash
-make macos-ports ENV=dev                                          # mode A (C.4): pf redirect 443 -> 8443 (sudo)
+make macos-ports ENV=dev                                          # pf redirect 443 -> 8443 (sudo, C.4)
 DEV_MANAGE_ETC_HOSTS=1 DEV_TRUST_CA=1 make cluster-up ENV=dev   # asks for your sudo password (/etc/hosts, keychain)
 make airgap-mirror ENV=dev           # the linux/arm64 images only (the cluster's architecture)
 export KUBECONFIG=~/.boccob/dev/kubeconfig
@@ -407,22 +407,12 @@ kubectl get nodes -o wide            # one node, Ready, arm64
   **again after stack `11-foundation-pki`** is deployed: it then also trusts the platform CA, which
   Safari and Chrome need for the web UIs (Firefox: import `~/.boccob/dev/pki/trust-bundle.crt` in
   its own settings). `ACTION=check` shows the state, `ACTION=remove` takes them out again.
-### C.4 Ports and URLs: with or without the pf redirect
+### C.4 Ports and URLs: the pf redirect
 
-Keycloak's hostname guidance is to configure **one fixed, full public URL** (scheme, host and a
-non-default port) instead of deriving it from request headers: the issuer in every token, the
-OIDC discovery document and all redirects are built from it, and dynamic URLs open the door to
-Host-header attacks. So the platform is deployed for exactly one public port,
-`DEV_PUBLIC_HTTPS_PORT`, and Keycloak (`KC_HOSTNAME`), the OIDC issuer, the redirect URIs of
-every client (Trino, Dagster/oauth2-proxy, Grafana, Polaris, OpenBao) and Traefik's entry points
-follow it. Pick one of the two modes:
-
-| | A: with the pf redirect (recommended) | B: without it |
-|---|---|---|
-| Setup | `make macos-ports ENV=dev` once (sudo) | nothing on the Mac |
-| URLs | `https://dagster.dev.lakehouse.internal` (same as Linux) | `https://dagster.dev.lakehouse.internal:8443` |
-| `DEV_PUBLIC_HTTPS_PORT` | `443` (default) | `8443` (export it in your shell for every `make`) |
-| Traefik in the cluster | ports 443/80 (unchanged) | ports 8443/8080 (`exposedPort`), so the same URL works inside the cluster |
+The public URLs are the same as on Linux, `https://<svc>.dev.lakehouse.internal` (port 443):
+Keycloak wants one fixed public URL, and the issuer in every token and all OIDC redirects are
+built from it. On the Mac, gvproxy can only forward the non-privileged 8443/8080, so a pf redirect
+on the loopback is required.
 
 `make macos-ports ENV=dev` installs a pf (packet filter) redirect on the loopback,
 `127.0.0.1:443 → 8443` and `:80 → 8080`, the way Apple's `pf.conf` is meant to be extended: the
@@ -434,13 +424,10 @@ It is idempotent. `make macos-ports-remove ENV=dev` takes all of it out again (a
 token). A macOS update may reset `/etc/pf.conf`: `make doctor` reports the redirect as inactive,
 then run `make macos-ports` again.
 
-Switching modes later: set `DEV_PUBLIC_HTTPS_PORT`, then `make cluster-up ENV=dev` (re-creates the
-node with the new port mapping) and `make deploy ENV=dev` (Traefik, Keycloak, clients, oauth2-proxy,
-Grafana). `make doctor` checks that the mode and the redirect agree.
 `DEV_PUBLISH_ADDR` (default `127.0.0.1`) is the address the ports are published on; there is no
 need to change it.
 
-Then deploy as in **A.5** and open the UIs as in **A.6** (mode A: the same URLs; mode B: with `:8443`). The solution
+Then deploy as in **A.5** and open the UIs as in **A.6** (the same URLs). The solution
 artifacts must be built for `linux/arm64` (`BOCCOB_CLUSTER_ARCH` in `developer.env`).
 
 Everyday commands are those of **A.7**. In addition: after the Mac restarts, `podman machine start`
@@ -465,7 +452,7 @@ before `make cluster-up ENV=dev`; to free the RAM, `make cluster-down ENV=dev` a
 | `image X: no linux/arm64 digest` | The lock has no build of that image for your architecture: see [versions.md](versions.md) ("missing_platforms"). |
 | macOS: `x509: certificate signed by unknown authority` from skopeo/helm/tofu | The dev CA is not in the System keychain: `make macos-trust ENV=dev`. |
 | macOS: `bash ... is too old` / Makefile errors about `.SHELLFLAGS` | Homebrew's bash and GNU make must come first in `PATH` (C.1). |
-| macOS: browser cannot reach `https://<svc>.dev.lakehouse.internal` | Mode A needs the pf redirect: `make macos-ports ENV=dev` (`make doctor` shows whether it is active). Mode B: use the URLs with `:8443`. |
+| macOS: browser cannot reach `https://<svc>.dev.lakehouse.internal` | The pf redirect is not active: `make macos-ports ENV=dev` (`make doctor` shows whether it is active). |
 | macOS: `missing Homebrew formulae: brew install ...` | Run that line, or `make brew-bundle`. |
 | macOS: `the podman machine is rootless` | `podman machine stop; podman machine set --rootful; podman machine start` (or `make machine-init`). |
 

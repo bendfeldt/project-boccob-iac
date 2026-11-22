@@ -18,17 +18,8 @@ else
   export DEV_HTTPS_PORT="${DEV_HTTPS_PORT:-443}"  # 127.0.0.1:<port> -> Traefik websecure
   export DEV_HTTP_PORT="${DEV_HTTP_PORT:-80}"     # 127.0.0.1:<port> -> Traefik web (redirects)
 fi
-# Port in the public URLs (Keycloak issuer, OIDC redirects, Traefik entry points; one
-# fixed value, as Keycloak's hostname guidance requires):
-#   443  (default) https://<svc>.dev.lakehouse.internal  - Linux, or macOS WITH the pf redirect
-#   8443 https://<svc>.dev.lakehouse.internal:8443       - macOS without the redirect
-# Changing it needs `make cluster-up` and `make deploy` (00-bootstrap, 13-identity, 21/22/30).
-export DEV_PUBLIC_HTTPS_PORT="${DEV_PUBLIC_HTTPS_PORT:-443}"
-if [[ "$DEV_PUBLIC_HTTPS_PORT" == "443" ]]; then
-  export DEV_PUBLIC_HTTP_PORT="${DEV_PUBLIC_HTTP_PORT:-80}"
-else
-  export DEV_PUBLIC_HTTP_PORT="${DEV_PUBLIC_HTTP_PORT:-${DEV_HTTP_PORT}}"
-fi
+# The public URLs are always https://<svc>.dev.lakehouse.internal (port 443; Keycloak
+# wants one fixed URL): on macOS through the pf redirect 443 -> DEV_HTTPS_PORT.
 export DEV_REGISTRY_PORT="${DEV_REGISTRY_PORT:-5000}"
 # kubelet tweaks for the dev node container (never for test/prod hosts):
 #  - eviction: the default "nodefs.available<10%" is relative to the size of

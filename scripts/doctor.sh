@@ -178,17 +178,10 @@ if [[ "$CLUSTER_MODE" == "podman" ]]; then
   done
 
   if [[ "$runtime" == "podman-machine" ]]; then
-    pub="${DEV_PUBLIC_HTTPS_PORT:-443}"
-    if [[ "$pub" == "443" ]]; then
-      if "${REPO_ROOT}/scripts/cluster/macos-ports.sh" "$ENV" check >/dev/null 2>&1; then
-        ok "pf redirect active: 127.0.0.1:443 -> ${DEV_HTTPS_PORT}, :80 -> ${DEV_HTTP_PORT} (public URLs without port)"
-      else
-        bad "public URLs use port 443 but the pf redirect is not active: make macos-ports ENV=${ENV} (sudo), or DEV_PUBLIC_HTTPS_PORT=${DEV_HTTPS_PORT} (URLs with :${DEV_HTTPS_PORT}) and redeploy"
-      fi
-    elif [[ "$pub" == "$DEV_HTTPS_PORT" ]]; then
-      ok "public URLs use :${pub} (no pf redirect needed)"
+    if "${REPO_ROOT}/scripts/cluster/macos-ports.sh" "$ENV" check >/dev/null 2>&1; then
+      ok "pf redirect active: 127.0.0.1:443 -> ${DEV_HTTPS_PORT}, :80 -> ${DEV_HTTP_PORT}"
     else
-      bad "DEV_PUBLIC_HTTPS_PORT=${pub} must be 443 (with make macos-ports) or DEV_HTTPS_PORT=${DEV_HTTPS_PORT}"
+      bad "the pf redirect is not active (the public URLs are on 443): make macos-ports ENV=${ENV} (sudo)"
     fi
   fi
 

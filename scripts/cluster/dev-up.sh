@@ -79,14 +79,8 @@ if ! container_host_exec 'echo -1 > /proc/self/oom_score_adj' 2>/dev/null; then
   dropin=true
 fi
 cfg_sum="$(echo "$node_ip" | cat - "${CFG}/etc/containerd-dropin.toml" "${CFG}/etc/hosts" "${CFG}/etc/config.yaml" "${CFG}/etc/registries.yaml" "${CFG}/etc/hardening/"* | sha256_stream | awk '{print $1}')"
-# Traefik's ServiceLB listens on the node at the PUBLIC ports (Traefik exposedPort,
-# stack 00-bootstrap); they differ from 443/80 only with DEV_PUBLIC_HTTPS_PORT set
-node_https="${DEV_PUBLIC_HTTPS_PORT:-443}" node_http="${DEV_PUBLIC_HTTP_PORT:-80}"
-if [[ "$node_https" != "443" || "$DEV_HTTPS_PORT" != "443" ]]; then
-  # port mapping is part of the container definition: recreate when it changes
-  # (only appended when not the Linux default, so existing nodes keep their hash)
-  cfg_sum="$(printf '%s %s:%s %s:%s' "$cfg_sum" "$DEV_HTTPS_PORT" "$node_https" "$DEV_HTTP_PORT" "$node_http" | sha256_stream | awk '{print $1}')"
-fi
+# the port mapping is part of the container definition: recreate when it changes
+cfg_sum="$(printf '%s %s %s %s' "$cfg_sum" "$DEV_API_PORT" "$DEV_HTTPS_PORT" "$DEV_HTTP_PORT" | sha256_stream | awk '{print $1}')"
 # bind mounts are resolved on the container host: native = ${CFG}/etc itself,
 # podman machine = a root-owned copy in the VM
 etc="$(container_host_sync_dir "${CFG}/etc" "${DEV_MACHINE_DIR:-/var/lib/boccob/${ENV}}/k3s-etc")"
@@ -127,8 +121,8 @@ if ! podman container exists "$NODE"; then
     -v "${etc}/hosts:/etc/hosts:ro" \
     --label "boccob.config-sha256=${cfg_sum}" \
     -p "${DEV_PUBLISH_ADDR:-127.0.0.1}:${DEV_API_PORT}:6443" \
-    -p "${DEV_PUBLISH_ADDR:-127.0.0.1}:${DEV_HTTPS_PORT}:${node_https}" \
-    -p "${DEV_PUBLISH_ADDR:-127.0.0.1}:${DEV_HTTP_PORT}:${node_http}" \
+    -p "${DEV_PUBLISH_ADDR:-127.0.0.1}:${DEV_HTTPS_PORT}:443" \
+    -p "${DEV_PUBLISH_ADDR:-127.0.0.1}:${DEV_HTTP_PORT}:80" \
     --tmpfs /run --tmpfs /var/run \
     -v "${NODE}-data:/var/lib/rancher/k3s" \
     -v "${NODE}-kubelet:/var/lib/kubelet" \
@@ -156,10 +150,8 @@ kubectl get nodes -o wide >&2
 if [[ "$runtime" == "podman-machine" ]]; then
   port_listening 127.0.0.1 "${DEV_HTTPS_PORT}" \
     || warn "nothing answers on 127.0.0.1:${DEV_HTTPS_PORT} on this Mac: podman (gvproxy) did not forward the ingress port (podman machine stop/start)"
-  if [[ "${DEV_PUBLIC_HTTPS_PORT:-443}" == "443" ]] && ! "${REPO_ROOT}/scripts/cluster/macos-ports.sh" "$ENV" check >/dev/null 2>&1; then
-    warn "public URLs are https://<svc>.${BASE_DOMAIN} (port 443) but the pf redirect 443 -> ${DEV_HTTPS_PORT} is not active:"
-    warn "make macos-ports ENV=${ENV} (sudo), or deploy with DEV_PUBLIC_HTTPS_PORT=${DEV_HTTPS_PORT} (docs/getting-started.md, Part C)"
-  fi
+  "${REPO_ROOT}/scripts/cluster/macos-ports.sh" "$ENV" check >/dev/null 2>&1 \
+    || warn "the pf redirect 443 -> ${DEV_HTTPS_PORT} is not active (the public URLs are on 443): make macos-ports ENV=${ENV} (sudo)"
 fi
 
 # OpenBao seals itself whenever its pod restarts. In dev the single unseal key

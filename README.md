@@ -7,8 +7,8 @@ your machine.
 Platforms: clusters run on **linux/amd64 (x64, x86_64)** or **linux/arm64 (aarch64)**; every image
 is pinned per architecture ([docs/versions.md](docs/versions.md)). The x64 Linux dev path is the
 tested one; arm64 and macOS are prepared but have not run on real hardware yet. macOS needs Homebrew
-(`make brew-bundle` installs the `Brewfile`); the ingress is on 127.0.0.1:8443 there, with an
-optional pf redirect from 443 (`make macos-ports`).
+(`make brew-bundle` installs the `Brewfile`); the ingress is on 127.0.0.1:8443 there, with a
+pf redirect from 443 (`make macos-ports`).
 
 Infrastructure as code for the Boccob lakehouse: on-prem, open source,
 air-gapped, k3s everywhere. OpenTofu only, driven by bash scripts wrapped in a

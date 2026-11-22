@@ -14,12 +14,6 @@ variable "replicas" {
   default     = 1
 }
 
-variable "public_port" {
-  description = "\":<port>\" when the public URL uses a non-default port (e.g. \":8443\" behind a port mapping), else \"\". Keycloak's hostname v2 guidance: give the full frontend URL incl. the port, so the issuer and redirects are fixed and never derived from request headers."
-  type        = string
-  default     = ""
-}
-
 variable "hostname" {
   description = "Public hostname (https://<hostname> is the fixed frontend and issuer URL)."
   type        = string
