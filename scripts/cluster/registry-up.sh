@@ -38,6 +38,7 @@ if [[ ! -f "${PKI}/registry-ca.crt" ]]; then
       -subj "/O=Boccob Lakehouse/OU=${ENV}/CN=${CLUSTER_NAME} bootstrap registry CA" \
       -addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
       -addext "keyUsage=critical,keyCertSign,cRLSign" \
+      -addext "nameConstraints=critical,permitted;DNS:${BASE_DOMAIN},permitted;DNS:${ZOT_NAME},permitted;DNS:localhost,permitted;IP:127.0.0.1/255.255.255.255" \
       -out "${PKI}/registry-ca.crt" )
   log "created ${PKI}/registry-ca.crt"
 fi

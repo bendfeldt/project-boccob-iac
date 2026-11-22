@@ -62,10 +62,16 @@ resource "vault_pki_secret_backend_root_cert" "root" {
   key_type     = "ec"
   key_bits     = 384
   issuer_name  = "root"
+  # name constraints: the root (trusted by workstations, e.g. the macOS keychain) can
+  # only vouch for the platform's own names, never for an outside site
+  permitted_dns_domains = var.pki_allowed_domains
 
-  # the root key never leaves OpenBao: replacing it re-issues the whole PKI (audit R3-3)
+  # the root key never leaves OpenBao: replacing it re-issues the whole PKI. A root
+  # created before the constraints keeps its (unconstrained) certificate; changing
+  # the domains later needs a root rotation (docs/compliance/runbooks/certificate-rotation.md)
   lifecycle {
     prevent_destroy = true
+    ignore_changes  = [permitted_dns_domains]
   }
 }
 

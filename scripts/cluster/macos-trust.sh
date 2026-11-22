@@ -5,9 +5,12 @@
 # Go programs on macOS (skopeo, helm, tofu, kubectl plugins, cosign, oras, crane)
 # verify TLS against the macOS keychain and ignore SSL_CERT_FILE, so the registry
 # CA (${STATE_DIR}/pki/registry-ca.crt) must be trusted there before mirroring.
-# Browsers (Safari, Chrome) also need the platform CA (${STATE_DIR}/pki/platform-ca.crt,
-# exists once stack 11-foundation-pki is deployed) for the web UIs. Firefox has its
-# own store: import ${STATE_DIR}/pki/trust-bundle.crt there.
+# Browsers (Safari, Chrome) also need the platform root CA (from
+# ${STATE_DIR}/pki/platform-ca.crt, written by make dev-env) for the web UIs. Only the
+# ROOT is trusted: the issuing CA chains to it, and the cert-manager bootstrap CA
+# (OpenBao's listener only) must never be a trusted root on the Mac. Both CAs carry
+# name constraints (registry CA: the dev names; root: the platform's domains), so
+# they cannot vouch for an outside site. Firefox has its own store.
 # `add` and `remove` use sudo (System keychain); `check` needs no privileges.
 # shellcheck source=../lib/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
@@ -30,11 +33,12 @@ trusted() {
 rc=0
 for ca in "${cas[@]}"; do
   [[ -f "$ca" ]] || { warn "missing ${ca} (run make cluster-up first)"; rc=1; continue; }
-  # platform-ca.crt is a bundle (root + issuing + bootstrap CA): handle each certificate
+  # platform-ca.crt is a bundle (root + issuing + bootstrap CA): only its root counts
   tmpd="$(mktemp -d)"
   awk -v d="$tmpd" '/BEGIN CERTIFICATE/{n++} n{print > (d "/" n ".pem")}' "$ca"
   for pem in "$tmpd"/*.pem; do
     subject="$(openssl x509 -in "$pem" -noout -subject | sed 's/^subject= *//')"
+    [[ "$action" != remove && "$ca" == *platform-ca.crt && "$subject" != *"Root CA"* ]] && continue
     case "$action" in
       check)
         if trusted "$pem"; then log "trusted: ${subject}"; else warn "NOT trusted: ${subject}"; rc=1; fi ;;
