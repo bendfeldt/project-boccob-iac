@@ -1,0 +1,13 @@
+{"resource_changes": [
+  {"address": "module.ns_database.kubernetes_namespace_v1.this", "type": "kubernetes_namespace_v1", "change": {"actions": ["delete"], "before": {}}},
+  {"address": "vault_mount.kv", "type": "vault_mount", "change": {"actions": ["delete", "create"], "before": {}}},
+  {"address": "module.keycloak_db.kubernetes_manifest.cluster", "type": "kubernetes_manifest",
+   "change": {"actions": ["delete"], "before": {"manifest": {"apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster"}}}},
+  {"address": "module.rustfs.helm_release.this", "type": "helm_release", "change": {"actions": ["create", "delete"], "before": {}}},
+  {"address": "kubernetes_persistent_volume_claim_v1.data", "type": "kubernetes_persistent_volume_claim_v1", "change": {"actions": ["delete"], "before": {}}},
+  {"address": "kubernetes_config_map_v1.harmless", "type": "kubernetes_config_map_v1", "change": {"actions": ["delete"], "before": {}}},
+  {"address": "kubernetes_manifest.other_cluster", "type": "kubernetes_manifest",
+   "change": {"actions": ["delete"], "before": {"manifest": {"apiVersion": "example.io/v1", "kind": "Cluster"}}}},
+  {"address": "vault_policy.updated", "type": "vault_policy", "change": {"actions": ["update"], "before": {}}},
+  {"address": "kubernetes_namespace_v1.unchanged", "type": "kubernetes_namespace_v1", "change": {"actions": ["no-op"], "before": {}}}
+]}

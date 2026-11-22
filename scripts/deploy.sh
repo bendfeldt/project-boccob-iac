@@ -5,7 +5,7 @@
 #   scripts/deploy.sh <env> <stack>    one stack
 #   PLAN_ONLY=1 scripts/deploy.sh ...  plan instead of apply
 #   ALLOW_DESTROY=<env>                 accept a plan that deletes/replaces OpenBao
-#                                       (vault_*), CNPG clusters, RustFS, PVCs
+#                                       (vault_*), namespaces, CNPG clusters, RustFS, PVCs
 #
 # Per-stack settings live in stacks/<stack>/stack.env:
 #   STACK_NEEDS_OPENBAO=1      tofu needs an authenticated OpenBao connection
@@ -37,20 +37,12 @@ if [[ "$ENV" == "prod" || "${REQUIRE_POLICY_ENFORCE:-0}" == "1" ]] && ! policy_e
 fi
 
 # destroy_guard <stack> <plan file>: a saved plan that deletes or replaces an
-# irreplaceable resource is refused unless ALLOW_DESTROY=<env>:
-#   vault_* (OpenBao mounts, auth, policies, roles, PKI, transit keys),
-#   CloudNativePG clusters, the RustFS release, PersistentVolumeClaims.
+# irreplaceable resource (scripts/lib/destroy-guard.jq) is refused unless ALLOW_DESTROY=<env>.
 # (Buckets are never deleted by OpenTofu: the RustFS provisioning Job only creates.)
 destroy_guard() {
   local stack="$1" plan="$2" hits
-  hits="$("${REPO_ROOT}/scripts/tofu.sh" "$ENV" "$stack" show -json "$plan" | jq -r '
-    [.resource_changes[]? | select(.change.actions | index("delete"))
-     | select((.type | startswith("vault_"))
-              or (.type == "kubernetes_manifest" and ((.change.before.manifest.kind // "") == "Cluster")
-                  and ((.change.before.manifest.apiVersion // "") | startswith("postgresql.cnpg.io")))
-              or (.type == "helm_release" and (.address | test("module\\.rustfs\\.")))
-              or (.type | startswith("kubernetes_persistent_volume_claim")))
-     | "\(.address) (\(.change.actions | join("+")))"] | .[]')" || die "cannot read plan ${plan}"
+  hits="$("${REPO_ROOT}/scripts/tofu.sh" "$ENV" "$stack" show -json "$plan" | jq -r -f "${REPO_ROOT}/scripts/lib/destroy-guard.jq")" \
+    || die "cannot read plan ${plan}"
   [[ -z "$hits" ]] && return 0
   if [[ "${ALLOW_DESTROY:-}" == "$ENV" ]]; then
     warn "plan of ${stack} deletes/replaces irreplaceable resources (ALLOW_DESTROY=${ENV}):"$'\n'"${hits}"
@@ -83,7 +75,7 @@ for stack in "${stacks[@]}"; do
 
   step "apply ${stack} (${ENV})"
   # plan to a file, refuse destructive changes of irreplaceable resources, then
-  # apply exactly that plan (audit R3-3)
+  # apply exactly that plan
   plan_file="${STATE_DIR}/tofu/${stack}.tfplan"
   mkdir -p "$(dirname "$plan_file")"; rm -f "$plan_file"
   "${REPO_ROOT}/scripts/tofu.sh" "$ENV" "$stack" plan -out="$plan_file"
