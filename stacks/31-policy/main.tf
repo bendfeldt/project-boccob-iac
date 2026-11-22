@@ -78,6 +78,10 @@ resource "helm_release" "kyverno" {
     # hooks that need extra images (readiness-checker): the webhook
     # configurations are removed by the admission controller itself on shutdown
     webhooksCleanup = { enabled = false }
+    # the pre-upgrade hook Job needs the kyverno-cli image; the chart's render-time
+    # lookup still refuses an install while legacy kyverno.io policies exist (none:
+    # every policy here is policies.kyverno.io/v1)
+    upgrade = { legacyPolicyCheck = { enabled = false } }
     config = {
       webhooks = {
         # kube-system stays excluded: it holds the k3s system pods the cluster needs to recover

@@ -280,38 +280,38 @@ images:
       - data-plane
   kyverno:
     source: ghcr.io/kyverno/kyverno
-    tag: v1.19.2
-    index_digest: sha256:c8c4dd09e720d2cd7fd24ca73ac28e46651001372f988e0cba3f2f612f04b955
+    tag: v1.20.0
+    index_digest: sha256:9de49c5416ea536f00a205527197ac048abdf32c5a75d633cd9afff8928f359d
     digests:
-      amd64: sha256:6f0c520054d863a4a3df53ac7bb67d571d20421b77b99809013a62ec5f1d5947
-      arm64: sha256:5e0f7832adb9a3fda59ad879bf233df5b9602339efae44a45f0e5a399f4e1607
+      amd64: sha256:60c02e59bc914bee8eea21534720fff45fc8c81a3ceff09bdc84c3ab53fa4e90
+      arm64: sha256:e28b751644b544e72a7633d7578220c2a2f2333bef6365491c0dfd369d46d703
     groups:
       - policy
   kyverno-pre:
     source: ghcr.io/kyverno/kyvernopre
-    tag: v1.19.2
-    index_digest: sha256:27f3cc52e628559b56d08363b85316819802086c9808606914f7805a244148f4
+    tag: v1.20.0
+    index_digest: sha256:339067e083430e0c97007541bef9cfdbac89bee13f7228772c77ae8aead14b8b
     digests:
-      amd64: sha256:380c58effb6f065d4e856c084564482930eef789f47fab9dafa68a1964139a81
-      arm64: sha256:8aa23a4e6871c3be38ad58473758e70898d395789b7e51cea984b2cf44f8d434
+      amd64: sha256:0b3ef40d1570c36b5f00c2847e48c1be80130af2eb97712f78f6fb225a064625
+      arm64: sha256:ef802fc58229911c73b49de31148b7559c03e4c0098b9d7ef4f9ca44be51f34f
     groups:
       - policy
   kyverno-background-controller:
     source: ghcr.io/kyverno/background-controller
-    tag: v1.19.2
-    index_digest: sha256:c46e124f21ef8a6bb4b48de57106808b1007edcd5ddd4ff7df5d23b9efa60ce2
+    tag: v1.20.0
+    index_digest: sha256:c72df38320a48fc9de10f9d23d087a117853bb08207b7f60f6d1e8457fb3ddb7
     digests:
-      amd64: sha256:7643ae5d759ae45f5c6035c62d9db4de6b325e513e36d43cfe47f3bc95dadac7
-      arm64: sha256:5eed6a66f27dd1814bdbef88afe9c78fe62365e459ffbe709be1f2c4c2040298
+      amd64: sha256:a487519fe607c3ff01f7e1d1493d7c7bc84cb4118a2b5edc24611b1a507cb6f3
+      arm64: sha256:45287fe4ab60fd4e9e0f9f052fd89baa758f484bfb9d550e9c976147484c3bde
     groups:
       - policy
   kyverno-reports-controller:
     source: ghcr.io/kyverno/reports-controller
-    tag: v1.19.2
-    index_digest: sha256:5fb6d3e738050dbce84f60ecabaede7665fbe0578d07c1e8c912443b035e79c3
+    tag: v1.20.0
+    index_digest: sha256:f54e3cc106fadb1a615d0ec11c42f741f51d3580a5f70dfbe7bd7ec58864ef03
     digests:
-      amd64: sha256:9fbfa8cce7008bc45be75b2f6c4bf40e5ff582466fe571c1a38733a16a2bb510
-      arm64: sha256:a65e6c28e74720cdf5398a5d0d78c0e0b25127427c5006b50a15a08123d9de21
+      amd64: sha256:a9b9bec641d46ef51d010769aac2bf4b6a2df1ff073bc8004a4ae970d6ebaf1b
+      arm64: sha256:f663d8aa6f0c354727fea63984cfee6804146ce0017353b2ae6ddbd5508b7a05
     groups:
       - policy
   prometheus:
@@ -435,8 +435,8 @@ charts:
   kyverno:
     repo: https://kyverno.github.io/kyverno
     name: kyverno
-    version: 3.9.2
-    sha256: f6fe7184544d5e2ee33a77808c09e67aa603ce6560cc197038fde31d727c861e
+    version: 3.10.0
+    sha256: 55961392dc0821eb367323f0e9585c061dd4407ef7ada921bd56ea1642c2a301
     groups:
       - policy
   prometheus:
