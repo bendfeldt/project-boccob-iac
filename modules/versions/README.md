@@ -10,7 +10,7 @@ module "versions" {
   arch          = var.cluster_arch   # amd64 (x64) | arm64; default amd64
 }
 
-image   = module.versions.images["openbao"].ref          # registry/quay.io/openbao/openbao:2.7.2@sha256:...
+image   = module.versions.images["openbao"].ref          # registry/quay.io/openbao/openbao:2.7.3@sha256:...
 chart   = module.versions.charts["openbao"]              # { repository, name, version }
 ```
 

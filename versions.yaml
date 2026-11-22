@@ -14,7 +14,7 @@
 #     is possible (make airgap-mirror GROUPS=foundation).
 #
 # Zot layout produced by the mirror:
-#   images: <registry>/<source registry>/<repo>:<tag>@<digest>   e.g. registry/quay.io/openbao/openbao:2.7.2
+#   images: <registry>/<source registry>/<repo>:<tag>@<digest>   e.g. registry/quay.io/openbao/openbao:2.7.3
 #   charts: oci://<registry>/charts/<name>:<version>
 #   solution artefacts (pushed by the solution repo): <registry>/boccob/<name>
 

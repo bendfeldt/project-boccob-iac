@@ -75,13 +75,16 @@ binaries:
   machine it runs on; `make node-bundle` packs the `linux/<CLUSTER_ARCH>` k3s files, and
   `host-install.sh` refuses a node of another architecture.
 
-### State of the lock (resolved 2026-11-21)
+### State of the lock (resolved 2026-11-22)
 
-All 40 images publish linux/amd64 **and** linux/arm64; there are no `missing_platforms`. Every
-arm64 digest was re-checked independently (`skopeo inspect --config` of `source@digest` reports
-`linux/arm64`). All binaries have upstream checksums for every listed platform; the amd64 values
-equal the previous lock. Notes:
+All 40 images publish linux/amd64 **and** linux/arm64; there are no `missing_platforms`. All
+binaries have upstream checksums for every listed platform. Every pin is the newest stable
+upstream release as of 2026-11-22 (k3s: newest minor of the stable channel), with these
+deliberate exceptions:
 
+- `postgresql` is on major 18: CloudNativePG 1.30 (newest stable operator) supports
+  PostgreSQL 15 - 18; 19.0 waits for CloudNativePG 1.31. Each major version archives to its
+  own Barman path (`<cluster>-pg<major>`, see `modules/postgres-cluster`).
 - `zot` also publishes freebsd images in its index; the lock takes the `linux` entries only.
 - `kube-state-metrics` is still not listed (its blobs live on a host the build sandbox cannot
   reach, see `versions.yaml`); it publishes arm64 upstream as well.
