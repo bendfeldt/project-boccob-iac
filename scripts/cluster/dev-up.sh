@@ -102,8 +102,13 @@ fi
 
 if podman_container_alive "$NODE"; then
   old_sum="$(podman inspect -f '{{ index .Config.Labels "boccob.config-sha256" }}' "$NODE")"
+  old_image="$(podman inspect -f '{{ .ImageName }}' "$NODE")"
   if [[ "$old_sum" != "$cfg_sum" ]]; then
     warn "k3s configuration changed; recreating the node container (data volumes are kept)"
+    podman rm -f "$NODE" >/dev/null
+  elif [[ "$old_image" != "$k3s_ref" ]]; then
+    # k3s upgrade (versions.lock.yaml): the node restarts on the new image with its data
+    warn "k3s image changed (${old_image##*/} -> ${k3s_ref##*/}); recreating the node container (data volumes are kept)"
     podman rm -f "$NODE" >/dev/null
   fi
 else

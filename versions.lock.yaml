@@ -6,15 +6,15 @@ platforms:
   - linux/amd64
   - linux/arm64
 k3s:
-  version: v1.35.10+k3s1
+  version: v1.36.6+k3s1
 images:
   k3s:
     source: docker.io/rancher/k3s
-    tag: v1.35.10-k3s1
-    index_digest: sha256:8262ca99a558dca0c0437443421986480b2359f9118f2371359f88a41514522f
+    tag: v1.36.6-k3s1
+    index_digest: sha256:88d3fac10eb4a429d3c5275f4868fe4b13620f6bbca5bdb5dca0627ac76ae2a0
     digests:
-      amd64: sha256:0f5d7af9f2efad9ca59a71a8751f95e8be95da8d8938a22c2971f7e4b404b2af
-      arm64: sha256:9f9fc50106d43d4b82a87dd7d70bb996cffd645190eea1bebffb2af75f050be3
+      amd64: sha256:c47f384b997da1718c009c95b5e3abb4bcb906ceeeae64c37ffa9cab1e3d9537
+      arm64: sha256:6d654de9f73e36a5a7879c051349a6f43a7941f3552a2f2a00fa9087bd546b85
     groups:
       - cluster
   zot:
@@ -473,37 +473,37 @@ binaries:
       - cluster
     platforms:
       linux/amd64:
-        url: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/k3s
+        url: https://github.com/k3s-io/k3s/releases/download/v1.36.6%2Bk3s1/k3s
         file: k3s
-        sha256: 5cd49f0faca5b2ea4355d4761e7b1445b8aa05cd50e612fd9c370551db49e5e2
-        checksums: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/sha256sum-amd64.txt
+        sha256: 66ceb8e67edfa547195135d74783bfadc2ecc04a91059e90ae5f70a3dbc98c15
+        checksums: https://github.com/k3s-io/k3s/releases/download/v1.36.6%2Bk3s1/sha256sum-amd64.txt
       linux/arm64:
-        url: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/k3s-arm64
+        url: https://github.com/k3s-io/k3s/releases/download/v1.36.6%2Bk3s1/k3s-arm64
         file: k3s-arm64
-        sha256: 0c780ef4b6275bd27c77ed64a647fa1d859b1bd60597ad420f3243c261e5ffb6
-        checksums: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/sha256sum-arm64.txt
+        sha256: 49dcecdb4f64f5e92bdc52d204d407fb39729e492f09074488125ee58b6f2895
+        checksums: https://github.com/k3s-io/k3s/releases/download/v1.36.6%2Bk3s1/sha256sum-arm64.txt
   k3s-airgap-images:
     groups:
       - cluster
     platforms:
       linux/amd64:
-        url: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/k3s-airgap-images-amd64.tar.zst
+        url: https://github.com/k3s-io/k3s/releases/download/v1.36.6%2Bk3s1/k3s-airgap-images-amd64.tar.zst
         file: k3s-airgap-images-amd64.tar.zst
-        sha256: c10a9f07c357cfc41488f29c15872621ac8664c9864b3d1148a10155c9a1c2ff
-        checksums: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/sha256sum-amd64.txt
+        sha256: b3029b1a682b8597587e89f5b1c48493e579a6ea1d0ec6a9aac718a8c356e5be
+        checksums: https://github.com/k3s-io/k3s/releases/download/v1.36.6%2Bk3s1/sha256sum-amd64.txt
       linux/arm64:
-        url: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/k3s-airgap-images-arm64.tar.zst
+        url: https://github.com/k3s-io/k3s/releases/download/v1.36.6%2Bk3s1/k3s-airgap-images-arm64.tar.zst
         file: k3s-airgap-images-arm64.tar.zst
-        sha256: 60236f6ff33231eab0572af562d70d2e55a815f9bdb5a13a827d7f7840d6ea54
-        checksums: https://github.com/k3s-io/k3s/releases/download/v1.35.10%2Bk3s1/sha256sum-arm64.txt
+        sha256: 881b93edba1b9d91cb0a4ea09ca08298d0f22ec9442ce9a80e697da97945532c
+        checksums: https://github.com/k3s-io/k3s/releases/download/v1.36.6%2Bk3s1/sha256sum-arm64.txt
   k3s-install:
     groups:
       - cluster
     platforms:
       any:
-        url: https://raw.githubusercontent.com/k3s-io/k3s/v1.35.10%2Bk3s1/install.sh
+        url: https://raw.githubusercontent.com/k3s-io/k3s/v1.36.6%2Bk3s1/install.sh
         file: k3s-install.sh
-        sha256: 8598e002e61d658fed7b7542fc6d2c66d8da6eae69e088830105d2ee1ffb6d91
+        sha256: 46177d4c99440b4c0311b67233823a8e8a2fc09693f6c89af1a7161e152fbfad
   cosign:
     groups:
       - tools
