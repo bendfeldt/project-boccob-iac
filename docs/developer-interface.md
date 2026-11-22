@@ -17,36 +17,33 @@ export BOCCOB_PLATFORM_ENV=~/.boccob/dev/developer.env    # for the solution rep
 ```
 
 `~/.boccob/dev/developer.env` lies outside both checkouts, is mode 0600 and is regenerated on
-every run (do not edit it). Format: one `KEY='value'` per line (shell-sourceable, also valid
-dotenv); values never contain a single quote. Secret values are never in the file: keys ending in
-`_FILE` name a 0600 file that holds the secret.
+every run (do not edit it). Format: plain shell `KEY=value` lines (values contain no spaces or
+quotes). Secret values are never in the file: keys ending in `_FILE` name a 0600 file outside the
+repositories. The key set is exactly the one the solution's platform contract (its
+`docs/platform-contract.md`, section 4) reads:
 
-| Key | Meaning |
+| Key | Value on dev |
 |---|---|
-| `BOCCOB_INTERFACE_VERSION` | `1`; incremented on an incompatible change |
 | `BOCCOB_ENV` | `dev` |
-| `BOCCOB_PLATFORM_DIR` | checkout of this repository, for `make -C "$BOCCOB_PLATFORM_DIR" sign ENV=dev REFS=...` and `make ... verify ENV=dev` |
-| `BOCCOB_KUBECONFIG` | kubeconfig of the dev cluster |
-| `BOCCOB_BASE_DOMAIN` | e.g. `dev.lakehouse.internal`; public hosts are `<svc>.<base domain>` |
-| `BOCCOB_CA_BUNDLE` | PEM bundle of the platform CA (every ingress and in-cluster TLS certificate) |
-| `BOCCOB_INGRESS_IP`, `BOCCOB_INGRESS_PORT` | where this machine reaches the ingress (`127.0.0.1`, `443` on Linux, `8443` on macOS); use it with `curl --resolve <host>:<port>:<ip>` when `/etc/hosts` is not managed |
-| `BOCCOB_NO_PROXY` | internal names that must bypass an outbound proxy |
-| `BOCCOB_TRINO_URL`, `BOCCOB_KEYCLOAK_URL`, `BOCCOB_POLARIS_URL`, `BOCCOB_DAGSTER_URL`, `BOCCOB_S3_URL`, `BOCCOB_OPENBAO_URL` | public URLs (always port 443) |
-| `BOCCOB_OIDC_ISSUER` | Keycloak realm `lakehouse` |
-| `BOCCOB_REGISTRY_HOST`, `BOCCOB_REGISTRY_CA_FILE` | Zot registry and its CA |
-| `BOCCOB_REGISTRY_NAMESPACE` | `boccob`: push to `<registry>/boccob/<name>` |
-| `BOCCOB_REGISTRY_PUSH_USER`, `BOCCOB_REGISTRY_PUSH_PASSWORD_FILE` | push credentials |
-| `BOCCOB_CLUSTER_ARCH` | `amd64` or `arm64`: build the artifacts for `linux/<arch>` |
-| `BOCCOB_TEST_USERS` | space-separated `user=group[,group]` (Keycloak realm `lakehouse`) |
-| `BOCCOB_TEST_USER_PASSWORD_DIR` | `<dir>/<user>` holds that user's password |
-| `BOCCOB_OIDC_TEST_CLIENT`, `BOCCOB_OIDC_TEST_CLIENT_SECRET_FILE` | OIDC client with direct access grants (dev only) for tokens of test users |
-| `BOCCOB_TRINO_SERVICE_USER`, `BOCCOB_TRINO_SERVICE_PASSWORD_FILE` | Trino service account (password authentication) |
+| `BOCCOB_REGISTRY_HOST`, `BOCCOB_REGISTRY_CA_FILE` | Zot host:port and its CA (`~/.boccob/dev/pki/registry-ca.crt`) |
+| `BOCCOB_REGISTRY_USER`, `BOCCOB_REGISTRY_PASSWORD_FILE` | push user `mirror`, `~/.boccob/dev/registry/push-password` |
+| `BOCCOB_KUBECONFIG` | `~/.boccob/dev/kubeconfig` |
+| `BOCCOB_DAGSTER_NAMESPACE` | `orchestration` |
+| `BOCCOB_CODE_LOCATION`, `BOCCOB_CODE_LOCATION_NAME` | `deploy/dagster-code-dagster-user-deployments-lakehouse`, `lakehouse` |
+| `BOCCOB_DAGSTER_WEBSERVER`, `BOCCOB_DAGSTER_WEBSERVER_CONTAINER` | `deploy/dagster-dagster-webserver`, `dagster` |
+| `BOCCOB_DAGSTER_GRAPHQL_URL` | `http://127.0.0.1:80/graphql` (as seen inside the webserver container) |
+| `BOCCOB_DAGSTER_URL` | `https://dagster.<base domain>` (UI, informational) |
+| `BOCCOB_CA_BUNDLE` | platform CA bundle (`~/.boccob/dev/pki/platform-ca.crt`) |
+| `BOCCOB_TRINO_URL`, `BOCCOB_KEYCLOAK_URL`, `BOCCOB_KEYCLOAK_REALM` | `https://trino.<base domain>`, `https://keycloak.<base domain>`, `lakehouse` |
+| `BOCCOB_KEYCLOAK_CLIENT_ID`, `BOCCOB_KEYCLOAK_CLIENT_SECRET_FILE` | `trino` (direct access grants, dev only), `~/.boccob/dev/developer/oidc-trino-client-secret` |
+| `BOCCOB_TEST_ANALYST_USER`, `BOCCOB_TEST_ANALYST_PASSWORD_FILE` | the test user with groups exactly `analyst` (`environments/dev/test-users.conf`), its password file in `~/.boccob/dev/test-users/` |
+| `BOCCOB_TEST_PII_READER_USER`, `BOCCOB_TEST_PII_READER_PASSWORD_FILE` | the test user with groups exactly `analyst,pii-reader`, its password file |
 
 Rules:
 
 - The solution reads only this file and the artifacts' digests; it never reads files of this
   repository. This repository never reads files of the solution repository.
-- A new key is added with a default that keeps old readers working; removing or renaming a key
-  increments `BOCCOB_INTERFACE_VERSION`.
+- Adding, removing or renaming a key is a change of both contracts (this file and the
+  solution's), made together.
 - test/prod have no such file: their registry host, CA and push credentials are handed to the
   release builder by the platform operators.

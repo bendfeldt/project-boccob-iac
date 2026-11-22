@@ -115,9 +115,8 @@ explicit, reviewable input (`CLUSTER_ARCH`).
 
 ## Solution artefacts
 
-The solution repository builds its artefacts for `linux/<CLUSTER_ARCH>`
-(`BOCCOB_CLUSTER_ARCH` in [developer-interface.md](developer-interface.md)); this repository
-signs and transfers them by digest only.
+The solution repository builds its artefacts for the cluster's `linux/<CLUSTER_ARCH>`; this
+repository signs and transfers them by digest only ([developer-interface.md](developer-interface.md)).
 
 ## Changing a version
 

@@ -425,7 +425,7 @@ then run `make macos-ports` again.
 need to change it.
 
 Then deploy as in **A.5** and open the UIs as in **A.6** (the same URLs). The solution
-artifacts must be built for `linux/arm64` (`BOCCOB_CLUSTER_ARCH` in `developer.env`).
+artifacts must be built for `linux/arm64` (the cluster's architecture).
 
 Everyday commands are those of **A.7**. In addition: after the Mac restarts, `podman machine start`
 before `make cluster-up ENV=dev`; to free the RAM, `make cluster-down ENV=dev` and `podman machine stop`.
