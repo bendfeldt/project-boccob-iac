@@ -70,7 +70,7 @@ ob_test() {
   s3_session "$tmp"
   local key; key="$(openbao_latest_snapshot)"
   [[ -n "$key" ]] || { err "no snapshot in s3://${BACKUP_BUCKET}/openbao/"; return 1; }
-  local age=$(( $(date -u +%s) - $(date -u -d "$(sed -E 's#.*raft-([0-9]{8})T([0-9]{2})([0-9]{2})([0-9]{2})Z\.snap#\1 \2:\3:\4#' <<<"$key")" +%s) ))
+  local age=$(( $(date -u +%s) - $(snapshot_epoch "$key") ))
   log "newest snapshot ${key} is $(( age / 60 )) min old"
   openbao_snapshot_check "$key" "$tmp"
 }

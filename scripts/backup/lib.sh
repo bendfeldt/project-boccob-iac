@@ -31,9 +31,18 @@ s3_curl() {
     --aws-sigv4 "aws:amz:us-east-1:s3" -K "${S3_DIR}/s3.cred" "$@" "https://${S3_HOST}:${S3_LOCAL_PORT}${path}"
 }
 
-# s3_keys <prefix>: object keys below the prefix (first 1000), sorted
+# s3_keys <prefix>: ALL object keys below the prefix, sorted. A ListObjectsV2
+# page holds at most 1000 keys: follow NextContinuationToken until the last page.
 s3_keys() {
-  s3_curl "/${BACKUP_BUCKET}?list-type=2&prefix=$1" | grep -o '<Key>[^<]*</Key>' | sed 's/<[^>]*>//g' | sort
+  local q page token=""
+  q="list-type=2&prefix=$(jq -rn --arg v "$1" '$v|@uri')"
+  while :; do
+    page="$(s3_curl "/${BACKUP_BUCKET}?${q}${token:+&continuation-token=$(jq -rn --arg v "$token" '$v|@uri')}")" || return 1
+    { grep -o '<Key>[^<]*</Key>' <<<"$page" || true; } | sed 's/<[^>]*>//g'
+    grep -q '<IsTruncated>true</IsTruncated>' <<<"$page" || break
+    token="$({ grep -o '<NextContinuationToken>[^<]*' <<<"$page" || true; } | sed 's/.*>//')"
+    [[ -n "$token" ]] || { err "S3 listing truncated without NextContinuationToken"; return 1; }
+  done | sort
 }
 
 # clusters_with_backup: CloudNativePG clusters in the database namespace that archive to S3
@@ -96,6 +105,9 @@ pg_restore_cluster() {
 
 # openbao_latest_snapshot: newest snapshot key below openbao/
 openbao_latest_snapshot() { s3_keys "openbao/" | grep '\.snap$' | tail -n 1; }
+# snapshot_epoch <key>: creation time (epoch seconds) from ".../raft-YYYYMMDDTHHMMSSZ.snap";
+# jq instead of `date -d`, which BSD date (macOS) lacks
+snapshot_epoch() { jq -rn --arg k "$1" '$k | capture("raft-(?<t>[0-9]{8}T[0-9]{6}Z)").t | strptime("%Y%m%dT%H%M%SZ") | mktime'; }
 
 # openbao_snapshot_check <key> <workdir>: download + integrity checks
 #   1. sha256 of the object matches the .sha256 written at backup time

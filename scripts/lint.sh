@@ -17,6 +17,11 @@ for d in "${REPO_ROOT}"/modules/*/files; do
     || { err "unit tests failed in ${d#"${REPO_ROOT}"/}"; rc=1; }
 done
 
+step "script self-tests (scripts/tests/*.test.sh)"
+for t in "${REPO_ROOT}"/scripts/tests/*.test.sh; do
+  "$t" || { err "self-test failed: ${t#"${REPO_ROOT}"/}"; rc=1; }
+done
+
 step "tofu fmt"
 tofu fmt -check -recursive "${REPO_ROOT}" || rc=1
 

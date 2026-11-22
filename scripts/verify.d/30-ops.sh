@@ -153,7 +153,7 @@ ops_backup_objects() ( # subshell: a die() in the S3 helpers must not end verify
   snap="$(openbao_latest_snapshot)"
   echo "postgres base backups: ${pg}, newest OpenBao snapshot: ${snap:-none}"
   [[ "$pg" -gt 0 && -n "$snap" ]] || return 1
-  age=$(( $(date -u +%s) - $(date -u -d "$(sed -E 's#.*raft-([0-9]{8})T([0-9]{2})([0-9]{2})([0-9]{2})Z\.snap#\1 \2:\3:\4#' <<<"$snap")" +%s) ))
+  age=$(( $(date -u +%s) - $(snapshot_epoch "$snap") ))
   echo "snapshot age ${age}s"
   (( age < ${VERIFY_SNAPSHOT_MAX_AGE:-7200} ))
 )
