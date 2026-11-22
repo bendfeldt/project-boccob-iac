@@ -135,8 +135,6 @@ same-namespace allow, so other pods there cannot query OPA [verified by `make ve
   `TRINO_HOST=trino.<base_domain>`, `TRINO_PORT=443` (through Traefik like every
   client: `X-Forwarded-For` in the audit trail can only be set by Traefik; direct
   access to 8443 is closed unless `trino_client_namespaces` lists a namespace).
-  `ERASURE_VERIFY_STORAGE` from `erasure_verify_storage`: `full` on dev,
-  `scoped` in test/prod (see "Erasure verification" below).
   `LAKEHOUSE_ENV` = the environment name (dev/test/prod).
 - Concurrency: pool `lakehouse_writer` = 1 (Job running
   `dagster instance concurrency set`, idempotent; instance `pools.granularity: op`),
@@ -257,8 +255,8 @@ only to the runs that need it:
   the launcher only with one container, no command, args
   `dagster api execute_run|resume_run`, the deployed code location image,
   `dagster/job` == `DAGSTER_RUN_JOB_NAME` and only the contract's Secrets.
-  `make verify` launches three forged runs (command + purge Secret, purge
-  Secret on `migrate`, forged label) and expects each to fail without a Job.
+  `make verify` checks both policies with server-side dry runs; the forged-run
+  tests (launching runs with injected tags) belong to the solution's e2e.
   Note: the allowlist cannot be `{container_config: {env_from: true}}` alone -
   dagster-k8s validates the code location's container context together with
   the tags, so every field the context sets must be allowed.
@@ -296,32 +294,12 @@ The off-site lake copy keeps its own short expiry
 
 ## Erasure verification
 
-`ERASURE_VERIFY_STORAGE` (stack 22 `erasure_verify_storage`) chooses the object
-scan after each erasure request, which runs while the request holds the
-`lakehouse_writer` pool:
-
-| Value | Scope (solution `governance/erasure`) | Used in |
-|---|---|---|
-| `full` | every object version of all four lake buckets: O(size of the lake) per request | dev (the synthetic lake is a few MB) and explicit audits |
-| `scoped` | every object version under the locations of the tables the plan touched plus the subject's raw files: cost grows with those tables, not with the lake | test, prod (default of the variable) |
-| `false` | SQL verification only | not used |
-
-What runs on every request regardless (solution): the row counts of every plan
-step must be 0 afterwards, the subject's raw files are deleted with all their
-versions, Iceberg history is expired and the versions of the touched objects
-are deleted explicitly. Periodic verification on top:
-
-1. **Canary in test (monthly and after every release).** The synthetic source
-   carries a fictional canary subject; submit its erasure and run the `erasure`
-   job with stack 22 deployed with `erasure_verify_storage = "full"` for that
-   window, then back to `scoped`. This proves the mechanism over the whole lake
-   on the same code and storage layout as prod without keeping any real
-   identifier (the subject key is gone after the erasure, so a later
-   whole-lake search for a real subject is impossible by design).
-2. **Off-site copy.** The lake copy follows the source within one mirror run
-   plus the target's noncurrent-version expiry (stack 32 README, "Off-site copy
-   and erasure"); a canary scan of the off-site target is part of the yearly DR
-   exercise.
+How an erasure request is verified is the solution's concern (its GDPR
+documentation). The platform's part: the purge credential (above), the lake
+buckets' noncurrent-version expiry, and the off-site lake copy following the
+source within one mirror run plus the target's noncurrent-version expiry (stack
+32 README, "Off-site copy and erasure"); a canary scan of the off-site target is
+part of the yearly DR exercise.
 
 ## Alignment with the solution's platform contract
 
@@ -334,7 +312,6 @@ are deleted explicitly. Periodic verification on top:
 | groups `platform-admin`, `data-engineer`, `analyst`, `pii-reader`, `auditor`, `lakehouse-service`; service-account groups from static file entries, OPA `principals` overlay empty | Keycloak groups synced (five), `lakehouse-service` static only (`trino_service_accounts`; the group sync ignores static-only groups even if a Keycloak group of that name exists) | aligned |
 | `svc-dagster` in `data-engineer`, `pii-reader`, `lakehouse-service`; no person in `lakehouse-service` | stack 21 default | aligned |
 | `PURGE_S3_ACCESS_KEY_ID` / `PURGE_S3_SECRET_ACCESS_KEY`: ListBucket, ListBucketVersions, GetObject, GetObjectVersion, DeleteObject, DeleteObjectVersion on the four lakehouse buckets | S3 user `lakehouse-purge` (`purge_buckets` in `modules/rustfs`: exactly those actions + GetBucketLocation; PutObject is refused [verified on dev]) in Secret `lakehouse-purge-env` (name in `PURGE_CREDENTIALS_SECRET`), attached only by `erasure`, `retention`, `iceberg_maintenance` through their `dagster-k8s/config` tag | **changed: the solution must add the tag** (see "Purge credential and deletion safety window") |
-| `ERASURE_VERIFY_STORAGE` = `false`/`scoped`/`full` | variable `erasure_verify_storage`: dev `full`, test/prod `scoped`; see "Erasure verification" | aligned |
 | `LAKEHOUSE_ENV` (only `dev` permits `dbt --full-refresh` of incremental models) | stack 22: `var.environment` (dev/test/prod) | aligned |
 | `NONCURRENT_VERSION_GRACE_DAYS` = the bucket lifecycle's noncurrent expiry | stack 22 from the common variable `lakehouse_noncurrent_version_days` (one value for the lifecycle in stack 12 and the env in stack 22; `environments/<env>/common.tfvars`) | aligned |
 | no object lock on the lakehouse buckets; lifecycle as second line of defence | buckets versioned, no object lock; lifecycle expires noncurrent versions (ops package) | aligned |
@@ -386,9 +363,9 @@ with it (an extra group and extra environment variables are ignored).
   Dagster above); Dagster UI has no per-group roles.
 - Trino internal TLS and the Dagster plaintext hops (see "TLS exceptions"; CNI encryption recommended).
 - Kyverno policy `verify-solution-image-signatures` (ops package, Audit mode)
-  reports the code-location image as unsigned: sign it with
-  `scripts/supply-chain/sign.sh` / `COSIGN_KEY` in the solution's `make image-push`
-  before switching that policy to Enforce.
+  reports a code-location image as unsigned until it is signed: sign every
+  released artefact with `make sign ENV=<env> REFS=...` (OpenBao transit key;
+  the solution holds no signing key) before switching that policy to Enforce.
 - Group sync is a poll (30 s): removing a user from a Keycloak group takes up to
   ~40 s to reach Trino; disabling the user in Keycloak takes effect at the next
   token validation.

@@ -3,5 +3,3 @@ dagster_code_location_image = "registry.dev.lakehouse.internal:5000/boccob/dagst
 solution_env = {
   DBT_THREADS = "2"
 }
-# dev lake is tiny: whole-lake scan of every object version after each erasure
-erasure_verify_storage = "full"

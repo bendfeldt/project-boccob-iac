@@ -6,19 +6,9 @@ variable "dagster_code_location_image" {
 }
 
 variable "solution_env" {
-  description = "Extra / overriding non-secret environment for the code location and run pods (e.g. INGEST_START_DATE, DBT_THREADS; ERASURE_VERIFY_STORAGE has its own variable erasure_verify_storage)."
+  description = "Extra / overriding non-secret environment for the code location and run pods (e.g. INGEST_START_DATE, DBT_THREADS)."
   type        = map(string)
   default     = {}
-}
-
-variable "erasure_verify_storage" {
-  description = "ERASURE_VERIFY_STORAGE (object scan after each erasure request, while the lakehouse_writer pool is held): `scoped` = every object version under the locations of the touched tables plus the subject's raw files (default; test/prod), `full` = every version of all four lake buckets, O(size of the lake) per request (dev, audits), `false` = SQL verification only. See docs/data-plane.md, \"Erasure verification\"."
-  type        = string
-  default     = "scoped"
-  validation {
-    condition     = contains(["false", "scoped", "full"], var.erasure_verify_storage)
-    error_message = "erasure_verify_storage must be one of false, scoped, full."
-  }
 }
 
 variable "schedules_enabled" {

@@ -20,7 +20,8 @@ pinned by digest or tagged `latest` once `policy_mode = "Enforce"`.
    accepted risks with a justification and expiry.
 6. Solution artefacts: built and pushed by the solution repo, then
    `make sign ENV=<env> REFS="<registry>/boccob/<name>@sha256:…"`. A solution
-   release follows "Solution release" below (lake backup before, `migrate` after).
+   release follows "Solution release" below (lake backup before, the solution's
+   post-deployment steps after).
 7. `make plan ENV=test STACK=<stack>` → review → `make deploy ENV=test STACK=<stack>` → `make verify ENV=test`.
 8. Same on prod in the change window; `make verify ENV=prod`; keep outputs.
 9. Commit `versions.yaml` + `versions.lock.yaml` (+ code changes) together.

@@ -114,9 +114,6 @@ module "dagster" {
     DBT_TARGET        = "password"
     SCHEDULES_ENABLED = tostring(var.schedules_enabled)
     SCHEDULE_TIMEZONE = "Europe/Copenhagen"
-    # object scan after each erasure: scoped (test/prod) | full (dev: whole lake,
-    # O(size of the lake)) | false (docs/data-plane.md, "Erasure verification")
-    ERASURE_VERIFY_STORAGE = var.erasure_verify_storage
     # dbt --full-refresh of incremental models is refused unless dev (solution docs/releases.md)
     LAKEHOUSE_ENV = var.environment
     # delayed-deletion window: maintenance/retention purge only older noncurrent
