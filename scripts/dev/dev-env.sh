@@ -24,9 +24,9 @@ test_user() {
   for e in "${TEST_USERS[@]}"; do [[ "${e#*=}" == "$1" ]] && { printf '%s' "${e%%=*}"; return 0; }; done
   die "environments/${ENV}/test-users.conf has no user with groups exactly '$1'"
 }
-analyst="$(test_user analyst)"; pii_reader="$(test_user analyst,pii-reader)"
+analyst="$(test_user analyst)"; pii_reader="$(test_user analyst,pii-reader)"; auditor="$(test_user auditor)"
 pwdir="${STATE_DIR}/test-users"
-for u in "$analyst" "$pii_reader"; do [[ -s "${pwdir}/${u}" ]] || die "password file ${pwdir}/${u} missing"; done
+for u in "$analyst" "$pii_reader" "$auditor"; do [[ -s "${pwdir}/${u}" ]] || die "password file ${pwdir}/${u} missing"; done
 
 sec="${STATE_DIR}/developer"
 kubectl -n identity get secret oidc-client-trino -o jsonpath='{.data.client-secret}' | base64 -d \
@@ -70,6 +70,8 @@ out="${STATE_DIR}/developer.env"
   echo "BOCCOB_TEST_ANALYST_PASSWORD_FILE=${pwdir}/${analyst}"
   echo "BOCCOB_TEST_PII_READER_USER=${pii_reader}"
   echo "BOCCOB_TEST_PII_READER_PASSWORD_FILE=${pwdir}/${pii_reader}"
+  echo "BOCCOB_TEST_AUDITOR_USER=${auditor}"
+  echo "BOCCOB_TEST_AUDITOR_PASSWORD_FILE=${pwdir}/${auditor}"
 } | write_secret_file "$out"
 rm -f "${sec}/trino-svc-dagster-password"   # no longer part of the interface
 log "wrote ${out} (export BOCCOB_PLATFORM_ENV=${out} for the solution repository)"

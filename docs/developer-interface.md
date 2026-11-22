@@ -38,6 +38,7 @@ repositories. The key set is exactly the one the solution's platform contract (i
 | `BOCCOB_KEYCLOAK_CLIENT_ID`, `BOCCOB_KEYCLOAK_CLIENT_SECRET_FILE` | `trino` (direct access grants, dev only), `~/.boccob/dev/developer/oidc-trino-client-secret` |
 | `BOCCOB_TEST_ANALYST_USER`, `BOCCOB_TEST_ANALYST_PASSWORD_FILE` | the test user with groups exactly `analyst` (`environments/dev/test-users.conf`), its password file in `~/.boccob/dev/test-users/` |
 | `BOCCOB_TEST_PII_READER_USER`, `BOCCOB_TEST_PII_READER_PASSWORD_FILE` | the test user with groups exactly `analyst,pii-reader`, its password file |
+| `BOCCOB_TEST_AUDITOR_USER`, `BOCCOB_TEST_AUDITOR_PASSWORD_FILE` | the test user with groups exactly `auditor` (reads Trino's query history), its password file |
 
 Rules:
 
