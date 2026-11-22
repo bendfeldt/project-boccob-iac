@@ -148,8 +148,8 @@ deployed in the build sandbox.
   object lock, bucket and site replication, lifecycle, IAM policies listed as
   available in the upstream README; CLI `rustfs/rc`. Versioning was exercised
   here through the S3 API (`GetBucketVersioning` = Enabled).
-- OpenBao 2.7.2: declarative `audit` stanzas; API audit creation is disabled by
+- OpenBao 2.7.3: declarative `audit` stanzas; API audit creation is disabled by
   default upstream.
-- CloudNativePG 1.30.1: in-tree Barman object store still present in the CRD
+- CloudNativePG 1.30.2: in-tree Barman object store still present in the CRD
   (used by `modules/postgres-cluster` with the `system` operand image).
 - Keycloak 26.8.2, External Secrets 2.15.0, cert-manager 1.21.3, k3s 1.37.2.

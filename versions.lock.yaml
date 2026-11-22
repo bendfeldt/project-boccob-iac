@@ -136,11 +136,11 @@ images:
       - foundation
   openbao:
     source: quay.io/openbao/openbao
-    tag: 2.7.2
-    index_digest: sha256:5046911075e137e154ce49ab051502f4ec7cf367d484ae4a4dce665d9b90561f
+    tag: 2.7.3
+    index_digest: sha256:ba4b133eb9586630024e71a617e66f37f29cc3534cdd46a6233e098ceded8dc9
     digests:
-      amd64: sha256:a78eb12a9fc7a3ebb4bec1724e2bdd6a28e33394820641d061166919a3f1866b
-      arm64: sha256:dcf8c71424760a76368966b07227fff45ff49944fbbd53994afb6b83d205b08b
+      amd64: sha256:b9418c63e2185157d8ee8689a8a93265d5aadad677d6320156172bd42ad3b10b
+      arm64: sha256:6a68ede0364092d8b93c12f8ea3b8ff1305925a8024511354a0d79a7cca68f23
     groups:
       - foundation
   external-secrets:
@@ -154,11 +154,11 @@ images:
       - foundation
   cloudnative-pg:
     source: ghcr.io/cloudnative-pg/cloudnative-pg
-    tag: 1.30.1
-    index_digest: sha256:923c267ec29636db3bee20f993d0ec4973fa22998e1adad37da79e4d32b5bc07
+    tag: 1.30.2
+    index_digest: sha256:f96f6be3d81ec93819b443c665c575c609342fca840df90d4d87dae314a5b913
     digests:
-      amd64: sha256:b0f9805bd5f98592e7320b5ea624dd10a7a6ef8e477df5650655c94f0b242497
-      arm64: sha256:9a10dd7d7466310d5d543f618478cb905093cfc7a5463b538f449da626660083
+      amd64: sha256:7172ea6acc90b0af204e513ee7b5f05fb04a44dcf96a8666655de88511758d7f
+      arm64: sha256:9be85561bd93beb1dfac8c1976562b4acb6585c9b58c0dfd5169fba8d6b85807
     groups:
       - foundation
   postgresql:
@@ -181,11 +181,11 @@ images:
       - foundation
   rustfs-rc:
     source: docker.io/rustfs/rc
-    tag: v0.1.37
-    index_digest: sha256:7e93fd410a8fe51514f89373e093392c92095b98dc6140335fcfe956810c4c80
+    tag: v0.1.38
+    index_digest: sha256:3c080aff53f0d3b06554fd08711d05c80be40bd7e56001874d7df5e18d5ec88a
     digests:
-      amd64: sha256:cd83258b81a177cae00f6dc2dca22f83b85c294eed40188dd1a66fa22ecf4ed8
-      arm64: sha256:7d124005b9139a8f0fa3de63090d4181241d4475560519820df889ccc78ce1fa
+      amd64: sha256:45783de178318fc3cd6d622c376a0ab8952ffc135075d6ae583b8b3d028ba5ee
+      arm64: sha256:a6dc4a30cba46cc3c2f841674b58e5b438394f636cc0154bc1f5e36f9d1fc6e8
     groups:
       - foundation
   busybox:
@@ -379,8 +379,8 @@ charts:
   openbao:
     repo: https://openbao.github.io/openbao-helm
     name: openbao
-    version: 0.30.7
-    sha256: fa4e6f3c1bbe936dc7ba079f1303ea56810af2f8600f046d8d5809860a4f980f
+    version: 0.30.8
+    sha256: a1a202d6300de36b3be9d924d52ba7dd24c6a1c7cd5b660b9bbda975f725f02b
     groups:
       - foundation
   external-secrets:
@@ -393,8 +393,8 @@ charts:
   cloudnative-pg:
     repo: oci://ghcr.io/cloudnative-pg/charts
     name: cloudnative-pg
-    version: 0.29.1
-    sha256: b53d3991fe84bcf38767e7702cae78666265427a127a26fff168ab4207d2b1df
+    version: 0.29.2
+    sha256: 9df3f074ecaa8af10277ad155899470618ea9a565d7c7c48187bdc7887655960
     groups:
       - foundation
   rustfs:

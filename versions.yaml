@@ -90,7 +90,7 @@ images:
     groups: [foundation]
   openbao:
     source: quay.io/openbao/openbao
-    tag: 2.7.2
+    tag: 2.7.3
     groups: [foundation]
   external-secrets:
     source: ghcr.io/external-secrets/external-secrets
@@ -98,7 +98,7 @@ images:
     groups: [foundation]
   cloudnative-pg:
     source: ghcr.io/cloudnative-pg/cloudnative-pg
-    tag: 1.30.1
+    tag: 1.30.2
     groups: [foundation]
   postgresql:
     # "system" flavour = includes barman-cloud for in-tree object-store backups
@@ -112,7 +112,7 @@ images:
   rustfs-rc:
     # RustFS S3/admin CLI, used by the bucket provisioning Job
     source: docker.io/rustfs/rc
-    tag: v0.1.37
+    tag: v0.1.38
     groups: [foundation]
   busybox:
     source: docker.io/library/busybox
@@ -220,7 +220,7 @@ charts:
   openbao:
     repo: https://openbao.github.io/openbao-helm
     name: openbao
-    version: 0.30.7
+    version: 0.30.8
     groups: [foundation]
   external-secrets:
     repo: oci://ghcr.io/external-secrets/charts
@@ -230,7 +230,7 @@ charts:
   cloudnative-pg:
     repo: oci://ghcr.io/cloudnative-pg/charts
     name: cloudnative-pg
-    version: 0.29.1
+    version: 0.29.2
     groups: [foundation]
   rustfs:
     repo: https://charts.rustfs.com
