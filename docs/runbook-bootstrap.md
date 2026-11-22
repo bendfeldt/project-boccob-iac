@@ -142,7 +142,7 @@ except its own, PKI, transit key lifecycle; **no** secret values, transit
 signing, raft snapshots, seal, audit devices or token creation; verified on
 dev: kv read, raft snapshot, token create and rewriting its own policy are
 refused; no delete of mounts, CA keys/issuers/root or transit keys).
-**The deploy token is privileged** (audit R3-5): it can write ACL policies and
+**The deploy token is privileged**: it can write ACL policies and
 kubernetes-auth roles, so with access to any ServiceAccount it can grant itself
 `kv/*`. Treat it like an admin token: four-eyes review of every change to the
 OpenBao stacks (11, 20, 21, 22, 30, 31, 32) and of their `make plan` output

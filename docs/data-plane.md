@@ -136,7 +136,7 @@ same-namespace allow, so other pods there cannot query OPA [verified by `make ve
   client: `X-Forwarded-For` in the audit trail can only be set by Traefik; direct
   access to 8443 is closed unless `trino_client_namespaces` lists a namespace).
   `ERASURE_VERIFY_STORAGE` from `erasure_verify_storage`: `full` on dev,
-  `scoped` in test/prod (see "Erasure verification" below; audit M-8, N-1).
+  `scoped` in test/prod (see "Erasure verification" below).
   `LAKEHOUSE_ENV` = the environment name (dev/test/prod).
 - Concurrency: pool `lakehouse_writer` = 1 (Job running
   `dagster instance concurrency set`, idempotent; instance `pools.granularity: op`),
@@ -181,7 +181,7 @@ Job then leaves it alone. KV v2 keeps versions: a mistaken write can be rolled
 back with `bao kv rollback`. Never rotate without the re-index plan of the
 solution (docs/gdpr.md there).
 
-## TLS exceptions (audit M-3)
+## TLS exceptions
 
 Every connection that leaves a namespace, and every client connection, is
 TLS with certificates from the platform PKI. Three hops inside a namespace are
@@ -204,7 +204,7 @@ backend on all servers (it cannot be changed on a running cluster without
 re-creating it). dev (single node, k3s in Podman) keeps the default vxlan
 backend: there the hops never leave the node.
 
-## Audit trail and personal data (audit H-1)
+## Audit trail and personal data
 
 The Trino audit sink redacts string content that looks like a pseudonymised
 subject key (64 hex characters) or a CPR number (`DDMMYY-NNNN`, `DDMMYYNNNN`)
@@ -220,8 +220,8 @@ H-1, solution part).
 ## Purge credential and deletion safety window
 
 The S3 user `lakehouse-purge` may delete object **versions** on the four lake
-buckets: whoever holds it can destroy lake data beyond recovery. Since audit
-N-3 it is handed only to the runs that need it:
+buckets: whoever holds it can destroy lake data beyond recovery. It is handed
+only to the runs that need it:
 
 - Secret `lakehouse-purge-env` (`PURGE_S3_ACCESS_KEY_ID`,
   `PURGE_S3_SECRET_ACCESS_KEY`; `modules/dagster` `job_secrets`, stack 22
@@ -244,7 +244,7 @@ N-3 it is handed only to the runs that need it:
   (Pod). Run pods' own ServiceAccount may create Jobs and Pods (chart RBAC), so
   without the creator rule a compromised ingestion run could mount the Secret.
   `make verify` checks all three cases with server-side dry runs.
-- Run-tag injection (audit R3-1): the K8sRunLauncher runs with
+- Run-tag injection: the K8sRunLauncher runs with
   `only_allow_user_defined_k8s_config_fields` (configured through the chart's
   CustomRunLauncher; the chart has no value for it): a run may only use the
   fields the code location's container context needs (container env, env_from,
@@ -298,7 +298,7 @@ The off-site lake copy keeps its own short expiry
 
 `ERASURE_VERIFY_STORAGE` (stack 22 `erasure_verify_storage`) chooses the object
 scan after each erasure request, which runs while the request holds the
-`lakehouse_writer` pool (audit N-1):
+`lakehouse_writer` pool:
 
 | Value | Scope (solution `governance/erasure`) | Used in |
 |---|---|---|
@@ -325,8 +325,7 @@ are deleted explicitly. Periodic verification on top:
 
 ## Alignment with the solution's platform contract
 
-`project-boccob/docs/platform-contract.md` (updated with the solution's audit
-fixes) now describes the platform as deployed. Checked point by point:
+`project-boccob/docs/platform-contract.md` now describes the platform as deployed. Checked point by point:
 
 | Contract | Platform | Status |
 |---|---|---|
@@ -334,12 +333,12 @@ fixes) now describes the platform as deployed. Checked point by point:
 | `TRINO_HOST=trino.<base_domain>`, `TRINO_PORT=443` (through Traefik) | stack 22 `solution_env` | aligned |
 | groups `platform-admin`, `data-engineer`, `analyst`, `pii-reader`, `auditor`, `lakehouse-service`; service-account groups from static file entries, OPA `principals` overlay empty | Keycloak groups synced (five), `lakehouse-service` static only (`trino_service_accounts`; the group sync ignores static-only groups even if a Keycloak group of that name exists) | aligned |
 | `svc-dagster` in `data-engineer`, `pii-reader`, `lakehouse-service`; no person in `lakehouse-service` | stack 21 default | aligned |
-| `PURGE_S3_ACCESS_KEY_ID` / `PURGE_S3_SECRET_ACCESS_KEY`: ListBucket, ListBucketVersions, GetObject, GetObjectVersion, DeleteObject, DeleteObjectVersion on the four lakehouse buckets | S3 user `lakehouse-purge` (`purge_buckets` in `modules/rustfs`: exactly those actions + GetBucketLocation; PutObject is refused [verified on dev]) in Secret `lakehouse-purge-env` (name in `PURGE_CREDENTIALS_SECRET`), attached only by `erasure`, `retention`, `iceberg_maintenance` through their `dagster-k8s/config` tag (audit N-3) | **changed: the solution must add the tag** (see "Purge credential and deletion safety window") |
-| `ERASURE_VERIFY_STORAGE` = `false`/`scoped`/`full` | variable `erasure_verify_storage`: dev `full`, test/prod `scoped` (audit N-1); see "Erasure verification" | aligned |
+| `PURGE_S3_ACCESS_KEY_ID` / `PURGE_S3_SECRET_ACCESS_KEY`: ListBucket, ListBucketVersions, GetObject, GetObjectVersion, DeleteObject, DeleteObjectVersion on the four lakehouse buckets | S3 user `lakehouse-purge` (`purge_buckets` in `modules/rustfs`: exactly those actions + GetBucketLocation; PutObject is refused [verified on dev]) in Secret `lakehouse-purge-env` (name in `PURGE_CREDENTIALS_SECRET`), attached only by `erasure`, `retention`, `iceberg_maintenance` through their `dagster-k8s/config` tag | **changed: the solution must add the tag** (see "Purge credential and deletion safety window") |
+| `ERASURE_VERIFY_STORAGE` = `false`/`scoped`/`full` | variable `erasure_verify_storage`: dev `full`, test/prod `scoped`; see "Erasure verification" | aligned |
 | `LAKEHOUSE_ENV` (only `dev` permits `dbt --full-refresh` of incremental models) | stack 22: `var.environment` (dev/test/prod) | aligned |
 | `NONCURRENT_VERSION_GRACE_DAYS` = the bucket lifecycle's noncurrent expiry | stack 22 from the common variable `lakehouse_noncurrent_version_days` (one value for the lifecycle in stack 12 and the env in stack 22; `environments/<env>/common.tfvars`) | aligned |
 | no object lock on the lakehouse buckets; lifecycle as second line of defence | buckets versioned, no object lock; lifecycle expires noncurrent versions (ops package) | aligned |
-| query text in the audit archive: no keys/CPR from the tooling; ad-hoc literals redacted by the platform | audit sink redaction (H-1) | aligned |
+| query text in the audit archive: no keys/CPR from the tooling; ad-hoc literals redacted by the platform | audit sink redaction | aligned |
 | compute logs to stdout; image contains `dagster-aws`, S3ComputeLogManager allowed | stdout + `S3ComputeLogManager` on bucket `dagster-compute-logs` (own S3 user, not `platform-logs`; dev off until the image with dagster-aws is deployed) | aligned |
 
 Not yet deployed on dev: the solution's new image and bundle (they need the

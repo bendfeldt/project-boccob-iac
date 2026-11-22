@@ -57,7 +57,7 @@ check "kube-apiserver ready" kubectl get --raw /readyz
 check "all nodes Ready" bash -c '! kubectl get nodes --no-headers | grep -v " Ready "'
 # Not a problem (listed as warnings): failed attempts of a Job that later
 # completed; pods EVICTED for node pressure (their controller already replaced
-# them; audit R3-6); failed runs of a CronJob whose most recent run completed.
+# them); failed runs of a CronJob whose most recent run completed.
 failed_pods() {
   local done_jobs cron_ok
   done_jobs="$(kubectl get jobs -A -o json | jq -c '[.items[] | select(any(.status.conditions[]?; .type == "Complete" and .status == "True")) | .metadata.namespace + "/" + .metadata.name]')"

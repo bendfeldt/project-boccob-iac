@@ -15,7 +15,7 @@ the lists below, have the owners confirm or revoke, store the signed result.
 | Break-glass accounts (Keycloak `bootstrap-admin`, RustFS root, OpenBao root) | records of use; rotate after use (`key-rotation.md`) | security officer |
 | OPA role → table/column rules | solution repo policy bundle (`make opa-test` output) | data owner |
 | PolicyExceptions (Kyverno) | `kubectl -n kyverno get policyexceptions.policies.kyverno.io -o yaml` (each has `boccob.io/justification`) | security officer |
-| Dagster UI access (`dagster_ui_groups`, stack 22; test/prod: `platform-admin` only) | members of those Keycloak groups | security officer — **privileged**: a UI user can launch every job with run config and tags, i.e. act as `svc-dagster` (`pii-reader`, `lakehouse-service`) and, through the purge jobs, with the purge credential. The launcher's tag allowlist and admission policies stop arbitrary code (audit R3-1), not misuse of the jobs themselves |
+| Dagster UI access (`dagster_ui_groups`, stack 22; test/prod: `platform-admin` only) | members of those Keycloak groups | security officer — **privileged**: a UI user can launch every job with run config and tags, i.e. act as `svc-dagster` (`pii-reader`, `lakehouse-service`) and, through the purge jobs, with the purge credential. The launcher's tag allowlist and admission policies stop arbitrary code, not misuse of the jobs themselves |
 | Grafana audit instance access | members of the `auditor` group (Keycloak) | DPO |
 
 Evidence: the Kubernetes API, OpenBao and Keycloak event logs in the audit

@@ -123,7 +123,7 @@ variable "resource_quota" {
 }
 
 variable "limit_range" {
-  description = "Default container requests/limits applied per resource when a container does not set it. null = no LimitRange. ephemeral-storage defaults (audit R3-6): a request so that the kubelet evicts the pods that exceed theirs first under node disk pressure, and a limit that stops a runaway writer before it fills the node; workloads that write more (spill, caches) set their own."
+  description = "Default container requests/limits applied per resource when a container does not set it. null = no LimitRange. ephemeral-storage defaults: a request so that the kubelet evicts the pods that exceed theirs first under node disk pressure, and a limit that stops a runaway writer before it fills the node; workloads that write more (spill, caches) set their own."
   type = object({
     default_request = optional(map(string), { cpu = "20m", memory = "64Mi", ephemeral-storage = "64Mi" })
     default_limit   = optional(map(string), { memory = "256Mi", ephemeral-storage = "2Gi" })

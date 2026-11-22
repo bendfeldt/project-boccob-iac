@@ -392,7 +392,7 @@ resource "kubernetes_manifest" "job_secret_guard_binding" {
   }
 }
 
-# Admission guard for every run Job the launcher creates (audit R3-1): exactly the
+# Admission guard for every run Job the launcher creates: exactly the
 # launcher's entrypoint (no command, args `dagster api execute_run|resume_run`),
 # one container from the code location image, no init/ephemeral containers, the
 # label dagster/job equal to the launcher-set DAGSTER_RUN_JOB_NAME, and only the
@@ -554,7 +554,7 @@ resource "helm_release" "this" {
     }
 
     # K8sRunLauncher through the chart's CustomRunLauncher: the chart has no value for
-    # only_allow_user_defined_k8s_config_fields (audit R3-1). The allowlist is what
+    # only_allow_user_defined_k8s_config_fields. The allowlist is what
     # the code location's container context sets plus env_from for the purge tag;
     # a dagster-k8s/config run tag with anything else (command, args, image,
     # labels, init containers, ...) makes the launch fail. Env var names are limited

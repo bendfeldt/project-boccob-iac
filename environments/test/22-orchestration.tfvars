@@ -6,5 +6,5 @@ schedules_enabled = true
 erasure_verify_storage = "scoped"
 # Dagster OSS has no roles: whoever passes the UI login can launch any job with
 # run config and tags, i.e. act with the svc-dagster identity and the purge
-# credential (audit R3-1). Operators only; data engineers use dev.
+# credential. Operators only; data engineers use dev.
 dagster_ui_groups = ["platform-admin"]

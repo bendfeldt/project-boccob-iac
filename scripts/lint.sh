@@ -39,7 +39,7 @@ for d in "${REPO_ROOT}"/stacks/[0-9]*/; do
   fi
 done
 
-step "HA profile: RustFS PodDisruptionBudget (audit L6)"
+step "HA profile: RustFS PodDisruptionBudget"
 # the module enables the chart's PDB whenever RustFS runs distributed (HA); the
 # chart renders it only in distributed mode, so dev (single pod) has none
 if grep -Eq 'pdb[[:space:]]*=[[:space:]]*\{[[:space:]]*create[[:space:]]*=[[:space:]]*var\.distributed' "${REPO_ROOT}/modules/rustfs/main.tf"; then

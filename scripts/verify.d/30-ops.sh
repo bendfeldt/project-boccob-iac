@@ -159,7 +159,7 @@ ops_backup_objects() ( # subshell: a die() in the S3 helpers must not end verify
 )
 check "backup objects in platform-backup (PostgreSQL base backups, OpenBao snapshot < 2h)" ops_backup_objects
 # off-site lake copy: separate target, checked before every run (no object lock,
-# short noncurrent expiry) so that erasure reaches the copy (audit N-2)
+# short noncurrent expiry) so that erasure reaches the copy
 ops_offsite_lake() {
   local job
   job="verify-offsite-lake-$(date +%s)"

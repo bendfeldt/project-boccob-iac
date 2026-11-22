@@ -132,7 +132,7 @@ module "dagster" {
   }
   # the purge credential (s3:DeleteObjectVersion on the lake buckets) is not in
   # lakehouse-env: Secret lakehouse-purge-env (PURGE_CREDENTIALS_SECRET), attached only by
-  # the purge_jobs through their dagster-k8s/config tag; admission-guarded (audit N-3)
+  # the purge_jobs through their dagster-k8s/config tag; admission-guarded
   job_secrets = {
     purge = {
       env = {

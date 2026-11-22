@@ -139,7 +139,7 @@ resource "vault_mount" "transit" {
   description = "Signing keys (cosign) — keys are created non-exportable"
 
   # irreplaceable (all KV secrets incl. the pepper / the CA keys / the cosign key):
-  # a change that forces replacement must fail instead of wiping it (audit R3-3)
+  # a change that forces replacement must fail instead of wiping it
   lifecycle {
     prevent_destroy = true
   }
@@ -153,7 +153,7 @@ resource "vault_transit_secret_backend_key" "cosign" {
   deletion_allowed = false
 
   # irreplaceable (all KV secrets incl. the pepper / the CA keys / the cosign key):
-  # a change that forces replacement must fail instead of wiping it (audit R3-3)
+  # a change that forces replacement must fail instead of wiping it
   lifecycle {
     prevent_destroy = true
   }

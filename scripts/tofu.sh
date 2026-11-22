@@ -73,7 +73,7 @@ unencrypted="" fallback="" enforced=true
 if [[ "${STATE_READ_UNENCRYPTED:-0}" == "1" ]]; then
   # only for moving state between stacks: a plaintext state from the backend would
   # be accepted unauthenticated (no AES-GCM tamper protection), so nothing else
-  # may run with it (audit R3-7)
+  # may run with it
   [[ "$action" == state ]] || die "STATE_READ_UNENCRYPTED=1 is only allowed for 'state' subcommands (pull/push/mv/list), not '${action}': unset STATE_READ_UNENCRYPTED"
   warn "STATE_READ_UNENCRYPTED=1: plaintext state is accepted on READ for this command; writes stay encrypted. Unset it right after the state move."
   enforced=false   # required by OpenTofu for an unencrypted fallback; the primary method still encrypts

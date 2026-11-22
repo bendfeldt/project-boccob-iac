@@ -44,7 +44,7 @@ variable "offsite" {
       that erasure and retention reach the copy. Its target bucket must have NO
       object lock and, if versioned, a lifecycle rule that expires noncurrent
       versions within lake.max_noncurrent_days: every run checks this first and
-      refuses otherwise (audit N-2). Set lake = null to copy backups only.
+      refuses otherwise. Set lake = null to copy backups only.
     endpoint/cidrs/namespaces/port: where the target lives (NetworkPolicy egress);
     the target CA must be in the platform-ca bundle.
   EOT

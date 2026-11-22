@@ -11,7 +11,7 @@ CPR number (DDMMYY-NNNN / DDMMYYNNNN) are replaced in the query text before
 the record is written, so neither an erasure nor an ad-hoc lookup of a person
 puts the identifier into the archive. The query shape stays auditable. With
 AUDIT_FULL_EVENTS=true every string field of the event is redacted the same way
-(preparedQuery, failureInfo messages, plans, ...; audit N-10).
+(preparedQuery, failureInfo messages, plans, ...).
 Python standard library only.
 """
 

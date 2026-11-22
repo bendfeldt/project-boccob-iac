@@ -11,7 +11,7 @@ resource "vault_mount" "kv" {
   description = "Platform secrets (KV v2). Layout: ${var.kv_mount}/<namespace>/<name>"
 
   # irreplaceable (all KV secrets incl. the pepper / the CA keys / the cosign key):
-  # a change that forces replacement must fail instead of wiping it (audit R3-3)
+  # a change that forces replacement must fail instead of wiping it
   lifecycle {
     prevent_destroy = true
   }
@@ -24,7 +24,7 @@ resource "vault_auth_backend" "kubernetes" {
   description = "Workload identity: Kubernetes ServiceAccount tokens"
 
   # irreplaceable (all KV secrets incl. the pepper / the CA keys / the cosign key):
-  # a change that forces replacement must fail instead of wiping it (audit R3-3)
+  # a change that forces replacement must fail instead of wiping it
   lifecycle {
     prevent_destroy = true
   }
@@ -46,7 +46,7 @@ resource "vault_mount" "pki_root" {
   max_lease_ttl_seconds     = var.pki_root_ttl_hours * 3600
 
   # irreplaceable (all KV secrets incl. the pepper / the CA keys / the cosign key):
-  # a change that forces replacement must fail instead of wiping it (audit R3-3)
+  # a change that forces replacement must fail instead of wiping it
   lifecycle {
     prevent_destroy = true
   }
@@ -89,7 +89,7 @@ resource "vault_mount" "pki_int" {
   max_lease_ttl_seconds     = var.pki_intermediate_ttl_hours * 3600
 
   # irreplaceable (all KV secrets incl. the pepper / the CA keys / the cosign key):
-  # a change that forces replacement must fail instead of wiping it (audit R3-3)
+  # a change that forces replacement must fail instead of wiping it
   lifecycle {
     prevent_destroy = true
   }

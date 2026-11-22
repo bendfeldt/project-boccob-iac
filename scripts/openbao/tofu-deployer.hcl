@@ -5,7 +5,7 @@
 #
 # Not granted: any secret value (kv data/metadata), transit encrypt/sign, raft
 # snapshots, seal/unseal, audit devices, token creation for others, sys/raw.
-# PRIVILEGED (audit R3-5): this token can write any ACL policy except its own
+# PRIVILEGED: this token can write any ACL policy except its own
 # and any kubernetes-auth role, so together with Kubernetes access to some
 # ServiceAccount it can grant itself everything, kv/* included. "No secret
 # values" is therefore a guard against accidents and against a leaked token used
@@ -18,7 +18,7 @@
 # --- secrets engines managed as code: kv (v2), pki, pki_int, transit ----------
 # no "delete": disabling a mount destroys everything in it (all KV secrets incl.
 # the pepper, the CA keys, the cosign key); the resources also carry
-# prevent_destroy and deploy.sh refuses such plans (audit R3-3)
+# prevent_destroy and deploy.sh refuses such plans
 path "sys/mounts" {
   capabilities = ["read"]
 }
@@ -98,7 +98,7 @@ path "pki/*" {
 path "pki_int/*" {
   capabilities = ["create", "read", "update", "delete", "list", "sudo"]
 }
-# never delete CA keys, issuers or the root (audit R3-3)
+# never delete CA keys, issuers or the root
 path "pki/root" {
   capabilities = ["deny"]
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Air-gap path for the solution artefacts (audit R3-2): the code location image
+# Air-gap path for the solution artefacts: the code location image
 # and the OPA bundle, by digest, together with their referrers (the cosign
 # signature bundles, attestations).
 #
