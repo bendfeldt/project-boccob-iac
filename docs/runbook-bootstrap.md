@@ -138,12 +138,12 @@ before `make deploy`; its requests are in the OpenBao audit trail.
 Destructive changes are refused twice: `prevent_destroy` on the kv, pki,
 pki_int and transit mounts, the kubernetes auth method, the root CA and the
 cosign key, and `scripts/deploy.sh` refuses any plan that deletes or replaces a
-`vault_*` resource, a CloudNativePG cluster, the RustFS release or a PVC unless
-`ALLOW_DESTROY=<env>` (after a backup and review; audit R3-3).
+`vault_*` resource, a namespace, a CloudNativePG cluster, the RustFS release or a
+PVC unless `ALLOW_DESTROY=<env>` (after a backup and review).
 
 - dev: `scripts/tofu.sh` uses the root token of the init file only to (re)write
   that policy and mint a 1 h, non-renewable `tofu-deployer` token, hands that
-  to OpenTofu and revokes it on exit (`OPENBAO_TOFU_ROOT=1` = old behaviour).
+  to OpenTofu and revokes it on exit.
 - test/prod: root token once at bootstrap: the security officer decrypts it,
   writes the policy and issues the deploy token, then revokes root:
 

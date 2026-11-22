@@ -84,10 +84,9 @@ _bao_call() {
 #   dev -> the root token from the init file is used only here, to (re)write the
 #     policy and mint a short-lived, non-renewable token with it; OpenTofu never
 #     receives the root token. openbao_tofu_token_revoke revokes it afterwards.
-# OPENBAO_TOFU_ROOT=1 restores the old behaviour (root token for OpenTofu).
 _OPENBAO_TOFU_TOKEN=""
 openbao_tofu_token() {
-  if [[ -n "${BAO_TOKEN:-${VAULT_TOKEN:-}}" || "${OPENBAO_TOFU_ROOT:-0}" == "1" ]]; then
+  if [[ -n "${BAO_TOKEN:-${VAULT_TOKEN:-}}" ]]; then
     openbao_export_token
     return 0
   fi

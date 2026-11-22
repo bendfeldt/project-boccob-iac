@@ -41,7 +41,7 @@ case "$(uname -m)" in
   aarch64|arm64) node_arch=arm64 ;;
   *) echo "unsupported node architecture $(uname -m): x64 (x86_64/amd64) or arm64 (aarch64) only" >&2; exit 1 ;;
 esac
-bundle_arch="${K3S_ARCH:-amd64}"   # bundles built before K3S_ARCH existed were amd64
+bundle_arch="${K3S_ARCH:?bundle.env lacks K3S_ARCH}"
 if [[ "$node_arch" != "$bundle_arch" ]]; then
   echo "this node is ${node_arch} but the bundle is for ${bundle_arch}: build it with CLUSTER_ARCH=${node_arch}" >&2; exit 1
 fi
