@@ -73,7 +73,7 @@ variable "keycloak_client_namespaces" {
 }
 
 variable "postgres_backup" {
-  description = "Continuous backup (base backups + WAL, PITR) of keycloak-db to s3://platform-backup/postgres/<cluster>. null = off."
+  description = "Continuous backup (base backups + WAL, PITR) of keycloak-db to s3://platform-backup/postgres/<cluster>-pg<major>. null = off."
   type = object({
     retention_policy = optional(string, "7d")
     schedule         = optional(string, "0 30 1 * * *")

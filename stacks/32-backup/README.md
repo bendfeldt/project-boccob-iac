@@ -2,7 +2,7 @@
 
 | What | How | Where |
 |---|---|---|
-| PostgreSQL (every CNPG cluster) | base backup daily + continuous WAL archive (PITR), gzip, SSE-S3 | `s3://platform-backup/postgres/<cluster>/` — configured on the cluster (`modules/postgres-cluster` `backup`, stack 12 `local.postgres_backup`) |
+| PostgreSQL (every CNPG cluster) | base backup daily + continuous WAL archive (PITR), gzip, SSE-S3 | `s3://platform-backup/postgres/<cluster>-pg<major>/` (one archive per PostgreSQL major version) — configured on the cluster (`modules/postgres-cluster` `backup`, stack 12 `local.postgres_backup`) |
 | OpenBao | raft snapshot CronJob (`openbao_snapshot_schedule`), SSE-S3 | `s3://platform-backup/openbao/raft-<ts>.snap` |
 | Retention | barman `retentionPolicy` (PostgreSQL); S3 lifecycle: snapshots `openbao_snapshot_retention_days`, noncurrent versions `noncurrent_version_retention_days` | bucket `platform-backup` (versioned) |
 | Off-site copy, backups | CronJob `offsite-copy`: `platform-backup` -> `offsite.bucket` (no delete propagation; the target should have versioning + object lock COMPLIANCE) | variable `offsite`, target credentials `kv/backup/offsite-s3`, source user `platform-backup` (own bucket only) |

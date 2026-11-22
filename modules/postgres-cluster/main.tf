@@ -4,6 +4,8 @@ locals {
   tls_name = "${var.name}-server-tls"
   ha       = var.instances > 1
   host     = "${var.name}-rw.${var.namespace}.svc"
+  # PostgreSQL major version of the operand image (".../postgresql:18.7-system-trixie@sha256:.." -> "18")
+  pg_major = regex("postgresql:([0-9]+)", var.image)[0]
 
   spec = merge(
     {
@@ -74,8 +76,12 @@ locals {
         # when backup is added to an existing cluster
         target = "prefer-standby"
         barmanObjectStore = {
-          # barman writes below <destinationPath>/<serverName = cluster name>/
+          # barman writes below <destinationPath>/<serverName>/, one archive per
+          # PostgreSQL major version: a major upgrade (pg_upgrade) starts a new system
+          # with timeline 1, and pre-upgrade backups cannot be replayed into it
+          # (CloudNativePG "Backup and WAL Archive Considerations")
           destinationPath = var.backup.destination_path
+          serverName      = "${var.name}-pg${local.pg_major}"
           endpointURL     = var.backup.endpoint_url
           endpointCA      = { name = var.backup.ca_secret, key = "ca.crt" }
           s3Credentials = {

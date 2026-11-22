@@ -13,7 +13,7 @@ data "kubernetes_config_map_v1" "platform_ca" {
 }
 
 locals {
-  # continuous backup to s3://platform-backup/postgres/<cluster> (ops work
+  # continuous backup to s3://platform-backup/postgres/<cluster>-pg<major> (ops work
   # package, stack 32-backup): credentials + CA Secret are created by stack 12
   postgres_backup = var.postgres_backup == null ? null : {
     destination_path   = "s3://platform-backup/postgres"

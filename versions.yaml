@@ -101,9 +101,10 @@ images:
     tag: 1.30.2
     groups: [foundation]
   postgresql:
-    # "system" flavour = includes barman-cloud for in-tree object-store backups
+    # "system" flavour = includes barman-cloud for in-tree object-store backups.
+    # Major 18: the newest PostgreSQL major CloudNativePG 1.30 supports (15 - 18; 19.0 needs 1.31+)
     source: ghcr.io/cloudnative-pg/postgresql
-    tag: 17.12-system-trixie
+    tag: 18.7-system-trixie
     groups: [foundation]
   rustfs:
     source: docker.io/rustfs/rustfs

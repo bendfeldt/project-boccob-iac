@@ -8,7 +8,7 @@ from its business impact analysis **[manual]**. What the mechanisms give:
 
 | Data | Mechanism | Achievable RPO | Measured restore time |
 |---|---|---|---|
-| PostgreSQL (every CNPG cluster with `backup`) | daily base backup + continuous WAL archive (archive_timeout 5 min), SSE-S3, `s3://platform-backup/postgres/<cluster>/` | minutes | dev: 34 s for keycloak-db (PITR into a scratch cluster) **[verified]** |
+| PostgreSQL (every CNPG cluster with `backup`) | daily base backup + continuous WAL archive (archive_timeout 5 min), SSE-S3, `s3://platform-backup/postgres/<cluster>-pg<major>/` (one archive per PostgreSQL major version) | minutes | dev: 34 s for keycloak-db (PITR into a scratch cluster) **[verified]** |
 | OpenBao | raft snapshot CronJob (`openbao_snapshot_schedule`, default hourly), `s3://platform-backup/openbao/` | schedule interval | snapshot integrity checked by `make restore-test` **[verified]**; full restore **[static]** |
 | Object storage (layer buckets) | Iceberg snapshots (time travel within their expiry); off-site copy of the four lakehouse buckets to their own unlocked target bucket (`offsite.lake`, stack 32; deletions propagated so erasure reaches the copy) and of `platform-backup` to a locked target (`offsite.bucket`); noncurrent versions expire after `lakehouse_noncurrent_version_days` | off-site schedule (default 6 h) | dev: 746 lake objects copied to the stand-in target in 23 s **[verified]**; restore from it **[static]** |
 | Audit trail | Loki (`platform-logs`, versioned) + WORM archive `platform-audit` (daily) | 1 day for the archive | **[verified]** archive written and locked |

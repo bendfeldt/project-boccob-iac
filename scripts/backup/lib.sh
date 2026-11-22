@@ -96,7 +96,7 @@ pg_restore_cluster() {
         name: "origin",
         barmanObjectStore: ($s.spec.backup.barmanObjectStore
           | {destinationPath, endpointURL, endpointCA, s3Credentials, wal: {compression: .wal.compression}}
-          + {serverName: $s.metadata.name})
+          + {serverName: ($s.spec.backup.barmanObjectStore.serverName // $s.metadata.name)})
       }]
     }}' | kubectl apply -f - >/dev/null
   log "restoring ${src} -> ${dst}${target:+ (target time ${target})}"

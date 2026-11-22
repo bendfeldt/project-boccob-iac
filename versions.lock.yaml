@@ -163,11 +163,11 @@ images:
       - foundation
   postgresql:
     source: ghcr.io/cloudnative-pg/postgresql
-    tag: 17.12-system-trixie
-    index_digest: sha256:63a3c8ba02199ccd2fae4b75df5d197366905d41d792354a6eec3bec27eb05ce
+    tag: 18.7-system-trixie
+    index_digest: sha256:b4bbd2e623f1a8833e9a2a4210480ef215b6d13fc0988b06786a778a5c699a20
     digests:
-      amd64: sha256:285b0a7ad41cfc268696658ee11587f0fa1e99289342774335ca17a93acbc883
-      arm64: sha256:5fdb68a52e4bdb350a41200cc03b094a970b1c7e9a6a846087befcea849bdcd1
+      amd64: sha256:252807135e4e824d105f7c8195d675bcec4d2da4f68bbc9aabe72f6a44743d97
+      arm64: sha256:7ce42dca3d8431d25d97714b32422d4f3312105458683e8cc9b27895cc84815c
     groups:
       - foundation
   rustfs:
