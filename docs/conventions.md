@@ -49,8 +49,11 @@ Certificates are only issued for FQDNs under `<base_domain>`, `*.svc`,
 ## 2. Add a module
 
 `modules/<component>/` with `main.tf`, `variables.tf` (every variable described
-and typed), `outputs.tf`, `versions.tf` (providers with `>=` constraints; exact
-pins live in the stacks), `README.md` with a usage example.
+and typed), `versions.tf` (providers with `>=` constraints; exact pins live in
+the stacks); `outputs.tf` only for values a caller uses, `README.md` when the
+usage is not obvious. A component that is one chart used by one stack goes
+straight into that stack (e.g. the operators in `00-bootstrap`, Kyverno in
+`31-policy`), not into a module.
 
 - A module never reads `versions.lock.yaml`; it takes `image` / `chart`
   objects (`module.versions.images["x"]`, `module.versions.charts["x"]`).

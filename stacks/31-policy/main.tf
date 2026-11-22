@@ -46,20 +46,87 @@ module "ns_kyverno" {
   limit_range = {}
 }
 
-module "kyverno" {
-  source    = "../../modules/kyverno"
-  namespace = module.ns_kyverno.name
-  chart     = module.versions.charts["kyverno"]
-  images = {
-    admission  = module.versions.images["kyverno"]
-    pre        = module.versions.images["kyverno-pre"]
-    background = module.versions.images["kyverno-background-controller"]
-    reports    = module.versions.images["kyverno-reports-controller"]
-  }
-  ha                            = var.ha
-  registry_ca_pem               = local.registry_ca_pem
-  background_controller_enabled = var.kyverno_background_controller_enabled
-  resources                     = var.kyverno_resources
+locals {
+  kyverno_image = { for k, key in {
+    admission  = "kyverno"
+    pre        = "kyverno-pre"
+    background = "kyverno-background-controller"
+    reports    = "kyverno-reports-controller"
+    } : k => {
+    registry   = module.versions.images[key].registry
+    repository = module.versions.images[key].repository_path
+    tag        = module.versions.images[key].tag_digest
+  } }
+  kyverno_pdb = { enabled = var.ha, minAvailable = 1 }
+}
+
+resource "helm_release" "kyverno" {
+  name       = "kyverno"
+  namespace  = module.ns_kyverno.name
+  repository = module.versions.charts["kyverno"].repository
+  chart      = module.versions.charts["kyverno"].name
+  version    = module.versions.charts["kyverno"].version
+  timeout    = 600
+  atomic     = true
+
+  values = [yamlencode({
+    crds = {
+      install = true
+      # the CRD migration hook needs the kyverno-cli image and only matters when upgrading from old CRD versions
+      migration = { enabled = false }
+    }
+    # hooks that need extra images (readiness-checker): the webhook
+    # configurations are removed by the admission controller itself on shutdown
+    webhooksCleanup = { enabled = false }
+    config = {
+      webhooks = {
+        # kube-system stays excluded: it holds the k3s system pods the cluster needs to recover
+        namespaceSelector = {
+          matchExpressions = [{
+            key      = "kubernetes.io/metadata.name"
+            operator = "NotIn"
+            values   = ["kube-system"]
+          }]
+        }
+      }
+    }
+    # Kyverno fetches image signatures from the registry and must trust its CA
+    global = { caCertificates = { data = local.registry_ca_pem } }
+    features = {
+      # PolicyExceptions are honoured only from Kyverno's own namespace
+      policyExceptions = { enabled = true, namespace = module.ns_kyverno.name }
+      backgroundScan   = { enabled = true, backgroundScanInterval = "1h" }
+      logging          = { format = "json" }
+    }
+    admissionController = {
+      replicas            = var.ha ? 3 : 1
+      podDisruptionBudget = local.kyverno_pdb
+      initContainer       = { image = local.kyverno_image["pre"] }
+      container = {
+        image     = local.kyverno_image["admission"]
+        resources = var.kyverno_resources["admission"]
+      }
+    }
+    backgroundController = {
+      enabled             = var.kyverno_background_controller_enabled
+      replicas            = var.ha ? 2 : 1
+      podDisruptionBudget = local.kyverno_pdb
+      image               = local.kyverno_image["background"]
+      resources           = var.kyverno_resources["background"]
+    }
+    cleanupController = { enabled = false }
+    reportsController = {
+      replicas            = var.ha ? 2 : 1
+      podDisruptionBudget = local.kyverno_pdb
+      image               = local.kyverno_image["reports"]
+      resources           = var.kyverno_resources["reports"]
+    }
+  })]
+}
+
+moved {
+  from = module.kyverno.helm_release.this
+  to   = helm_release.kyverno
 }
 
 # =============================================================================
@@ -138,7 +205,7 @@ locals {
 
 module "policies" {
   source                = "../../modules/kyverno-policies"
-  namespace             = module.kyverno.namespace
+  namespace             = helm_release.kyverno.namespace
   registry_host         = var.registry_host
   mode                  = var.policy_mode
   failure_policy        = coalesce(var.policy_failure_policy, var.ha ? "Fail" : "Ignore")

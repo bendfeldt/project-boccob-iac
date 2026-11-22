@@ -23,12 +23,17 @@ variable "kyverno_background_controller_enabled" {
 }
 
 variable "kyverno_resources" {
-  description = "Container resources per Kyverno controller (admission, background, reports). null = module defaults (dev sized)."
+  description = "Container resources per Kyverno controller (admission, background, reports); default dev sized."
+  nullable    = false
   type = map(object({
     requests = map(string)
     limits   = map(string)
   }))
-  default = null
+  default = {
+    admission  = { requests = { cpu = "50m", memory = "128Mi" }, limits = { memory = "384Mi" } }
+    background = { requests = { cpu = "20m", memory = "64Mi" }, limits = { memory = "128Mi" } }
+    reports    = { requests = { cpu = "20m", memory = "64Mi" }, limits = { memory = "256Mi" } }
+  }
 }
 
 # --- policies ---------------------------------------------------------------------

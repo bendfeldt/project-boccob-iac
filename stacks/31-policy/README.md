@@ -1,6 +1,6 @@
 # 31-policy
 
-Kyverno (namespace `kyverno`, `modules/kyverno`) and the policy set
+Kyverno (namespace `kyverno`) and the policy set
 (`modules/kyverno-policies`, CEL `ValidatingPolicy` / `ImageValidatingPolicy`):
 
 | Policy | Rule |
