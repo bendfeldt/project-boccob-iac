@@ -549,57 +549,57 @@ binaries:
     extract: syft
     platforms:
       linux/amd64:
-        url: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_linux_amd64.tar.gz
-        file: syft_1.57.1_linux_amd64.tar.gz
-        sha256: bf52519eb57f675d47c07d43213cb6dff6449f3d6d1147ff6701ed91f44eef0c
-        checksums: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_checksums.txt
+        url: https://github.com/anchore/syft/releases/download/v1.57.2/syft_1.57.2_linux_amd64.tar.gz
+        file: syft_1.57.2_linux_amd64.tar.gz
+        sha256: ad92bd3ec1b94a3df01d4d0aec199afa9c42b72e86da436ff5f837914d32706b
+        checksums: https://github.com/anchore/syft/releases/download/v1.57.2/syft_1.57.2_checksums.txt
       linux/arm64:
-        url: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_linux_arm64.tar.gz
-        file: syft_1.57.1_linux_arm64.tar.gz
-        sha256: aa3d3e07344f590bcce8d31043b752daa76c8a56c2aa34ceeee63c6168152582
-        checksums: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_checksums.txt
+        url: https://github.com/anchore/syft/releases/download/v1.57.2/syft_1.57.2_linux_arm64.tar.gz
+        file: syft_1.57.2_linux_arm64.tar.gz
+        sha256: 8efe605309c98798e1ee0cffdcf8c05ca26819b4cd44c0b03650f1e963e9bdb6
+        checksums: https://github.com/anchore/syft/releases/download/v1.57.2/syft_1.57.2_checksums.txt
       darwin/arm64:
-        url: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_darwin_arm64.tar.gz
-        file: syft_1.57.1_darwin_arm64.tar.gz
-        sha256: e0a74a5d2688d1254b4e17b71f068a83215e3625f846265bf6614c7ba06f3a96
-        checksums: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_checksums.txt
+        url: https://github.com/anchore/syft/releases/download/v1.57.2/syft_1.57.2_darwin_arm64.tar.gz
+        file: syft_1.57.2_darwin_arm64.tar.gz
+        sha256: 38afbcc03a9d9afac2d7572432fd2c435e051e03930582ea90f4710ffb515224
+        checksums: https://github.com/anchore/syft/releases/download/v1.57.2/syft_1.57.2_checksums.txt
   oras:
     groups:
       - tools
     extract: oras
     platforms:
       linux/amd64:
-        url: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_linux_amd64.tar.gz
-        file: oras_1.3.6_linux_amd64.tar.gz
-        sha256: 66fb0ad7206f3f6fa77ed5b552049d364ccf4b50b1684554f731f76302b52ca0
-        checksums: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_checksums.txt
+        url: https://github.com/oras-project/oras/releases/download/v1.4.0/oras_1.4.0_linux_amd64.tar.gz
+        file: oras_1.4.0_linux_amd64.tar.gz
+        sha256: d8e1dce2fd8ce996f1d901845b688eb0cf505a6082897606f053825bb47935d1
+        checksums: https://github.com/oras-project/oras/releases/download/v1.4.0/oras_1.4.0_checksums.txt
       linux/arm64:
-        url: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_linux_arm64.tar.gz
-        file: oras_1.3.6_linux_arm64.tar.gz
-        sha256: b84269e78dfc2d5329a4aab373da3200de95e6c138338cf6c66c10c0a3f248c1
-        checksums: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_checksums.txt
+        url: https://github.com/oras-project/oras/releases/download/v1.4.0/oras_1.4.0_linux_arm64.tar.gz
+        file: oras_1.4.0_linux_arm64.tar.gz
+        sha256: 0791fc200831563e498638d30e8ee8aac20ad1da2610760120fe3f770e12a8a4
+        checksums: https://github.com/oras-project/oras/releases/download/v1.4.0/oras_1.4.0_checksums.txt
       darwin/arm64:
-        url: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_darwin_arm64.tar.gz
-        file: oras_1.3.6_darwin_arm64.tar.gz
-        sha256: e2b25a53234e2471c5fc81936f957fa612065ab559c21834c02d8bfbc2f62b30
-        checksums: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_checksums.txt
+        url: https://github.com/oras-project/oras/releases/download/v1.4.0/oras_1.4.0_darwin_arm64.tar.gz
+        file: oras_1.4.0_darwin_arm64.tar.gz
+        sha256: 0a7f499bb28793a97bd0939de8654607e753ff6082fd72697a700868b9cdab53
+        checksums: https://github.com/oras-project/oras/releases/download/v1.4.0/oras_1.4.0_checksums.txt
   tofu:
     groups:
       - tools
     extract: tofu
     platforms:
       linux/amd64:
-        url: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_linux_amd64.tar.gz
-        file: tofu_1.10.6_linux_amd64.tar.gz
-        sha256: b6b46b4fd8dd0b96e624f2a2d5fbc4efae2fc0174529b37292775c847c2e7d2c
-        checksums: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_SHA256SUMS
+        url: https://github.com/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_linux_amd64.tar.gz
+        file: tofu_1.13.9_linux_amd64.tar.gz
+        sha256: b34b327cc1ef07178207b6f2cd1f5276537d3e5b7be316500f6dac50d4c0a857
+        checksums: https://github.com/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_SHA256SUMS
       linux/arm64:
-        url: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_linux_arm64.tar.gz
-        file: tofu_1.10.6_linux_arm64.tar.gz
-        sha256: b2cac25defd5009d644daaadb05f9b9bdc2b4a544d6d7eb05ea41487e0d6c0c3
-        checksums: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_SHA256SUMS
+        url: https://github.com/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_linux_arm64.tar.gz
+        file: tofu_1.13.9_linux_arm64.tar.gz
+        sha256: 5dc196dde75b667e4806d358310ec96742774cd0993c54c1237efee5644b69b8
+        checksums: https://github.com/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_SHA256SUMS
       darwin/arm64:
-        url: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_darwin_arm64.tar.gz
-        file: tofu_1.10.6_darwin_arm64.tar.gz
-        sha256: f5399a1ebca90724fda83d93f8a76790979fadb4d896e2be964efcd7df3c146c
-        checksums: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_SHA256SUMS
+        url: https://github.com/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_darwin_arm64.tar.gz
+        file: tofu_1.13.9_darwin_arm64.tar.gz
+        sha256: 496f4c3064b5c3bff79174b3dae4faaf65a66774eb8e2bf074f895412c5f124f
+        checksums: https://github.com/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_SHA256SUMS

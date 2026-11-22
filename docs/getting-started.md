@@ -368,7 +368,7 @@ yq --version                 # "yq 3.x": the Python yq (jq wrapper)
   `brew uninstall yq` if you had it. `make doctor` tells you which one you have.
 - **OpenTofu, cosign, trivy, syft, oras**: `make tools` installs the pinned, checksum-verified
   darwin/arm64 builds into `~/.cache/boccob/bin`. OpenTofu must be exactly the locked version
-  (the stacks accept 1.10.x; `make doctor` checks it), so it is not taken from Homebrew.
+  (the stacks accept 1.13.x; `make doctor` checks it), so it is not taken from Homebrew.
 - Then `make tools`.
 
 ### C.2 Create the podman machine

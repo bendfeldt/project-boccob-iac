@@ -83,7 +83,7 @@ if command -v openssl >/dev/null 2>&1; then
   else soft "${v}: OpenSSL 3 is the tested one (macOS LibreSSL: brew install openssl@3 and put it first in PATH)"; fi
 fi
 if command -v tofu >/dev/null 2>&1; then
-  # exactly the locked version: the stacks accept 1.10.x only, and every operator of a
+  # exactly the locked version: the stacks accept 1.13.x only, and every operator of a
   # shared state should run the same one
   v="$(tofu version 2>/dev/null | head -1 | sed -E 's/.*v([0-9.]+).*/\1/')"
   want="$(yq -r '.binaries.tofu.platforms[] | .url' "$LOCK_FILE" 2>/dev/null | head -1 | sed -E 's#.*/download/v([0-9.]+)/.*#\1#')"

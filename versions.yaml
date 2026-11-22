@@ -345,39 +345,39 @@ binaries:
     extract: syft
     platforms:
       linux/amd64:
-        url: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_linux_amd64.tar.gz
-        checksums: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_checksums.txt
+        url: https://github.com/anchore/syft/releases/download/v1.57.2/syft_1.57.2_linux_amd64.tar.gz
+        checksums: https://github.com/anchore/syft/releases/download/v1.57.2/syft_1.57.2_checksums.txt
       linux/arm64:
-        url: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_linux_arm64.tar.gz
-        checksums: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_checksums.txt
+        url: https://github.com/anchore/syft/releases/download/v1.57.2/syft_1.57.2_linux_arm64.tar.gz
+        checksums: https://github.com/anchore/syft/releases/download/v1.57.2/syft_1.57.2_checksums.txt
       darwin/arm64:
-        url: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_darwin_arm64.tar.gz
-        checksums: https://github.com/anchore/syft/releases/download/v1.57.1/syft_1.57.1_checksums.txt
+        url: https://github.com/anchore/syft/releases/download/v1.57.2/syft_1.57.2_darwin_arm64.tar.gz
+        checksums: https://github.com/anchore/syft/releases/download/v1.57.2/syft_1.57.2_checksums.txt
   oras:
     # OCI artefacts with referrers (OPA bundle, cosign signature bundles): solution air-gap path
     groups: [tools]
     extract: oras
     platforms:
       linux/amd64:
-        url: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_linux_amd64.tar.gz
-        checksums: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_checksums.txt
+        url: https://github.com/oras-project/oras/releases/download/v1.4.0/oras_1.4.0_linux_amd64.tar.gz
+        checksums: https://github.com/oras-project/oras/releases/download/v1.4.0/oras_1.4.0_checksums.txt
       linux/arm64:
-        url: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_linux_arm64.tar.gz
-        checksums: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_checksums.txt
+        url: https://github.com/oras-project/oras/releases/download/v1.4.0/oras_1.4.0_linux_arm64.tar.gz
+        checksums: https://github.com/oras-project/oras/releases/download/v1.4.0/oras_1.4.0_checksums.txt
       darwin/arm64:
-        url: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_darwin_arm64.tar.gz
-        checksums: https://github.com/oras-project/oras/releases/download/v1.3.6/oras_1.3.6_checksums.txt
+        url: https://github.com/oras-project/oras/releases/download/v1.4.0/oras_1.4.0_darwin_arm64.tar.gz
+        checksums: https://github.com/oras-project/oras/releases/download/v1.4.0/oras_1.4.0_checksums.txt
   tofu:
-    # OpenTofu for the operator machines (stacks require ~> 1.10.0); make tools installs it
+    # OpenTofu for the operator machines (stacks require ~> 1.13.0); make tools installs it
     groups: [tools]
     extract: tofu
     platforms:
       linux/amd64:
-        url: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_linux_amd64.tar.gz
-        checksums: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_SHA256SUMS
+        url: https://github.com/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_linux_amd64.tar.gz
+        checksums: https://github.com/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_SHA256SUMS
       linux/arm64:
-        url: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_linux_arm64.tar.gz
-        checksums: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_SHA256SUMS
+        url: https://github.com/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_linux_arm64.tar.gz
+        checksums: https://github.com/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_SHA256SUMS
       darwin/arm64:
-        url: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_darwin_arm64.tar.gz
-        checksums: https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_SHA256SUMS
+        url: https://github.com/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_darwin_arm64.tar.gz
+        checksums: https://github.com/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_SHA256SUMS
