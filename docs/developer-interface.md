@@ -17,7 +17,9 @@ export BOCCOB_PLATFORM_ENV=~/.boccob/dev/developer.env    # for the solution rep
 ```
 
 `~/.boccob/dev/developer.env` lies outside both checkouts, is mode 0600 and is regenerated on
-every run (do not edit it). Format: plain shell `KEY=value` lines (values contain no spaces or
+every run (do not edit it). It needs stacks up to `20-catalog`; before `22-orchestration` exists it
+warns but still writes the file, so the first solution release can be published
+([getting-started.md](getting-started.md), step 8). Format: plain shell `KEY=value` lines (values contain no spaces or
 quotes). Secret values are never in the file: keys ending in `_FILE` name a 0600 file outside the
 repositories. The key set is exactly the one the solution's platform contract (its
 `docs/platform-contract.md`, section 4) reads:

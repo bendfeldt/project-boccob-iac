@@ -154,7 +154,7 @@ same-namespace allow, so other pods there cannot query OPA [verified by `make ve
   server and run pods; `verifyCertPath` = platform CA). Deliberately **not**
   `platform-logs`: its S3 user also writes Loki's audit tenant and the WORM
   bucket `platform-audit`, and every run pod would hold it. The webserver/daemon
-  image has dagster-aws 0.29.30 [verified]; the code location image has it from
+  image has dagster-aws (0.29.31 with Dagster 1.13.31) [verified]; the code location image has it from
   solution commit 0112d93 on (with an older image the run pods cannot load the
   instance: set `compute_logs_s3 = false` for such an image). dev runs with the
   default `true`. [verified on dev: the user can write its bucket, is refused on
@@ -228,7 +228,7 @@ only to the runs that need it:
   in `lakehouse-env` nor in the code server's container context, so ingestion,
   dbt and every other run start without it.
 - A purge job attaches it with the Dagster K8sRunLauncher's per-job Kubernetes
-  config (pinned dagster-k8s 0.29.30: tag `dagster-k8s/config`,
+  config (dagster-k8s 0.29.31: tag `dagster-k8s/config`,
   `container_config.env_from`, merged DEEP with the code location's container
   context, lists appended). The Secret name is in `PURGE_CREDENTIALS_SECRET`.
   [verified on dev: an `erasure` run launched with the tag got
@@ -302,7 +302,7 @@ part of the yearly DR exercise.
 
 ## Alignment with the solution's platform contract
 
-`project-boccob/docs/platform-contract.md` now describes the platform as deployed. Checked point by point:
+The solution's platform contract (`docs/platform-contract.md` in the solution repository) describes the platform as deployed. Checked point by point:
 
 | Contract | Platform | Status |
 |---|---|---|

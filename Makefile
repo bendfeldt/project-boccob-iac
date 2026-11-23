@@ -21,9 +21,9 @@ help: ## Show this help
 .PHONY: lock tools airgap-mirror airgap-bundle airgap-load airgap-check providers-mirror node-bundle solution-bundle solution-load
 lock: ## Resolve versions.yaml -> versions.lock.yaml (needs internet)
 	$(S)/lock-update.sh
-tools: ## Install pinned tofu/cosign/trivy/syft/oras for this machine (linux amd64/arm64, macOS arm64) into ~/.cache/boccob/bin
+tools: ## Install pinned tofu/helm/cosign/trivy/syft/oras for this machine (linux amd64/arm64, macOS arm64) into ~/.cache/boccob/bin
 	$(S)/tools-install.sh
-airgap-mirror: ## Connected: verify signatures, copy locked images + charts into Zot, scan (GROUPS=.. to limit)
+airgap-mirror: ## Connected: verify signatures, copy locked images + charts into Zot, scan (GROUPS=.. to limit; dev skips the checks)
 	MIRROR_GROUPS=$(GROUPS) $(S)/airgap/mirror.sh sync $(ENV)
 airgap-bundle: ## Connected: verify signatures, export a transferable bundle, scan (BUNDLE=<dir>, TAR=1 for a tarball)
 	MIRROR_GROUPS=$(GROUPS) $(S)/airgap/mirror.sh bundle $(ENV) $(BUNDLE)
@@ -86,7 +86,7 @@ openbao-init: ## Initialise + unseal OpenBao (runs automatically after 10-founda
 	$(S)/openbao/init.sh $(ENV)
 openbao-unseal: ## Unseal OpenBao after a restart
 	$(S)/openbao/init.sh $(ENV) --unseal
-verify: ## Smoke test of cluster + foundation
+verify: ## Smoke test of the whole platform, ~110 checks (VERIFY_RESTORE_TEST=0 skips the restore test)
 	$(S)/verify.sh $(ENV)
 dev-env: ## dev: test users + ~/.boccob/dev/developer.env for the solution repository (docs/developer-interface.md)
 	$(S)/dev/dev-env.sh $(ENV)
@@ -104,7 +104,7 @@ restore-test: ## Restore test: PITR of a database into a scratch cluster + OpenB
 
 # --- quality ----------------------------------------------------------------------
 .PHONY: lint fmt
-lint: ## shellcheck + tofu fmt -check + tofu validate + lock consistency
+lint: ## shellcheck, module unit tests, script self-tests, tofu fmt -check + validate, lock consistency
 	$(S)/lint.sh
 fmt: ## tofu fmt -recursive
 	tofu fmt -recursive .
