@@ -43,7 +43,8 @@ make solution-load   ENV=prod BUNDLE=<dir>                                   # a
 Put the two digest references into `environments/<env>/22-orchestration.tfvars`
 (`dagster_code_location_image`) and `environments/<env>/21-query.tfvars`
 (`opa_bundle_ref`); both variables reject references without `@sha256:`.
-[verified: image `...dagster-code-location@sha256:7bc89ba1...`, bundle `...opa-policy-bundle@sha256:04e694f5...`]
+The first deployment of a new environment and the order of these steps on dev are in
+[getting-started.md](getting-started.md), step 8. [verified on dev: release `0.1.0-417e6de`]
 
 ## Polaris [verified]
 
@@ -154,10 +155,10 @@ same-namespace allow, so other pods there cannot query OPA [verified by `make ve
   `platform-logs`: its S3 user also writes Loki's audit tenant and the WORM
   bucket `platform-audit`, and every run pod would hold it. The webserver/daemon
   image has dagster-aws 0.29.30 [verified]; the code location image has it from
-  solution commit 0112d93 on — the image deployed on dev predates it, so dev
-  keeps `compute_logs_s3 = false` until the next image (with an older image the
-  run pods cannot load the instance). [verified on dev: the user can write its
-  bucket, is refused on `platform-logs`; the bucket expiry rule is active]
+  solution commit 0112d93 on (with an older image the run pods cannot load the
+  instance: set `compute_logs_s3 = false` for such an image). dev runs with the
+  default `true`. [verified on dev: the user can write its bucket, is refused on
+  `platform-logs`; the bucket expiry rule is active]
 
 ### Pseudonymisation pepper
 
@@ -264,14 +265,12 @@ only to the runs that need it:
   themselves; test/prod restrict `dagster_ui_groups` to `platform-admin` and
   the access review treats UI access as privileged.
 
-Solution side (`orchestration/jobs.py`, solution commit 4d79fed): with
-`PURGE_CREDENTIALS_SECRET` set, the jobs `erasure`, `retention` and
-`iceberg_maintenance` carry the tag
+Solution side (`orchestration/jobs.py`): with `PURGE_CREDENTIALS_SECRET` set,
+the jobs `erasure`, `retention` and `iceberg_maintenance` carry the tag
 `{"dagster-k8s/config": {"container_config": {"env_from": [{"secret_ref": {"name": <secret>}}]}}}`
 (the default multiprocess executor runs every op inside the run pod, so no
-step-level config is needed). Until an image with that code is deployed,
-these jobs run without `PURGE_S3_*`: `S3Settings.for_purge()` falls back to the
-ordinary credential and the version deletes fail loudly (AccessDenied) instead
+step-level config is needed). A run without `PURGE_S3_*` falls back to the
+ordinary credential, and the version deletes fail loudly (AccessDenied) instead
 of being skipped. A renamed or additional purge job must be added to
 `purge_jobs`. The run pods' ServiceAccount needs no RBAC on Secrets: `envFrom`
 is resolved by the kubelet; the admission policies above are the gate.
@@ -311,18 +310,15 @@ part of the yearly DR exercise.
 | `TRINO_HOST=trino.<base_domain>`, `TRINO_PORT=443` (through Traefik) | stack 22 `solution_env` | aligned |
 | groups `platform-admin`, `data-engineer`, `analyst`, `pii-reader`, `auditor`, `lakehouse-service`; service-account groups from static file entries, OPA `principals` overlay empty | Keycloak groups synced (five), `lakehouse-service` static only (`trino_service_accounts`; the group sync ignores static-only groups even if a Keycloak group of that name exists) | aligned |
 | `svc-dagster` in `data-engineer`, `pii-reader`, `lakehouse-service`; no person in `lakehouse-service` | stack 21 default | aligned |
-| `PURGE_S3_ACCESS_KEY_ID` / `PURGE_S3_SECRET_ACCESS_KEY`: ListBucket, ListBucketVersions, GetObject, GetObjectVersion, DeleteObject, DeleteObjectVersion on the four lakehouse buckets | S3 user `lakehouse-purge` (`purge_buckets` in `modules/rustfs`: exactly those actions + GetBucketLocation; PutObject is refused [verified on dev]) in Secret `lakehouse-purge-env` (name in `PURGE_CREDENTIALS_SECRET`), attached only by `erasure`, `retention`, `iceberg_maintenance` through their `dagster-k8s/config` tag | **changed: the solution must add the tag** (see "Purge credential and deletion safety window") |
+| `PURGE_S3_ACCESS_KEY_ID` / `PURGE_S3_SECRET_ACCESS_KEY`: ListBucket, ListBucketVersions, GetObject, GetObjectVersion, DeleteObject, DeleteObjectVersion on the four lakehouse buckets | S3 user `lakehouse-purge` (`purge_buckets` in `modules/rustfs`: exactly those actions + GetBucketLocation; PutObject is refused [verified on dev]) in Secret `lakehouse-purge-env` (name in `PURGE_CREDENTIALS_SECRET`), attached only by `erasure`, `retention`, `iceberg_maintenance` through their `dagster-k8s/config` tag | aligned (the solution's `make e2e` checks that only these runs get it) |
 | `LAKEHOUSE_ENV` (only `dev` permits `dbt --full-refresh` of incremental models) | stack 22: `var.environment` (dev/test/prod) | aligned |
 | `NONCURRENT_VERSION_GRACE_DAYS` = the bucket lifecycle's noncurrent expiry | stack 22 from the common variable `lakehouse_noncurrent_version_days` (one value for the lifecycle in stack 12 and the env in stack 22; `environments/<env>/common.tfvars`) | aligned |
 | no object lock on the lakehouse buckets; lifecycle as second line of defence | buckets versioned, no object lock; lifecycle expires noncurrent versions (ops package) | aligned |
 | query text in the audit archive: no keys/CPR from the tooling; ad-hoc literals redacted by the platform | audit sink redaction | aligned |
-| compute logs to stdout; image contains `dagster-aws`, S3ComputeLogManager allowed | stdout + `S3ComputeLogManager` on bucket `dagster-compute-logs` (own S3 user, not `platform-logs`; dev off until the image with dagster-aws is deployed) | aligned |
+| compute logs to stdout; image contains `dagster-aws`, S3ComputeLogManager allowed | stdout + `S3ComputeLogManager` on bucket `dagster-compute-logs` (own S3 user, not `platform-logs`) | aligned |
 
-Not yet deployed on dev: the solution's new image and bundle (they need the
-user's approval before they are published to Zot); dev still runs
-`dagster-code-location@sha256:7bc89ba1…` / `opa-policy-bundle@sha256:04e694f5…`.
-The platform side is already in place, and the old artefacts keep working
-with it (an extra group and extra environment variables are ignored).
+The release deployed on dev is in `environments/dev/21-query.tfvars` and
+`22-orchestration.tfvars` (git history: commits "dev: deploy solution release ...").
 
 ## Registered with the foundation (tfvars of stack 12)
 
@@ -359,13 +355,13 @@ with it (an extra group and extra environment variables are ignored).
 ## Open items
 
 - HA profile (Polaris 2, OPA 2, Trino workers + HPA/KEDA, CNPG 3) validated statically only.
-- Dev: set `compute_logs_s3 = true` with the next code location image (see
-  Dagster above); Dagster UI has no per-group roles.
+- Dagster UI has no per-group roles (anyone allowed in may launch every job).
 - Trino internal TLS and the Dagster plaintext hops (see "TLS exceptions"; CNI encryption recommended).
-- Kyverno policy `verify-solution-image-signatures` (ops package, Audit mode)
-  reports a code-location image as unsigned until it is signed: sign every
-  released artefact with `make sign ENV=<env> REFS=...` (OpenBao transit key;
-  the solution holds no signing key) before switching that policy to Enforce.
+- Kyverno policy `verify-solution-image-signatures` reports a code-location
+  image as unsigned until it is signed (dev: Audit mode, a report only;
+  test/prod: Enforce, the pod is refused): sign every released artefact with
+  `make sign ENV=<env> REFS=...` (OpenBao transit key; the solution holds no
+  signing key).
 - Group sync is a poll (30 s): removing a user from a Keycloak group takes up to
   ~40 s to reach Trino; disabling the user in Keycloak takes effect at the next
   token validation.

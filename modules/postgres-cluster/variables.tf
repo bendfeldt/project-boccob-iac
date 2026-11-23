@@ -116,7 +116,7 @@ variable "kv_path" {
 }
 
 variable "push_store" {
-  description = "ClusterSecretStore with write access to OpenBao."
+  description = "Store with write access to OpenBao (kind: store_kind)."
   type        = string
   default     = "openbao-push"
 }

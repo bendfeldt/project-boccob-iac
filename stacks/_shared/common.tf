@@ -94,9 +94,9 @@ locals {
     # cert-manager ClusterIssuers
     bootstrap_issuer = "bootstrap-ca" # only for OpenBao's own listener certificate
     cluster_issuer   = "openbao-pki"  # everything else
-    # External Secrets ClusterSecretStores
-    secret_store      = "openbao"      # read  kv/*
-    secret_store_push = "openbao-push" # write kv/* (generated secrets)
+    # External Secrets stores: each namespace's own SecretStores (modules/namespace-baseline)
+    secret_store      = "openbao"      # read  kv/<ns>/* + granted paths
+    secret_store_push = "openbao-push" # write kv/<ns>/* (generated secrets)
     kv_mount          = "kv"
     # ConfigMap with the internal CA bundle (key ca.crt); source of truth in
     # platform-system, copied into namespaces by modules/namespace-baseline

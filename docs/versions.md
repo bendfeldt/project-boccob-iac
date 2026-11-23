@@ -71,20 +71,30 @@ binaries:
 - Binary checksums come from the checksum file each upstream release publishes (`checksums:`).
   `k3s-install.sh` has none upstream; its sha256 is that of the download (platform `any`).
 - Cluster binaries (k3s, airgap images) exist for linux/amd64 and linux/arm64; operator tools
-  (cosign, trivy, syft, oras) also for darwin/arm64. `make tools` installs the build of the
-  machine it runs on; `make node-bundle` packs the `linux/<CLUSTER_ARCH>` k3s files, and
-  `host-install.sh` refuses a node of another architecture.
+  (OpenTofu, Helm, cosign, trivy, syft, oras; group `tools`) also for darwin/arm64. `make tools`
+  installs the build of the machine it runs on into `~/.cache/boccob/bin`; `make node-bundle`
+  packs the `linux/<CLUSTER_ARCH>` k3s files, and `host-install.sh` refuses a node of another
+  architecture.
+- `extract:` names the file inside a tarball; `{os}-{arch}` in it is replaced by the platform
+  (Helm's tarballs hold `linux-amd64/helm`, `darwin-arm64/helm`, ...). `make doctor` requires
+  OpenTofu and Helm in exactly the locked versions.
 
-### State of the lock (resolved 2026-11-22)
+### State of the lock (resolved 2026-11-22; Helm added 2026-11-23)
 
 All 40 images publish linux/amd64 **and** linux/arm64; there are no `missing_platforms`. All
 binaries have upstream checksums for every listed platform. Every pin is the newest stable
-upstream release as of 2026-11-22 (k3s: newest minor of the stable channel), with these
-deliberate exceptions:
+upstream release as of 2026-11-22 (k3s: newest minor of the stable channel; Helm 4.3.2, the
+newest stable on 2026-11-23), with these deliberate exceptions:
 
 - `postgresql` is on major 18: CloudNativePG 1.30 (newest stable operator) supports
   PostgreSQL 15 - 18; 19.0 waits for CloudNativePG 1.31. Each major version archives to its
   own Barman path (`<cluster>-pg<major>`, see `modules/postgres-cluster`).
+- Helm 4 (CLI): the scripts use only `helm pull`, `helm push` (OCI), `helm template` and
+  `helm version`, which Helm 4 kept; its breaking changes (renamed `--atomic`/`--force` flags,
+  server-side apply, post-renderer plugins) concern `install`/`upgrade`, which the scripts never
+  call. Releases are installed by the OpenTofu `hashicorp/helm` provider, which embeds its own Helm
+  library and does not use the CLI. Checked: `make lint` (renders a chart), registry htpasswd
+  rendering, `make plan ENV=dev` with no changes on every stack, `make airgap-check`.
 - `zot` also publishes freebsd images in its index; the lock takes the `linux` entries only.
 - `kube-state-metrics` is still not listed (its blobs live on a host the build sandbox cannot
   reach, see `versions.yaml`); it publishes arm64 upstream as well.

@@ -6,34 +6,28 @@ were available).
 
 ## 1. Prerequisites (operator workstation)
 
-podman, skopeo, helm 3.18+, kubectl, jq, yq (python-yq), curl, openssl,
-shellcheck, and `make tools`: OpenTofu (exactly the locked version), cosign,
-trivy, syft, oras, pinned in `versions.lock.yaml`. Air-gapped operator hosts:
-`BUNDLE_DIR=<bundle> make tools` installs them from the air-gap bundle, which
-carries the linux/<CLUSTER_ARCH> builds.
+The same as for dev: [getting-started.md](getting-started.md), step 1 (podman, skopeo, kubectl,
+jq, the Python yq, make, git, curl, openssl, shellcheck; macOS: the `Brewfile`), plus
+`make tools`: OpenTofu and Helm in exactly the locked versions, cosign, trivy, syft and oras,
+pinned in `versions.lock.yaml`. Air-gapped operator hosts: `BUNDLE_DIR=<bundle> make tools`
+installs them from the air-gap bundle, which carries the linux/<CLUSTER_ARCH> builds.
 
 `skopeo` is used for mirroring instead of `podman pull/push` because it copies
 manifests byte-for-byte (`--preserve-digests`); podman re-compresses layers on
 push, which changes digests. Podman remains the container engine.
 
-## 2. dev from scratch [verified]
+## 2. dev [verified]
 
-```
-make cluster-up ENV=dev      # registry + mirror of the "cluster" group + k3s node, ~2 min
-make airgap-mirror ENV=dev   # remaining images + charts into Zot
-make deploy ENV=dev          # 00 -> 10 (+ OpenBao init/unseal) -> 11 -> 12 -> 20 -> 30
-make verify ENV=dev
-```
-
-Local state in `~/.boccob/dev/` (0700): `kubeconfig`, `pki/registry-ca.{crt,key}`,
-`registry/push-password`, `openbao/init.json` (unseal key + root token, dev
-only), `tofu/state-passphrase`. Losing this directory means losing the
-environment: `CONFIRM=dev CLUSTER=1 make destroy ENV=dev` and start again.
+Set up dev with [getting-started.md](getting-started.md). Local state is in `~/.boccob/dev/`
+(0700): `kubeconfig`, `pki/` (registry CA and key, platform CA, trust bundle),
+`registry/push-password`, `openbao/init.json` (unseal key + root token, dev only),
+`tofu/state/` and `tofu/state-passphrase`, `test-users/`, `developer.env`. Losing this directory
+means losing the environment: `CONFIRM=dev CLUSTER=1 make destroy ENV=dev` and start again.
 
 After a host restart: `make cluster-up ENV=dev` (re-creates stale containers
-from their volumes, unseals OpenBao) [verified, happened three times during the build].
+from their volumes, unseals OpenBao) [verified, happened several times during the build].
 
-Sandbox specifics handled automatically in dev only: cgroup v1 host
+Build-machine specifics handled automatically in dev only: cgroup v1 host
 (`fail-cgroupv1=false`), missing `CAP_SYS_RESOURCE`
 (containerd `restrict_oom_score_adj`), absolute kubelet eviction thresholds.
 
@@ -67,8 +61,9 @@ Air-gapped side:
    SHA256SUMS, that the bundle matches `versions.lock.yaml`, and every digest
    after the push. [verified: load path, digest preserved]
 3. `make airgap-check ENV=prod`; `make scan ENV=prod FAIL_ON=CRITICAL`,
-   `make sbom ENV=prod` (Trivy needs its vulnerability DB mirrored:
-   `TRIVY_DB_REPOSITORY`). [verified in dev: scan + SBOM of one image]
+   `make sbom ENV=prod`. Trivy needs its vulnerability DB in Zot: `make trivy-db` on the
+   connected side (`scripts/supply-chain/trivy-db.sh bundle|load` to carry it across); `make scan`
+   finds it there, or takes `TRIVY_DB_REPOSITORY`. [verified in dev: scan + SBOM of one image]
 4. Place the provider mirror at `~/.cache/boccob/tofu-provider-mirror`
    (`scripts/tofu.sh` then uses it instead of registry.opentofu.org).
 
@@ -208,6 +203,6 @@ rotate these and restrict the KV paths.
   revocation of the initial root token.
 - Keycloak: optimised image (read-only root filesystem), user federation.
 - Zot on the registry host for test/prod as a systemd/quadlet unit; registry
-  backup; Trivy DB mirroring.
-- Kyverno admission (digest pinning, signature verification), backups of
-  PostgreSQL / OpenBao raft snapshots / RustFS replication: ops work package.
+  backup.
+- The keyless signer identities in `scripts/supply-chain/signature-policy.yaml`
+  are unverified (section 3).

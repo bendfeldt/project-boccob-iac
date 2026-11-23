@@ -81,12 +81,11 @@ entity's classification (essential / important) **[DPO/legal review]**.
 
 ## 5. Known gaps (technical)
 
-- Grafana and kube-state-metrics are implemented but not deployed in the build
-  sandbox; Job/CronJob failure alerts need kube-state-metrics.
+- Grafana is implemented but not deployed on dev (`grafana_enabled = false`, image
+  size); kube-state-metrics is not mirrored (its blobs are on a host the build machine
+  cannot reach), so Job/CronJob failure alerts are not available yet.
 - Prometheus web endpoint is plain HTTP inside its namespace.
 - HA profile, off-site copy to a real second site (dev copies to a second
   bucket on the same RustFS) and k3s etcd snapshots were not exercised on real hosts.
 - RustFS data volumes and node disks are not encrypted by this repository.
 - MFA is not enforced in the Keycloak realm by default.
-- The data-plane databases (`polaris-db`, `dagster-db`) still need
-  `backup = …` (see `stacks/32-backup/README.md`); `make verify` reports it.

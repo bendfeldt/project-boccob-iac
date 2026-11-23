@@ -37,8 +37,12 @@ kubectl -n platform-system get configmap platform-ca -o jsonpath='{.data.ca\.crt
 mv "${STATE_DIR}/pki/platform-ca.crt.tmp" "${STATE_DIR}/pki/platform-ca.crt"
 
 ns=orchestration
+# The first deployment needs this file before stack 22 exists (the solution publishes its
+# image with the registry settings below): the Dagster keys are fixed names, so write them
+# anyway and only warn. make e2e needs the deployments.
 for d in dagster-code-dagster-user-deployments-lakehouse dagster-dagster-webserver; do
-  kubectl -n "$ns" get deploy "$d" >/dev/null || die "deployment ${ns}/${d} not found (make deploy ENV=${ENV})"
+  kubectl -n "$ns" get deploy "$d" >/dev/null 2>&1 \
+    || warn "deployment ${ns}/${d} not found yet: enough for the solution's make publish; make e2e needs stack 22-orchestration (make deploy ENV=${ENV})"
 done
 
 # exactly the keys of the solution's platform contract (docs/developer-interface.md);

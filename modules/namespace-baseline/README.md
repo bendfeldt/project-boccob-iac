@@ -8,7 +8,7 @@ Creates (or adopts) a namespace with the platform security baseline:
 | Network segmentation | `default-deny` NetworkPolicy for ingress **and** egress, plus explicit allows |
 | Resource governance | optional `ResourceQuota`, `LimitRange` with small container defaults |
 | Trust | optional `platform-ca` ConfigMap (`ca.crt`) with the internal CA bundle |
-| Secrets access | label `boccob.io/secrets-access=true` opts the namespace into the OpenBao ClusterSecretStores |
+| Secrets access | `secrets_access = true`: SecretStores `openbao` (read) and `openbao-push` (write) in the namespace, with ServiceAccounts `eso-read` / `eso-push` and the OpenBao roles `eso-<ns>-read` / `eso-<ns>-push` of stack 11 (label `boccob.io/secrets-access=true`) |
 
 Built-in allows (toggle with variables): DNS egress, same-namespace traffic,
 Kubernetes API egress (`allow_kube_api`), ingress from Traefik

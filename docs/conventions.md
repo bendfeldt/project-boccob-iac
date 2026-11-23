@@ -113,7 +113,7 @@ Solution-repo artefacts (Dagster code-location image, OPA bundle) are pushed to
 registry, CA and push credentials reach the solution through
 [developer-interface.md](developer-interface.md) (`make dev-env`).
 
-Sandbox note: container registries `docker.io`, `quay.io`, `ghcr.io`,
+Build-machine note: container registries `docker.io`, `quay.io`, `ghcr.io`,
 `registry.k8s.io` are reachable from the build machine; other registries
 (e.g. `reg.kyverno.io`, `cgr.dev`) may need an allowlist entry — prefer the
 ghcr.io location of an image.
@@ -169,7 +169,7 @@ resource "vault_kubernetes_auth_backend_role" "x" {
 
 and the namespace must be in `openbao_client_namespaces`
 (`environments/<env>/10-foundation-secrets.tfvars`; the default already lists
-identity, storage, database, catalog, query, orchestration, observability).
+identity, storage, database, catalog, query, orchestration, observability, backup).
 
 Secret isolation (per namespace): `modules/namespace-baseline` creates the
 SecretStores `openbao` (read) and `openbao-push` (write) with their own
@@ -213,7 +213,7 @@ module "polaris_db_credentials" {
 - Network: the client namespace needs an egress rule to `database:5432`, and
   must be listed in `postgres_client_namespaces`
   (`environments/<env>/12-foundation-services.tfvars`; default: identity,
-  catalog, orchestration, observability).
+  catalog, orchestration, observability, backup).
 - Backups (required: `make verify` fails for a cluster without): pass
   `backup = { destination_path = "s3://platform-backup/postgres", endpoint_url = local.platform.s3_url, credentials_secret = "platform-backup-s3", ca_secret = "platform-ca", encryption = "AES256" }`.
   barman writes below `<destination_path>/<cluster name>/`; the Secrets
@@ -239,13 +239,13 @@ buckets), `lakehouse-ingest` (rw raw), `platform-backup` (own bucket only),
 S3 clients: endpoint `https://rustfs-svc.storage.svc:9000`, path-style access,
 region `us-east-1`, CA from `platform-ca`; the namespace must be in
 `s3_client_namespaces` (default: database, secrets, catalog, query,
-orchestration, observability) and have an egress rule to `storage:9000`.
+orchestration, observability, backup) and have an egress rule to `storage:9000`.
 All contract buckets have versioning enabled.
 
 ## 8. Add an OIDC client
 
 In `environments/<env>/13-identity.tfvars` (merged over the built-in
-clients trino, polaris, dagster, grafana, openbao):
+clients trino, polaris, dagster, grafana, grafana-audit, openbao):
 
 ```hcl
 oidc_clients = {
@@ -333,7 +333,7 @@ kube-system has no NetworkPolicies. A new scrape target = a job in
 `stacks/30-observability` (`local.scrape_jobs`) + an ingress opening from
 `observability` in the target namespace.
 
-## 12. Ops hooks for every package
+## 11. Ops hooks for every package
 
 - Logs: everything on stdout is collected. Audit-relevant output is
   classified by namespace + container (+ body regex) in `audit_sources`
@@ -348,7 +348,7 @@ kube-system has no NetworkPolicies. A new scrape target = a job in
 - Optional components an environment does not deploy: put their images in an
   own group and list it in `MIRROR_EXCLUDE_GROUPS` (environments/<env>/env.sh).
 
-## 11. Scripts
+## 12. Scripts
 
 Bash, `set -euo pipefail` through `scripts/lib/common.sh`, shellcheck-clean
 (`make lint`), a Makefile target for every entry point. Use `load_env`,

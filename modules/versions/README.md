@@ -25,7 +25,7 @@ take `image` / `chart` objects as input variables.
 selects the digest of the cluster's node architecture, so a pod spec always
 references exactly the single-platform manifest that was mirrored into Zot
 (`scripts/airgap/mirror.sh` copies per-arch manifests, not whole indexes:
-see docs/versions.md, "Multi-architecture"). `scripts/tofu.sh` sets
+see docs/versions.md, "Mirroring per architecture"). `scripts/tofu.sh` sets
 `TF_VAR_cluster_arch` from `CLUSTER_ARCH` (detected for dev, set in
 `environments/<env>/env.sh` for test/prod). Images without a build for `arch`
 are left out of `images` and listed in the `missing_images` output.

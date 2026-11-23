@@ -1,7 +1,9 @@
 # external-secret
 
 Syncs one OpenBao KV v2 path into a Kubernetes Secret through the
-ClusterSecretStore `openbao`.
+namespace's own SecretStore `openbao` (created by `modules/namespace-baseline`
+with `secrets_access = true`; it reads `kv/<namespace>/*` plus the paths granted
+in stack 11, `namespace_secret_stores`).
 
 ```hcl
 module "trino_oidc" {

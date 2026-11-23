@@ -26,7 +26,7 @@ variable "pod_security_level" {
 }
 
 variable "secrets_access" {
-  description = "Allow ExternalSecrets in this namespace to use the cluster-wide OpenBao ClusterSecretStores (namespace label boccob.io/secrets-access=true)."
+  description = "Create the namespace's own OpenBao SecretStores openbao (read) and openbao-push (write) for External Secrets (namespace label boccob.io/secrets-access=true); stack 11 must list the namespace in namespace_secret_stores."
   type        = bool
   default     = false
 }

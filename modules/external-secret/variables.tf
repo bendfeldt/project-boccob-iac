@@ -26,7 +26,7 @@ variable "refresh_interval" {
 }
 
 variable "store" {
-  description = "ClusterSecretStore with read access to OpenBao."
+  description = "Store with read access to OpenBao (kind: store_kind)."
   type        = string
   default     = "openbao"
 }
