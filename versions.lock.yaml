@@ -603,3 +603,23 @@ binaries:
         file: tofu_1.13.9_darwin_arm64.tar.gz
         sha256: 496f4c3064b5c3bff79174b3dae4faaf65a66774eb8e2bf074f895412c5f124f
         checksums: https://github.com/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_SHA256SUMS
+  helm:
+    groups:
+      - tools
+    extract: '{os}-{arch}/helm'
+    platforms:
+      linux/amd64:
+        url: https://get.helm.sh/helm-v4.3.2-linux-amd64.tar.gz
+        file: helm-v4.3.2-linux-amd64.tar.gz
+        sha256: d1c0278d46beab79582d7e50f5b3dc206944ba8e577cde618513fd07daa53983
+        checksums: https://get.helm.sh/helm-v4.3.2-linux-amd64.tar.gz.sha256sum
+      linux/arm64:
+        url: https://get.helm.sh/helm-v4.3.2-linux-arm64.tar.gz
+        file: helm-v4.3.2-linux-arm64.tar.gz
+        sha256: df31cb61680ef728f82c770e5280dd565617bee6b039d37e85c677288be4bbb0
+        checksums: https://get.helm.sh/helm-v4.3.2-linux-arm64.tar.gz.sha256sum
+      darwin/arm64:
+        url: https://get.helm.sh/helm-v4.3.2-darwin-arm64.tar.gz
+        file: helm-v4.3.2-darwin-arm64.tar.gz
+        sha256: 6f3421de3a8cc2ac578c8cfb33b8edde290dde2871bc1bab12e24f2e5caeaa90
+        checksums: https://get.helm.sh/helm-v4.3.2-darwin-arm64.tar.gz.sha256sum

@@ -60,7 +60,7 @@ if [[ "$os" == "darwin" ]]; then
 fi
 
 section "tools"
-need=(make git curl jq yq openssl helm kubectl skopeo podman)
+need=(make git curl jq yq openssl kubectl skopeo podman)
 [[ "$os" == "linux" ]] && need+=(sysctl)
 for c in "${need[@]}"; do
   if command -v "$c" >/dev/null 2>&1; then ok "${c}: $(command -v "$c")"; else bad "${c} not found"; fi
@@ -82,18 +82,23 @@ if command -v openssl >/dev/null 2>&1; then
   if [[ "$v" == OpenSSL\ 3* ]]; then ok "${v}"
   else soft "${v}: OpenSSL 3 is the tested one (macOS LibreSSL: brew install openssl@3 and put it first in PATH)"; fi
 fi
+# locked_version <binary key> <sed pattern> -> version from the locked download URL
+locked_version() { yq -r --arg k "$1" '.binaries[$k].platforms[] | .url' "$LOCK_FILE" 2>/dev/null | head -1 | sed -E "$2"; }
 if command -v tofu >/dev/null 2>&1; then
   # exactly the locked version: the stacks accept 1.13.x only, and every operator of a
   # shared state should run the same one
   v="$(tofu version 2>/dev/null | head -1 | sed -E 's/.*v([0-9.]+).*/\1/')"
-  want="$(yq -r '.binaries.tofu.platforms[] | .url' "$LOCK_FILE" 2>/dev/null | head -1 | sed -E 's#.*/download/v([0-9.]+)/.*#\1#')"
+  want="$(locked_version tofu 's#.*/download/v([0-9.]+)/.*#\1#')"
   if [[ "$v" == "$want" ]]; then ok "OpenTofu ${v} (locked)"
   else bad "OpenTofu ${v:-?} is not the locked ${want:-?}: make tools (installs it into ${BOCCOB_CACHE_DIR}/bin, first in PATH)"; fi
 else bad "tofu not found: make tools"; fi
 if command -v helm >/dev/null 2>&1; then
+  # exactly the locked version (chart pulls/pushes, make lock): not a system/Homebrew helm
   v="$(helm version --short 2>/dev/null | sed -E 's/^v?([0-9.]+).*/\1/')"
-  if version_ge "$v" 3.8.0; then ok "helm ${v}"; else bad "helm ${v} < 3.8 (OCI support)"; fi
-fi
+  want="$(locked_version helm 's#.*/helm-v([0-9.]+)-.*#\1#')"
+  if [[ "$v" == "$want" ]]; then ok "helm ${v} (locked)"
+  else bad "helm ${v:-?} is not the locked ${want:-?}: make tools (installs it into ${BOCCOB_CACHE_DIR}/bin, first in PATH)"; fi
+else bad "helm not found: make tools"; fi
 for c in cosign trivy syft oras; do
   if command -v "$c" >/dev/null 2>&1; then ok "${c}: $(command -v "$c")"
   else soft "${c} not installed: make tools (needed for signing, scans, solution bundles)"; fi

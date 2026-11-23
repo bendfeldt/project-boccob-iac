@@ -4,7 +4,6 @@
 brew "bash"            # bash >= 4 (macOS ships 3.2)
 brew "make"            # GNU make >= 3.82 (put $(brew --prefix)/opt/make/libexec/gnubin first in PATH)
 brew "podman"          # client + podman machine (rootful VM with the k3s node and Zot)
-brew "helm"
 brew "kubernetes-cli"  # kubectl
 brew "jq"
 brew "python-yq"       # the Python yq (jq syntax); NOT the "yq" formula (Go, mikefarah)

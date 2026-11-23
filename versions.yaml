@@ -384,3 +384,19 @@ binaries:
       darwin/arm64:
         url: https://github.com/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_darwin_arm64.tar.gz
         checksums: https://github.com/opentofu/opentofu/releases/download/v1.13.9/tofu_1.13.9_SHA256SUMS
+  helm:
+    # Helm CLI for the operator machines (chart pulls/pushes, make lock, registry htpasswd);
+    # make tools installs it. The tarball holds <os>-<arch>/helm: `{os}-{arch}` in
+    # `extract` is replaced by the platform (linux-amd64, darwin-arm64, ...).
+    groups: [tools]
+    extract: "{os}-{arch}/helm"
+    platforms:
+      linux/amd64:
+        url: https://get.helm.sh/helm-v4.3.2-linux-amd64.tar.gz
+        checksums: https://get.helm.sh/helm-v4.3.2-linux-amd64.tar.gz.sha256sum
+      linux/arm64:
+        url: https://get.helm.sh/helm-v4.3.2-linux-arm64.tar.gz
+        checksums: https://get.helm.sh/helm-v4.3.2-linux-arm64.tar.gz.sha256sum
+      darwin/arm64:
+        url: https://get.helm.sh/helm-v4.3.2-darwin-arm64.tar.gz
+        checksums: https://get.helm.sh/helm-v4.3.2-darwin-arm64.tar.gz.sha256sum

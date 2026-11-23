@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the pinned operator tools (tofu, cosign, trivy, syft, oras) from
+# Install the pinned operator tools (tofu, helm, cosign, trivy, syft, oras) from
 # versions.lock.yaml into ${BOCCOB_CACHE_DIR}/bin (checksum verified), in the
 # build for THIS machine: linux/amd64 (x64), linux/arm64 or darwin/arm64
 # (Apple Silicon). Other platforms fail with a clear message.
@@ -23,10 +23,14 @@ while read -r key; do
     fetch_verified "$(binary_field "$key" "$p" url)" "$src" "$sum"
   fi
   if [[ -n "$extract" ]]; then
-    tar -xzf "$src" -C "$bin" "$extract"
+    # path inside the tarball; {os}-{arch} = this platform (helm: linux-amd64/helm)
+    extract="${extract//\{os\}-\{arch\}/${p/\//-}}"
+    tmp="$(mktemp -d)"
+    tar -xzf "$src" -C "$tmp" "$extract"
+    install -m 0755 "${tmp}/${extract}" "${bin}/${key}"
+    rm -rf "$tmp"
   else
     install -m 0755 "$src" "${bin}/${key}"
   fi
-  chmod 0755 "${bin}/${extract:-$key}"
-  log "installed ${key} (${p}) -> ${bin}/${extract:-$key}"
+  log "installed ${key} (${p}) -> ${bin}/${key}"
 done < <(lock_keys binaries tools)
