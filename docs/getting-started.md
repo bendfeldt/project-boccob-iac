@@ -397,7 +397,7 @@ A password: `cat ~/.boccob/dev/test-users/alice-admin`.
 ## Step 11. Apply the schema migrations
 
 After deploying a solution release, launch the Dagster job **`migrate`** once: in the Dagster UI,
-Jobs → `migrate` → Materialize. It applies the files in the solution's `transform/migrations/`
+open Jobs → `migrate` and click "Materialize all". It applies the files in the solution's `transform/migrations/`
 (`V0001` to `V0003` today) that the lake has not seen yet. On a new, empty lake they are recorded
 without effect. The jobs `transform`, `erasure` and `retention` also apply pending migrations as
 their first step, so step 12 would do it as well. Why migrations exist: the solution's
