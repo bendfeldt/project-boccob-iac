@@ -33,6 +33,7 @@ exists. Words you do not know are in its glossary.
 - [Step 10. Trust the CA and open the web UIs](#step-10-trust-the-ca-and-open-the-web-uis)
 - [Step 11. Apply the schema migrations](#step-11-apply-the-schema-migrations)
 - [Step 12. Load the demo data and run the end-to-end test](#step-12-load-the-demo-data-and-run-the-end-to-end-test)
+- [Your first run: what to do and what to test](#your-first-run-what-to-do-and-what-to-test)
 - [Step 13. Everyday commands](#step-13-everyday-commands)
 - [Option: a Linux VM you host yourself](#option-a-linux-vm-you-host-yourself)
 - [macOS details](#macos-details)
@@ -424,6 +425,30 @@ partition (a date) and then `transform` in the Dagster UI.
 
 **Success looks like:** `make e2e` ends without a failed check. In Dagster you see the runs and the
 asset graph from `landing/borgerportal/...` to `curated/...`.
+
+## Your first run: what to do and what to test
+
+Work through this list on your first setup and note the result of each line (pass, fail and the
+error). Lines marked **new** have never been run on a real machine of that kind, so they are the
+ones most likely to need a fix.
+
+| # | What to do | Pass when |
+|---|---|---|
+| 1 | Steps 1-3: install, clone `main` of both repositories, `make tools`, `make doctor ENV=dev` | doctor ends with `OK` (warnings are fine, errors are not) |
+| 2 | **New on macOS:** Step 4: `make brew-bundle`, `make machine-init`, `make macos-ports` | `make doctor ENV=dev` reports a rootful machine and the 443 → 8443 redirect active |
+| 3 | Step 5: `make cluster-up ENV=dev` | `kubectl get nodes` shows one node `Ready` |
+| 4 | Step 6: `make airgap-mirror ENV=dev`, then `make airgap-check ENV=dev` | the check reports every locked image and chart present |
+| 5 | **New from an empty machine:** Steps 7-8 in the exact order written (foundation, `make dev-env`, `make publish`, tfvars, deploy all, `make sign`) | every deploy ends without errors; `make verify-solution-signatures` passes |
+| 6 | Step 9: `make verify ENV=dev` | 0 failed |
+| 7 | Step 10: trust the CA, open Dagster, Keycloak and Trino in the browser | **new:** the Keycloak login works in the browser for Dagster and Trino |
+| 8 | Step 11: run the `migrate` job | the run succeeds and lists V0001-V0003 |
+| 9 | Step 12: `make e2e` in the solution repository | 0 failed checks |
+| 10 | Restart your machine (or the podman machine), then `make cluster-up ENV=dev` and `make verify ENV=dev` | the cluster comes back, OpenBao is unsealed, verify passes. Failed pods left from the restart are covered in [Troubleshooting](#troubleshooting) |
+| 11 | `make restore-test ENV=dev` | the PostgreSQL point-in-time restore and the OpenBao snapshot check pass |
+| 12 | In the solution repository: `make lint`, `make test`, and `make integration` if you have 6 GB free disk | all pass |
+
+If a line fails: look it up in [Troubleshooting](#troubleshooting), and write down the exact command,
+the last 20 lines of output and the output of `make doctor ENV=dev`. That is what a maintainer needs.
 
 ## Step 13. Everyday commands
 
