@@ -170,9 +170,8 @@ files of the other.
 mkdir -p ~/src && cd ~/src
 git clone https://github.com/bendfeldt/project-boccob-iac.git   # the platform (this repository)
 git clone https://github.com/bendfeldt/project-boccob.git       # the solution (data code)
-# while the work is not merged yet, use the development branch in both:
-git -C project-boccob-iac checkout claude/determined-lovelace-ugiz1b
-git -C project-boccob     checkout claude/determined-lovelace-ugiz1b
+git -C project-boccob-iac checkout main
+git -C project-boccob     checkout main
 ```
 
 **Success looks like:** `ls ~/src` shows `project-boccob` and `project-boccob-iac`.
